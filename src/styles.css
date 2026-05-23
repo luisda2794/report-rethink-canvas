@@ -4,7 +4,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,600;1,800&family=Syne:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,600;1,800&family=Syne:wght@500;600;700;800&display=swap');
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -51,33 +51,34 @@
 :root {
   --radius: 0.5rem;
 
-  --ink: oklch(0.13 0 0);
-  --electric: oklch(0.93 0.18 102);
-  --surface: oklch(0.16 0 0);
-  --surface-2: oklch(0.20 0 0);
-  --surface-3: oklch(0.25 0 0);
-  --hairline: oklch(1 0 0 / 6%);
-  --muted-text: oklch(0.65 0 0);
-  --success: oklch(0.75 0.16 150);
-  --warn: oklch(0.78 0.14 70);
-  --danger: oklch(0.68 0.20 25);
+  /* Light, clean palette */
+  --ink: oklch(0.18 0.01 260);            /* casi negro azulado para texto */
+  --electric: oklch(0.55 0.20 265);       /* azul/indigo acento */
+  --surface: oklch(0.985 0.003 260);      /* casi blanco */
+  --surface-2: oklch(0.965 0.005 260);    /* gris muy claro */
+  --surface-3: oklch(0.92 0.006 260);     /* gris claro */
+  --hairline: oklch(0.18 0.01 260 / 8%);  /* borde sutil */
+  --muted-text: oklch(0.50 0.01 260);     /* gris medio para texto secundario */
+  --success: oklch(0.62 0.15 150);
+  --warn: oklch(0.70 0.15 70);
+  --danger: oklch(0.60 0.22 25);
 
-  --background: var(--ink);
-  --foreground: oklch(0.96 0 0);
-  --card: var(--surface);
-  --card-foreground: oklch(0.96 0 0);
-  --popover: var(--surface);
-  --popover-foreground: oklch(0.96 0 0);
+  --background: oklch(1 0 0);
+  --foreground: var(--ink);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--ink);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--ink);
   --primary: var(--electric);
-  --primary-foreground: var(--ink);
+  --primary-foreground: oklch(1 0 0);
   --secondary: var(--surface-2);
-  --secondary-foreground: oklch(0.96 0 0);
+  --secondary-foreground: var(--ink);
   --muted: var(--surface-2);
   --muted-foreground: var(--muted-text);
   --accent: var(--electric);
-  --accent-foreground: var(--ink);
+  --accent-foreground: oklch(1 0 0);
   --destructive: var(--danger);
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive-foreground: oklch(1 0 0);
   --border: var(--hairline);
   --input: var(--hairline);
   --ring: var(--electric);
@@ -97,7 +98,7 @@
 
   ::selection {
     background: var(--color-electric);
-    color: var(--color-ink);
+    color: white;
   }
 }
 

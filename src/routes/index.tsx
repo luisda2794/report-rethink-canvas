@@ -125,18 +125,17 @@ function ReportesPage() {
   const descargar = async (id: string) => {
     if (!file) return;
     setStates((s) => ({ ...s, [id]: "loading" }));
-    // Demo timeout — sustituir por llamada real al backend
     await new Promise((r) => setTimeout(r, 1100));
     setStates((s) => ({ ...s, [id]: "done" }));
   };
 
   return (
-    <div className="min-h-screen bg-ink text-foreground font-syne flex">
+    <div className="min-h-screen bg-background text-foreground font-syne flex">
       {/* SIDEBAR */}
-      <aside className="w-20 lg:w-60 border-r border-hairline flex flex-col shrink-0 sticky top-0 h-screen">
+      <aside className="w-20 lg:w-60 border-r border-hairline flex flex-col shrink-0 sticky top-0 h-screen bg-background">
         <div className="p-5">
-          <div className="size-10 bg-electric flex items-center justify-center rounded-sm">
-            <span className="font-playfair italic font-extrabold text-ink text-2xl leading-none">
+          <div className="size-10 bg-electric flex items-center justify-center rounded-md">
+            <span className="font-playfair italic font-extrabold text-white text-2xl leading-none">
               M
             </span>
           </div>
@@ -149,8 +148,8 @@ function ReportesPage() {
               href="#"
               className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors group ${
                 active
-                  ? "bg-white/5 text-electric"
-                  : "text-muted-text hover:text-white hover:bg-white/[0.03]"
+                  ? "bg-electric/10 text-electric"
+                  : "text-muted-text hover:text-ink hover:bg-ink/[0.04]"
               }`}
             >
               <Icon className="size-4 shrink-0" strokeWidth={1.75} />
@@ -167,7 +166,7 @@ function ReportesPage() {
         <div className="p-3 border-t border-hairline">
           <a
             href="#"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-muted-text hover:text-white hover:bg-white/[0.03] transition-colors"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-md text-muted-text hover:text-ink hover:bg-ink/[0.04] transition-colors"
           >
             <Settings className="size-4 shrink-0" strokeWidth={1.75} />
             <span className="hidden lg:block text-sm font-medium">Ajustes</span>
@@ -178,12 +177,12 @@ function ReportesPage() {
       {/* MAIN */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* TOPBAR */}
-        <header className="h-16 border-b border-hairline flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 bg-ink/80 backdrop-blur-md z-40">
+        <header className="h-16 border-b border-hairline flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 bg-background/80 backdrop-blur-md z-40">
           <div className="flex items-center gap-4">
-            <span className="font-playfair italic font-extrabold tracking-tight text-xl">
+            <span className="font-playfair italic font-extrabold tracking-tight text-xl text-ink">
               Men<span className="text-electric">s</span>sajero
             </span>
-            <span className="text-zinc-700">/</span>
+            <span className="text-surface-3">/</span>
             <span className="text-muted-text font-mono text-[11px] tracking-widest uppercase">
               Reportes
             </span>
@@ -192,7 +191,7 @@ function ReportesPage() {
             <span className="font-mono text-[10px] text-muted-text tracking-widest hidden sm:block">
               USER_ID · ZR_09
             </span>
-            <div className="size-8 bg-electric rounded-full flex items-center justify-center text-[11px] font-bold text-ink font-syne">
+            <div className="size-8 bg-electric rounded-full flex items-center justify-center text-[11px] font-bold text-white font-syne">
               ZR
             </div>
           </div>
@@ -209,7 +208,7 @@ function ReportesPage() {
                   <span className="size-1 bg-electric rounded-full" />
                   Centro de operaciones · LOG_ACTIVE
                 </div>
-                <h1 className="text-5xl lg:text-7xl font-syne font-extrabold leading-[0.9] text-white tracking-tighter uppercase text-balance">
+                <h1 className="text-5xl lg:text-7xl font-syne font-extrabold leading-[0.9] text-ink tracking-tighter uppercase text-balance">
                   Inteligencia
                   <br />
                   <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
@@ -241,7 +240,7 @@ function ReportesPage() {
                     className={`group relative border-2 border-dashed transition-colors p-12 flex flex-col items-center justify-center rounded-lg cursor-pointer ${
                       dragOver
                         ? "border-electric bg-electric/[0.04]"
-                        : "border-surface-3 hover:border-electric/50 hover:bg-white/[0.02]"
+                        : "border-surface-3 hover:border-electric/50 hover:bg-ink/[0.02]"
                     }`}
                   >
                     <input
@@ -251,17 +250,17 @@ function ReportesPage() {
                       className="sr-only"
                       onChange={(e) => handleFile(e.target.files?.[0])}
                     />
-                    <div className="size-12 bg-surface rounded flex items-center justify-center mb-4 ring-1 ring-hairline">
+                    <div className="size-12 bg-surface-2 rounded-md flex items-center justify-center mb-4 ring-1 ring-hairline">
                       <Upload className="size-5 text-electric" strokeWidth={1.75} />
                     </div>
-                    <h3 className="font-syne text-lg mb-1.5 text-white">
+                    <h3 className="font-syne text-lg mb-1.5 text-ink">
                       Cargar archivo .xlsx
                     </h3>
                     <p className="text-muted-text text-xs font-mono tracking-widest uppercase">
                       Arrastra o haz click para seleccionar
                     </p>
                     <div className="absolute bottom-3 right-3">
-                      <span className="px-2 py-1 bg-surface text-[9px] font-mono tracking-widest text-muted-text border border-hairline uppercase">
+                      <span className="px-2 py-1 bg-surface-2 text-[9px] font-mono tracking-widest text-muted-text border border-hairline uppercase rounded">
                         IDLE_STATE
                       </span>
                     </div>
@@ -272,19 +271,19 @@ function ReportesPage() {
                       <Check className="size-4 text-electric" strokeWidth={2.5} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm text-white truncate">
+                      <div className="font-mono text-sm text-ink truncate">
                         {file.name}
                       </div>
                       <div className="font-mono text-[10px] text-muted-text tracking-widest uppercase mt-0.5">
                         {formatSize(file.size)} · LISTO PARA PROCESAR
                       </div>
                     </div>
-                    <span className="hidden sm:block px-2 py-1 bg-electric/10 text-electric text-[10px] font-mono border border-electric/20 uppercase tracking-widest">
+                    <span className="hidden sm:block px-2 py-1 bg-electric/10 text-electric text-[10px] font-mono border border-electric/20 uppercase tracking-widest rounded">
                       ACTIVO
                     </span>
                     <button
                       onClick={clearFile}
-                      className="size-8 rounded grid place-items-center text-muted-text hover:text-white hover:bg-white/5 transition-colors"
+                      className="size-8 rounded grid place-items-center text-muted-text hover:text-ink hover:bg-ink/5 transition-colors"
                       aria-label="Quitar archivo"
                     >
                       <X className="size-4" />
@@ -293,7 +292,7 @@ function ReportesPage() {
                 )}
 
                 {error && (
-                  <div className="mt-3 px-4 py-2.5 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs">
+                  <div className="mt-3 px-4 py-2.5 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs rounded-r">
                     {error}
                   </div>
                 )}
@@ -305,7 +304,7 @@ function ReportesPage() {
                   <h2 className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-text">
                     Catálogo de reportes
                   </h2>
-                  <span className="font-mono text-[10px] text-zinc-600 tracking-widest">
+                  <span className="font-mono text-[10px] text-muted-text/70 tracking-widest">
                     {REPORTES.length} DISPONIBLES
                   </span>
                 </div>
@@ -317,18 +316,18 @@ function ReportesPage() {
                     return (
                       <article
                         key={r.id}
-                        className="group flex items-center gap-5 p-5 bg-surface/50 hover:bg-surface border border-hairline transition-colors"
+                        className="group flex items-center gap-5 p-5 bg-surface hover:bg-surface-2 border border-hairline rounded-lg transition-colors"
                       >
                         <div className="font-playfair italic font-extrabold text-electric text-2xl w-14 leading-none">
                           {r.code}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2.5 mb-1">
-                            <h3 className="font-syne font-bold text-[15px] text-white tracking-tight">
+                            <h3 className="font-syne font-bold text-[15px] text-ink tracking-tight">
                               {r.name}
                             </h3>
                             <span
-                              className={`px-1.5 py-0.5 text-[9px] font-mono tracking-widest border ${
+                              className={`px-1.5 py-0.5 text-[9px] font-mono tracking-widest border rounded ${
                                 r.freq === "DIARIO"
                                   ? "bg-electric/10 text-electric border-electric/20"
                                   : "bg-surface-2 text-muted-text border-hairline"
@@ -337,7 +336,7 @@ function ReportesPage() {
                               {r.freq}
                             </span>
                             {r.target && (
-                              <span className="hidden md:inline font-mono text-[9px] text-zinc-600 tracking-widest uppercase">
+                              <span className="hidden md:inline font-mono text-[9px] text-muted-text/70 tracking-widest uppercase">
                                 · {r.target}
                               </span>
                             )}
@@ -349,14 +348,14 @@ function ReportesPage() {
                         <button
                           onClick={() => descargar(r.id)}
                           disabled={disabled}
-                          className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold font-syne tracking-tight transition-all ${
+                          className={`shrink-0 inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold font-syne tracking-tight rounded-md transition-all ${
                             state === "done"
                               ? "bg-success/15 text-success border border-success/30"
                               : state === "loading"
-                                ? "bg-white/5 text-muted-text border border-hairline cursor-wait"
+                                ? "bg-surface-2 text-muted-text border border-hairline cursor-wait"
                                 : r.accent && file
-                                  ? "bg-electric text-ink hover:brightness-110"
-                                  : "bg-white text-ink hover:bg-white/90 disabled:bg-surface-2 disabled:text-zinc-600 disabled:cursor-not-allowed disabled:border disabled:border-hairline"
+                                  ? "bg-electric text-white hover:brightness-110"
+                                  : "bg-ink text-white hover:bg-ink/90 disabled:bg-surface-2 disabled:text-muted-text disabled:cursor-not-allowed disabled:border disabled:border-hairline"
                           }`}
                         >
                           {state === "loading" && (
@@ -379,13 +378,13 @@ function ReportesPage() {
           </div>
 
           {/* RIGHT PANEL */}
-          <aside className="w-96 border-l border-hairline bg-ink p-8 hidden xl:block overflow-y-auto shrink-0">
+          <aside className="w-96 border-l border-hairline bg-surface p-8 hidden xl:block overflow-y-auto shrink-0">
             <div className="space-y-10">
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-6">
                   KPIs · semana actual
                 </div>
-                <div className="grid grid-cols-2 gap-px bg-hairline border border-hairline">
+                <div className="grid grid-cols-2 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
                   <Kpi label="DSR" value="90" suffix="%" tone="success" hint="TGT ≥ 90%" />
                   <Kpi label="CD6" value="99.5" suffix="%" tone="success" hint="TGT ≥ 99.5%" />
                   <Kpi label="CD4" value="Alerta" tone="warn" hint="Preventivo" />
@@ -393,11 +392,11 @@ function ReportesPage() {
                 </div>
               </div>
 
-              <div className="bg-surface border border-hairline p-6">
+              <div className="bg-background border border-hairline p-6 rounded-lg">
                 <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-4">
                   Qué incluye cada reporte
                 </div>
-                <ul className="space-y-3.5 text-[13px] text-zinc-300 leading-relaxed">
+                <ul className="space-y-3.5 text-[13px] text-ink/80 leading-relaxed">
                   <InfoLine code="DSR" text="Tasa de éxito por driver y CP. Solo L–V." dot="success" />
                   <InfoLine code="CD4" text="Paquetes en riesgo antes de D+4." dot="warn" />
                   <InfoLine code="CD6" text="Entregados antes D+6 por CP y repartidor." dot="electric" />
@@ -405,11 +404,11 @@ function ReportesPage() {
                 </ul>
               </div>
 
-              <div className="bg-surface border border-hairline p-6">
+              <div className="bg-background border border-hairline p-6 rounded-lg">
                 <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-4">
                   Protocolo · 3 pasos
                 </div>
-                <ol className="space-y-4 text-[13px] text-zinc-300">
+                <ol className="space-y-4 text-[13px] text-ink/80">
                   <Step n="01" title="Sube tu ePOD" sub="Archivo Excel de Cainiao." />
                   <Step n="02" title="Descarga cada reporte" sub="Un botón por reporte." />
                   <Step n="03" title="Envía a Cainiao" sub="Listos con el formato correcto." />
@@ -439,16 +438,16 @@ function Kpi({
   const toneColor =
     tone === "success" ? "text-success" : tone === "warn" ? "text-warn" : "text-danger";
   return (
-    <div className="bg-ink p-5">
+    <div className="bg-background p-5">
       <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-text mb-3">
         {label}
       </div>
       <div className={`font-mono font-medium tracking-tighter ${toneColor} flex items-baseline gap-0.5`}>
         <span className="text-3xl">{value}</span>
-        {suffix && <span className="text-base text-zinc-600">{suffix}</span>}
+        {suffix && <span className="text-base text-muted-text/70">{suffix}</span>}
       </div>
       {hint && (
-        <div className="font-mono text-[9px] text-zinc-600 tracking-widest uppercase mt-2">
+        <div className="font-mono text-[9px] text-muted-text/70 tracking-widest uppercase mt-2">
           {hint}
         </div>
       )}
@@ -471,7 +470,7 @@ function InfoLine({
     <li className="flex gap-3">
       <span className={`size-1.5 rounded-full ${c} mt-2 shrink-0`} />
       <span>
-        <span className="font-mono text-[11px] tracking-widest text-white mr-2">
+        <span className="font-mono text-[11px] tracking-widest text-ink mr-2">
           {code}
         </span>
         <span className="text-muted-text">{text}</span>
@@ -487,7 +486,7 @@ function Step({ n, title, sub }: { n: string; title: string; sub: string }) {
         {n}
       </span>
       <span>
-        <span className="block text-white font-syne text-sm font-semibold">
+        <span className="block text-ink font-syne text-sm font-semibold">
           {title}
         </span>
         <span className="block text-muted-text text-xs mt-0.5">{sub}</span>
