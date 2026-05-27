@@ -566,8 +566,3 @@ function Td({ children, mono }: { children: React.ReactNode; mono?: boolean }) {
     </td>
   );
 }
-
-function AlertCircleIcon() {
-  return <AlertCircle className="size-3" />;
-}
-void AlertCircleIcon;
