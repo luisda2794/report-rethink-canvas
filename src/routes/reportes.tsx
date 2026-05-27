@@ -214,6 +214,20 @@ function ReportesPage() {
             Reportes
           </span>
         </div>
+        <nav className="flex items-center gap-1">
+          <Link
+            to="/reportes"
+            className="px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded transition-colors"
+          >
+            Reportes
+          </Link>
+          <Link
+            to="/facturacion"
+            className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
+          >
+            Facturación
+          </Link>
+        </nav>
       </header>
 
       {/* CONTENT */}

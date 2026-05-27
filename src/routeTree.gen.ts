@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
+import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ReportesRoute = ReportesRouteImport.update({
   id: '/reportes',
   path: '/reportes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FacturacionRoute = FacturacionRouteImport.update({
+  id: '/facturacion',
+  path: '/facturacion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -25,27 +31,31 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/facturacion': typeof FacturacionRoute
   '/reportes': typeof ReportesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/facturacion': typeof FacturacionRoute
   '/reportes': typeof ReportesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/facturacion': typeof FacturacionRoute
   '/reportes': typeof ReportesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/reportes'
+  fullPaths: '/' | '/facturacion' | '/reportes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/reportes'
-  id: '__root__' | '/' | '/reportes'
+  to: '/' | '/facturacion' | '/reportes'
+  id: '__root__' | '/' | '/facturacion' | '/reportes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  FacturacionRoute: typeof FacturacionRoute
   ReportesRoute: typeof ReportesRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/reportes'
       fullPath: '/reportes'
       preLoaderRoute: typeof ReportesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/facturacion': {
+      id: '/facturacion'
+      path: '/facturacion'
+      fullPath: '/facturacion'
+      preLoaderRoute: typeof FacturacionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  FacturacionRoute: FacturacionRoute,
   ReportesRoute: ReportesRoute,
 }
 export const routeTree = rootRouteImport

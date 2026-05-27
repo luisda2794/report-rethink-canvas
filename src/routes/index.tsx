@@ -58,13 +58,21 @@ function LandingPage() {
               Men<span className="text-electric">s</span>sajero
             </span>
           </div>
-          <Link
-            to="/reportes"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold tracking-tight bg-ink text-white rounded-md hover:bg-ink/90 transition-colors"
-          >
-            Acceder al panel
-            <ArrowRight className="size-3.5" />
-          </Link>
+          <nav className="flex items-center gap-1">
+            <Link
+              to="/facturacion"
+              className="px-3 py-2 text-sm font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
+            >
+              Facturación
+            </Link>
+            <Link
+              to="/reportes"
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold tracking-tight bg-ink text-white rounded-md hover:bg-ink/90 transition-colors"
+            >
+              Reportes
+              <ArrowRight className="size-3.5" />
+            </Link>
+          </nav>
         </div>
       </header>
 
