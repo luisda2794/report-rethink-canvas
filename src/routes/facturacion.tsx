@@ -1,10 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Upload, X, Check, Loader2, ArrowDown, Sparkles } from "lucide-react";
+import { RequireAuth } from "@/components/RequireAuth";
+import { Topbar } from "@/components/Topbar";
 
 export const Route = createFileRoute("/facturacion")({
-  component: FacturacionPage,
+  component: () => (
+    <RequireAuth>
+      <FacturacionPage />
+    </RequireAuth>
+  ),
   head: () => ({
     meta: [
       { title: "Menssajero — Facturación" },
@@ -232,39 +238,7 @@ function FacturacionPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
-      {/* TOPBAR */}
-      <header className="h-16 border-b border-hairline flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 bg-background/80 backdrop-blur-md z-40">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="size-8 bg-electric flex items-center justify-center rounded-md">
-              <span className="font-playfair italic font-extrabold text-white text-lg leading-none">
-                M
-              </span>
-            </div>
-            <span className="font-playfair italic font-extrabold tracking-tight text-lg text-ink">
-              Men<span className="text-electric">s</span>sajero
-            </span>
-          </Link>
-          <span className="text-surface-3">/</span>
-          <span className="text-muted-text font-mono text-[11px] tracking-widest uppercase">
-            Facturación
-          </span>
-        </div>
-        <nav className="flex items-center gap-1">
-          <Link
-            to="/reportes"
-            className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
-          >
-            Reportes
-          </Link>
-          <Link
-            to="/facturacion"
-            className="px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded transition-colors"
-          >
-            Facturación
-          </Link>
-        </nav>
-      </header>
+      <Topbar section="Facturación" />
 
       <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14">
         <div className="max-w-5xl mx-auto">

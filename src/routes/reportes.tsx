@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   Upload,
@@ -8,9 +8,16 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+import { RequireAuth } from "@/components/RequireAuth";
+import { Topbar } from "@/components/Topbar";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/reportes")({
-  component: ReportesPage,
+  component: () => (
+    <RequireAuth>
+      <ReportesPage />
+    </RequireAuth>
+  ),
   head: () => ({
     meta: [
       { title: "Menssajero — Reportes" },
@@ -196,39 +203,7 @@ function ReportesPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
-      {/* TOPBAR */}
-      <header className="h-16 border-b border-hairline flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 bg-background/80 backdrop-blur-md z-40">
-        <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2.5">
-            <div className="size-8 bg-electric flex items-center justify-center rounded-md">
-              <span className="font-playfair italic font-extrabold text-white text-lg leading-none">
-                M
-              </span>
-            </div>
-            <span className="font-playfair italic font-extrabold tracking-tight text-lg text-ink">
-              Men<span className="text-electric">s</span>sajero
-            </span>
-          </Link>
-          <span className="text-surface-3">/</span>
-          <span className="text-muted-text font-mono text-[11px] tracking-widest uppercase">
-            Reportes
-          </span>
-        </div>
-        <nav className="flex items-center gap-1">
-          <Link
-            to="/reportes"
-            className="px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded transition-colors"
-          >
-            Reportes
-          </Link>
-          <Link
-            to="/facturacion"
-            className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
-          >
-            Facturación
-          </Link>
-        </nav>
-      </header>
+      <Topbar section="Reportes" />
 
       {/* CONTENT */}
       <div className="flex-1 flex overflow-hidden">
@@ -248,9 +223,9 @@ function ReportesPage() {
                 </span>
               </h1>
               <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
-                Sube tu ePOD del Hub Zerol una vez y descarga cada reporte por
-                separado, listo para enviar.
+                Sube tu ePOD del Hub <HubLabel /> una vez y descarga cada reporte por separado, listo para enviar.
               </p>
+
             </header>
 
             {/* UPLOAD */}
@@ -515,4 +490,9 @@ function Step({ n, title, sub }: { n: string; title: string; sub: string }) {
       </span>
     </li>
   );
+}
+
+function HubLabel() {
+  const { hub } = useAuth();
+  return <span className="text-ink font-semibold">{hub?.marca ?? "—"}</span>;
 }
