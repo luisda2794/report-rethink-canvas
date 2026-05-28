@@ -1,10 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Upload, X, Check, Loader2, ArrowDown, Sparkles } from "lucide-react";
+import { RequireAuth } from "@/components/RequireAuth";
+import { Topbar } from "@/components/Topbar";
 
 export const Route = createFileRoute("/facturacion")({
-  component: FacturacionPage,
+  component: () => (
+    <RequireAuth>
+      <FacturacionPage />
+    </RequireAuth>
+  ),
   head: () => ({
     meta: [
       { title: "Menssajero — Facturación" },
