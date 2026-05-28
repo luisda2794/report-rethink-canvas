@@ -222,10 +222,8 @@ function ReportesPage() {
                   reportes Cainiao
                 </span>
               </h1>
-              <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
-                Sube tu ePOD del Hub Zerol una vez y descarga cada reporte por
-                separado, listo para enviar.
-              </p>
+              <HubIntro />
+
             </header>
 
             {/* UPLOAD */}
