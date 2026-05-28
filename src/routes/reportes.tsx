@@ -222,7 +222,7 @@ function ReportesPage() {
                   reportes Cainiao
                 </span>
               </h1>
-              <HubIntro />
+              <HubIntroText />
 
             </header>
 
