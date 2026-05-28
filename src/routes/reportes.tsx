@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import {
   Upload,
@@ -8,9 +8,16 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+import { RequireAuth } from "@/components/RequireAuth";
+import { Topbar } from "@/components/Topbar";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/reportes")({
-  component: ReportesPage,
+  component: () => (
+    <RequireAuth>
+      <ReportesPage />
+    </RequireAuth>
+  ),
   head: () => ({
     meta: [
       { title: "Menssajero — Reportes" },
