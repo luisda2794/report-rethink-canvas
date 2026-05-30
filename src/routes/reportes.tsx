@@ -319,76 +319,143 @@ function ReportesPage() {
                 </span>
               </h1>
               <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
-                Sube tu ePOD del Hub <HubLabel /> una vez y descarga cada reporte por separado, listo para enviar.
+                Genera reportes Cainiao desde el ePOD del Hub <HubLabel />. Por defecto leemos los datos
+                ya cargados en{" "}
+                <Link to="/epod" className="text-electric hover:underline">
+                  /epod
+                </Link>
+                .
               </p>
 
             </header>
 
-            {/* UPLOAD */}
-            <section className="mb-12 animate-fade-up" style={{ animationDelay: "60ms" }}>
-              {!file ? (
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOver(false);
-                    handleFile(e.dataTransfer.files?.[0]);
-                  }}
-                  onClick={() => inputRef.current?.click()}
-                  className={`group relative border-2 border-dashed transition-colors p-10 flex flex-col items-center justify-center rounded-lg cursor-pointer ${
-                    dragOver
-                      ? "border-electric bg-electric/[0.04]"
-                      : "border-surface-3 hover:border-electric/50 hover:bg-ink/[0.02]"
-                  }`}
-                >
+            {/* MODE BAR */}
+            <section className="mb-6 animate-fade-up" style={{ animationDelay: "40ms" }}>
+              <div className="flex flex-wrap items-center gap-4 p-4 bg-surface border border-hairline rounded-lg">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
-                    ref={inputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="sr-only"
-                    onChange={(e) => handleFile(e.target.files?.[0])}
+                    type="checkbox"
+                    className="size-4 accent-electric"
+                    checked={useStored}
+                    onChange={(e) => {
+                      setUseStored(e.target.checked);
+                      setStates({});
+                    }}
                   />
-                  <div className="size-12 bg-surface-2 rounded-md flex items-center justify-center mb-4 ring-1 ring-hairline">
-                    <Upload className="size-5 text-electric" strokeWidth={1.75} />
+                  <span className="font-mono text-[11px] tracking-widest uppercase text-ink inline-flex items-center gap-1.5">
+                    <Database className="size-3.5 text-electric" />
+                    Usar datos guardados
+                  </span>
+                  {storedCount != null && (
+                    <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text">
+                      ({storedCount.toLocaleString("es-ES")} entregas)
+                    </span>
+                  )}
+                </label>
+                {useStored && (
+                  <div className="flex items-center gap-2 ml-auto">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted-text">
+                      Período
+                    </span>
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => {
+                        setFromDate(e.target.value);
+                        setStates({});
+                      }}
+                      className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
+                    />
+                    <span className="text-muted-text">—</span>
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => {
+                        setToDate(e.target.value);
+                        setStates({});
+                      }}
+                      className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
+                    />
                   </div>
-                  <h3 className="font-syne text-lg mb-1.5 text-ink">
-                    Cargar archivo ePOD .xlsx
-                  </h3>
-                  <p className="text-muted-text text-xs font-mono tracking-widest uppercase">
-                    Arrastra o haz click para seleccionar
-                  </p>
-                </div>
-              ) : (
-                <div className="flex items-center gap-4 p-5 bg-surface border border-hairline rounded-lg">
-                  <div className="size-10 bg-electric/10 border border-electric/30 rounded flex items-center justify-center shrink-0">
-                    <Check className="size-4 text-electric" strokeWidth={2.5} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-mono text-sm text-ink truncate">{file.name}</div>
-                    <div className="font-mono text-[10px] text-muted-text tracking-widest uppercase mt-0.5">
-                      {formatSize(file.size)} · LISTO PARA PROCESAR
-                    </div>
-                  </div>
-                  <button
-                    onClick={clearFile}
-                    className="size-8 rounded grid place-items-center text-muted-text hover:text-ink hover:bg-ink/5 transition-colors"
-                    aria-label="Quitar archivo"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-              )}
-
-              {error && (
-                <div className="mt-3 px-4 py-2.5 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs rounded-r">
-                  {error}
+                )}
+              </div>
+              {useStored && storedCount === 0 && (
+                <div className="mt-3 px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r flex items-center gap-2">
+                  <AlertCircle className="size-3.5" />
+                  Aún no hay entregas para este hub. Sube un ePOD desde{" "}
+                  <Link to="/epod" className="underline">/epod</Link>.
                 </div>
               )}
             </section>
+
+            {/* UPLOAD (fallback) */}
+            {!useStored && (
+              <section className="mb-12 animate-fade-up" style={{ animationDelay: "60ms" }}>
+                {!file ? (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      handleFile(e.dataTransfer.files?.[0]);
+                    }}
+                    onClick={() => inputRef.current?.click()}
+                    className={`group relative border-2 border-dashed transition-colors p-10 flex flex-col items-center justify-center rounded-lg cursor-pointer ${
+                      dragOver
+                        ? "border-electric bg-electric/[0.04]"
+                        : "border-surface-3 hover:border-electric/50 hover:bg-ink/[0.02]"
+                    }`}
+                  >
+                    <input
+                      ref={inputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="sr-only"
+                      onChange={(e) => handleFile(e.target.files?.[0])}
+                    />
+                    <div className="size-12 bg-surface-2 rounded-md flex items-center justify-center mb-4 ring-1 ring-hairline">
+                      <Upload className="size-5 text-electric" strokeWidth={1.75} />
+                    </div>
+                    <h3 className="font-syne text-lg mb-1.5 text-ink">
+                      Cargar archivo ePOD .xlsx
+                    </h3>
+                    <p className="text-muted-text text-xs font-mono tracking-widest uppercase">
+                      Arrastra o haz click para seleccionar
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4 p-5 bg-surface border border-hairline rounded-lg">
+                    <div className="size-10 bg-electric/10 border border-electric/30 rounded flex items-center justify-center shrink-0">
+                      <Check className="size-4 text-electric" strokeWidth={2.5} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-sm text-ink truncate">{file.name}</div>
+                      <div className="font-mono text-[10px] text-muted-text tracking-widest uppercase mt-0.5">
+                        {formatSize(file.size)} · LISTO PARA PROCESAR
+                      </div>
+                    </div>
+                    <button
+                      onClick={clearFile}
+                      className="size-8 rounded grid place-items-center text-muted-text hover:text-ink hover:bg-ink/5 transition-colors"
+                      aria-label="Quitar archivo"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                )}
+
+                {error && (
+                  <div className="mt-3 px-4 py-2.5 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs rounded-r">
+                    {error}
+                  </div>
+                )}
+              </section>
+            )}
+
 
             {/* TABS */}
             <section className="animate-fade-up" style={{ animationDelay: "120ms" }}>
