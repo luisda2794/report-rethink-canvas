@@ -43,6 +43,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          activo: boolean
           created_at: string
           full_name: string | null
           hub_id: string | null
@@ -50,6 +51,7 @@ export type Database = {
           role: string
         }
         Insert: {
+          activo?: boolean
           created_at?: string
           full_name?: string | null
           hub_id?: string | null
@@ -57,6 +59,7 @@ export type Database = {
           role?: string
         }
         Update: {
+          activo?: boolean
           created_at?: string
           full_name?: string | null
           hub_id?: string | null
