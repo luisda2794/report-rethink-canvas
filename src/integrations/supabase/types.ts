@@ -215,6 +215,62 @@ export type Database = {
           },
         ]
       }
+      entregas: {
+        Row: {
+          cp: string | null
+          created_at: string
+          driver: string | null
+          estado: string
+          fecha: string | null
+          fecha_inbound: string | null
+          hub_id: string
+          id: string
+          lp_no: string
+          source: string | null
+          tipo: string | null
+          updated_at: string
+          waybill: string | null
+        }
+        Insert: {
+          cp?: string | null
+          created_at?: string
+          driver?: string | null
+          estado?: string
+          fecha?: string | null
+          fecha_inbound?: string | null
+          hub_id: string
+          id?: string
+          lp_no: string
+          source?: string | null
+          tipo?: string | null
+          updated_at?: string
+          waybill?: string | null
+        }
+        Update: {
+          cp?: string | null
+          created_at?: string
+          driver?: string | null
+          estado?: string
+          fecha?: string | null
+          fecha_inbound?: string | null
+          hub_id?: string
+          id?: string
+          lp_no?: string
+          source?: string | null
+          tipo?: string | null
+          updated_at?: string
+          waybill?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entregas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       facturas_cainiao: {
         Row: {
           bill_id: string | null
