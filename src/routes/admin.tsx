@@ -942,6 +942,6 @@ function scorePassword(p: string): { bars: number; label: string; color: string 
   if (/\d/.test(p)) score++;
   if (/[^A-Za-z0-9]/.test(p)) score++;
   if (score <= 2) return { bars: 1, label: "Débil", color: "bg-danger" };
-  if (score <= 3) return { bars: 2, label: "Media", color: "bg-warning" };
+  if (score <= 3) return { bars: 2, label: "Media", color: "bg-[#a16207]" };
   return { bars: 3, label: "Fuerte", color: "bg-success" };
 }
