@@ -152,12 +152,20 @@ function ReportesPage() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
+  const { selectedHub } = useAuth();
+
   const descargar = async (r: Reporte) => {
     if (!file) return;
     setStates((s) => ({ ...s, [r.id]: { kind: "loading" } }));
     try {
       const fd = new FormData();
       fd.append("file", file);
+      if (selectedHub) {
+        fd.append("hub_id", selectedHub.id);
+        fd.append("hub_nombre", selectedHub.nombre);
+        fd.append("hub_marca", selectedHub.marca);
+        if (selectedHub.ciudad) fd.append("hub_ciudad", selectedHub.ciudad);
+      }
       const res = await fetch(`${API_BASE}/reporte/${r.id}`, {
         method: "POST",
         body: fd,
