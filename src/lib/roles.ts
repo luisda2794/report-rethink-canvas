@@ -13,6 +13,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 export type NavItem = { to: string; label: string };
 
 export const ALL_NAV: NavItem[] = [
+  { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/reportes", label: "Reportes" },
   { to: "/borradores", label: "Borradores" },
@@ -22,12 +23,13 @@ export const ALL_NAV: NavItem[] = [
 ];
 
 export const ROUTE_ACCESS: Record<Role, string[]> = {
-  admin: ["/dashboard", "/reportes", "/borradores", "/facturacion", "/reclamaciones", "/admin"],
-  manager: ["/dashboard", "/reportes", "/reclamaciones"],
-  jefe_flota: ["/dashboard", "/reportes", "/reclamaciones"],
+  admin: ["/epod", "/dashboard", "/reportes", "/borradores", "/facturacion", "/reclamaciones", "/admin"],
+  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones"],
+  jefe_flota: ["/epod", "/dashboard", "/reportes", "/reclamaciones"],
   contable: ["/borradores", "/facturacion"],
   customer: ["/reclamaciones"],
 };
+
 
 export function navForRole(role: Role | null | undefined): NavItem[] {
   if (!role) return [];
