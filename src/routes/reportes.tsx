@@ -485,7 +485,10 @@ function ReportesPage() {
               <div className="space-y-2">
                 {reportes.map((r) => {
                   const state = states[r.id] ?? { kind: "idle" as const };
-                  const disabled = !file || state.kind === "loading";
+                  const disabled =
+                    (useStored ? !selectedHub || storedCount === 0 : !file) ||
+                    state.kind === "loading";
+
                   return (
                     <article
                       key={r.id}
