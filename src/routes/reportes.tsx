@@ -493,6 +493,6 @@ function Step({ n, title, sub }: { n: string; title: string; sub: string }) {
 }
 
 function HubLabel() {
-  const { hub } = useAuth();
-  return <span className="text-ink font-semibold">{hub?.marca ?? "—"}</span>;
+  const { selectedHub } = useAuth();
+  return <span className="text-ink font-semibold">{selectedHub?.marca ?? "—"}</span>;
 }
