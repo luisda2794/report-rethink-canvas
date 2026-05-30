@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import {
   Upload,
   ArrowDown,
@@ -7,10 +7,13 @@ import {
   Check,
   Loader2,
   AlertCircle,
+  Database,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
