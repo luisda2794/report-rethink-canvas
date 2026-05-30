@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ChevronDown, LogOut } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { navForRole, ROLE_LABEL } from "@/lib/roles";
+import { supabase } from "@/integrations/supabase/client";
 
 export function Topbar({ section }: { section: string }) {
   const { user, profile, role, selectedHub, hubs, signOut, setSelectedHub } = useAuth();
