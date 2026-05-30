@@ -130,13 +130,50 @@ function filenameFromDisposition(header: string | null, fallback: string) {
   }
 }
 
+function isoToday() {
+  return new Date().toISOString().slice(0, 10);
+}
+function isoDaysAgo(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return d.toISOString().slice(0, 10);
+}
+
 function ReportesPage() {
+  const { selectedHub } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<keyof typeof TABS>("carretera");
   const [states, setStates] = useState<Record<string, ReportState>>({});
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const [useStored, setUseStored] = useState<boolean>(true);
+  const [storedCount, setStoredCount] = useState<number | null>(null);
+  const [fromDate, setFromDate] = useState<string>(isoDaysAgo(7));
+  const [toDate, setToDate] = useState<string>(isoToday());
+
+  // Probe entregas count for this hub; default toggle accordingly.
+  useEffect(() => {
+    if (!selectedHub) {
+      setStoredCount(0);
+      setUseStored(false);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { count } = await supabase
+        .from("entregas")
+        .select("id", { count: "exact", head: true })
+        .eq("hub_id", selectedHub.id);
+      if (cancelled) return;
+      setStoredCount(count ?? 0);
+      setUseStored((count ?? 0) > 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedHub?.id]);
 
   const handleFile = (f: File | null | undefined) => {
     if (!f) return;
@@ -155,24 +192,71 @@ function ReportesPage() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const { selectedHub } = useAuth();
+  const fetchEntregas = async () => {
+    if (!selectedHub) return [];
+    const all: Record<string, unknown>[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    for (;;) {
+      const { data, error: qErr } = await supabase
+        .from("entregas")
+        .select(
+          "lp_no, waybill, driver, fecha, fecha_inbound, cp, tipo, tipo_norm, estado, es_aa, direccion, contacto, pop_station_id",
+        )
+        .eq("hub_id", selectedHub.id)
+        .gte("fecha", fromDate)
+        .lte("fecha", toDate)
+        .range(from, from + pageSize - 1);
+      if (qErr) throw qErr;
+      const rows = (data ?? []) as Record<string, unknown>[];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+      from += pageSize;
+    }
+    return all;
+  };
 
   const descargar = async (r: Reporte) => {
-    if (!file) return;
+    if (useStored ? !selectedHub : !file) return;
     setStates((s) => ({ ...s, [r.id]: { kind: "loading" } }));
     try {
-      const fd = new FormData();
-      fd.append("file", file);
-      if (selectedHub) {
-        fd.append("hub_id", selectedHub.id);
-        fd.append("hub_nombre", selectedHub.nombre);
-        fd.append("hub_marca", selectedHub.marca);
-        if (selectedHub.ciudad) fd.append("hub_ciudad", selectedHub.ciudad);
+      let res: Response;
+      if (useStored) {
+        const entregas = await fetchEntregas();
+        if (entregas.length === 0) {
+          setStates((s) => ({
+            ...s,
+            [r.id]: { kind: "error", message: "Sin datos en el período seleccionado" },
+          }));
+          return;
+        }
+        res = await fetch(`${API_BASE}/reporte/${r.id}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            hub: selectedHub!.nombre,
+            hub_id: selectedHub!.id,
+            hub_marca: selectedHub!.marca,
+            hub_ciudad: selectedHub!.ciudad ?? null,
+            fecha_desde: fromDate,
+            fecha_hasta: toDate,
+            entregas,
+          }),
+        });
+      } else {
+        const fd = new FormData();
+        fd.append("file", file!);
+        if (selectedHub) {
+          fd.append("hub_id", selectedHub.id);
+          fd.append("hub_nombre", selectedHub.nombre);
+          fd.append("hub_marca", selectedHub.marca);
+          if (selectedHub.ciudad) fd.append("hub_ciudad", selectedHub.ciudad);
+        }
+        res = await fetch(`${API_BASE}/reporte/${r.id}`, {
+          method: "POST",
+          body: fd,
+        });
       }
-      const res = await fetch(`${API_BASE}/reporte/${r.id}`, {
-        method: "POST",
-        body: fd,
-      });
       if (!res.ok) {
         let msg = `Error ${res.status}`;
         try {
@@ -209,6 +293,7 @@ function ReportesPage() {
       }));
     }
   };
+
 
   const reportes = TABS[tab].reportes;
 
