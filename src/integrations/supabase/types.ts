@@ -217,53 +217,118 @@ export type Database = {
       }
       entregas: {
         Row: {
+          contacto: string | null
           cp: string | null
           created_at: string
+          direccion: string | null
           driver: string | null
+          epod_upload_id: string | null
+          es_aa: boolean
           estado: string
           fecha: string | null
           fecha_inbound: string | null
           hub_id: string
           id: string
           lp_no: string
+          pop_station_id: string | null
           source: string | null
           tipo: string | null
+          tipo_norm: string | null
           updated_at: string
           waybill: string | null
         }
         Insert: {
+          contacto?: string | null
           cp?: string | null
           created_at?: string
+          direccion?: string | null
           driver?: string | null
+          epod_upload_id?: string | null
+          es_aa?: boolean
           estado?: string
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id: string
           id?: string
           lp_no: string
+          pop_station_id?: string | null
           source?: string | null
           tipo?: string | null
+          tipo_norm?: string | null
           updated_at?: string
           waybill?: string | null
         }
         Update: {
+          contacto?: string | null
           cp?: string | null
           created_at?: string
+          direccion?: string | null
           driver?: string | null
+          epod_upload_id?: string | null
+          es_aa?: boolean
           estado?: string
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id?: string
           id?: string
           lp_no?: string
+          pop_station_id?: string | null
           source?: string | null
           tipo?: string | null
+          tipo_norm?: string | null
           updated_at?: string
           waybill?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "entregas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      epod_uploads: {
+        Row: {
+          created_at: string
+          fecha_epod: string | null
+          filename: string
+          hub_id: string
+          id: string
+          procesado: boolean
+          total_duplicados: number
+          total_entregados: number
+          total_paquetes: number
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          fecha_epod?: string | null
+          filename: string
+          hub_id: string
+          id?: string
+          procesado?: boolean
+          total_duplicados?: number
+          total_entregados?: number
+          total_paquetes?: number
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          fecha_epod?: string | null
+          filename?: string
+          hub_id?: string
+          id?: string
+          procesado?: boolean
+          total_duplicados?: number
+          total_entregados?: number
+          total_paquetes?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epod_uploads_hub_id_fkey"
             columns: ["hub_id"]
             isOneToOne: false
             referencedRelation: "hubs"
