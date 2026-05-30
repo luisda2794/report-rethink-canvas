@@ -10,14 +10,22 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
+import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ReportesRoute = ReportesRouteImport.update({
   id: '/reportes',
   path: '/reportes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReclamacionesRoute = ReclamacionesRouteImport.update({
+  id: '/reclamaciones',
+  path: '/reclamaciones',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -28,6 +36,16 @@ const LoginRoute = LoginRouteImport.update({
 const FacturacionRoute = FacturacionRouteImport.update({
   id: '/facturacion',
   path: '/facturacion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BorradoresRoute = BorradoresRouteImport.update({
+  id: '/borradores',
+  path: '/borradores',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -44,38 +62,75 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/borradores': typeof BorradoresRoute
+  '/dashboard': typeof DashboardRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/borradores': typeof BorradoresRoute
+  '/dashboard': typeof DashboardRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/borradores': typeof BorradoresRoute
+  '/dashboard': typeof DashboardRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/facturacion' | '/login' | '/reportes'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/borradores'
+    | '/dashboard'
+    | '/facturacion'
+    | '/login'
+    | '/reclamaciones'
+    | '/reportes'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/facturacion' | '/login' | '/reportes'
-  id: '__root__' | '/' | '/admin' | '/facturacion' | '/login' | '/reportes'
+  to:
+    | '/'
+    | '/admin'
+    | '/borradores'
+    | '/dashboard'
+    | '/facturacion'
+    | '/login'
+    | '/reclamaciones'
+    | '/reportes'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/borradores'
+    | '/dashboard'
+    | '/facturacion'
+    | '/login'
+    | '/reclamaciones'
+    | '/reportes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  BorradoresRoute: typeof BorradoresRoute
+  DashboardRoute: typeof DashboardRoute
   FacturacionRoute: typeof FacturacionRoute
   LoginRoute: typeof LoginRoute
+  ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
 }
 
@@ -86,6 +141,13 @@ declare module '@tanstack/react-router' {
       path: '/reportes'
       fullPath: '/reportes'
       preLoaderRoute: typeof ReportesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reclamaciones': {
+      id: '/reclamaciones'
+      path: '/reclamaciones'
+      fullPath: '/reclamaciones'
+      preLoaderRoute: typeof ReclamacionesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -100,6 +162,20 @@ declare module '@tanstack/react-router' {
       path: '/facturacion'
       fullPath: '/facturacion'
       preLoaderRoute: typeof FacturacionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/borradores': {
+      id: '/borradores'
+      path: '/borradores'
+      fullPath: '/borradores'
+      preLoaderRoute: typeof BorradoresRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -122,10 +198,23 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  BorradoresRoute: BorradoresRoute,
+  DashboardRoute: DashboardRoute,
   FacturacionRoute: FacturacionRoute,
   LoginRoute: LoginRoute,
+  ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
