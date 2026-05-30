@@ -7,7 +7,7 @@ import { Topbar } from "@/components/Topbar";
 
 export const Route = createFileRoute("/facturacion")({
   component: () => (
-    <RequireAuth>
+    <RequireAuth path="/facturacion">
       <FacturacionPage />
     </RequireAuth>
   ),
