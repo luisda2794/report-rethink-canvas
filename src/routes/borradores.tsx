@@ -1,8 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import {
-  Upload,
-  X,
   Check,
   Loader2,
   AlertCircle,
@@ -13,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "sonner";
