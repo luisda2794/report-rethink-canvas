@@ -1,10 +1,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChevronDown, LogOut, Shield } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { navForRole, ROLE_LABEL } from "@/lib/roles";
 
 export function Topbar({ section }: { section: string }) {
-  const { user, profile, hub, hubs, isAdmin, signOut, setActiveHubId } = useAuth();
+  const { user, profile, role, selectedHub, hubs, signOut, setSelectedHub } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [hubOpen, setHubOpen] = useState(false);
@@ -26,12 +27,8 @@ export function Topbar({ section }: { section: string }) {
   };
 
   const displayName = profile?.full_name || user?.email || "Usuario";
-  const initials = displayName
-    .split(/\s+/)
-    .map((s) => s[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+  const initial = (displayName[0] ?? "?").toUpperCase();
+  const navItems = navForRole(role);
 
   return (
     <header className="h-16 border-b border-hairline flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 bg-background/80 backdrop-blur-md z-40">
@@ -51,41 +48,28 @@ export function Topbar({ section }: { section: string }) {
       </div>
 
       <div className="flex items-center gap-2">
-        <nav className="flex items-center gap-1">
-          <Link
-            to="/reportes"
-            className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
-            activeProps={{ className: "px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded" }}
-          >
-            Reportes
-          </Link>
-          <Link
-            to="/facturacion"
-            className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
-            activeProps={{ className: "px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded" }}
-          >
-            Facturación
-          </Link>
-          {isAdmin && (
+        <nav className="hidden md:flex items-center gap-1">
+          {navItems.map((n) => (
             <Link
-              to="/admin"
-              className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors inline-flex items-center gap-1"
-              activeProps={{ className: "px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded inline-flex items-center gap-1" }}
+              key={n.to}
+              to={n.to as "/"}
+              className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
+              activeProps={{ className: "px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded" }}
             >
-              <Shield className="size-3" /> Admin
+              {n.label}
             </Link>
-          )}
+          ))}
         </nav>
 
-        {/* Hub selector (admin) or hub label (operator) */}
-        {isAdmin ? (
+        {/* Hub selector / badge */}
+        {hubs.length > 1 ? (
           <div ref={hubRef} className="relative">
             <button
               onClick={() => setHubOpen((o) => !o)}
               className="hidden md:inline-flex items-center gap-2 px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface border border-hairline rounded hover:bg-surface-2 transition-colors"
             >
               <span className="size-1.5 bg-electric rounded-full" />
-              Hub {hub?.marca ?? "—"}
+              {selectedHub?.marca ?? "Hub"}
               <ChevronDown className="size-3" />
             </button>
             {hubOpen && (
@@ -94,11 +78,11 @@ export function Topbar({ section }: { section: string }) {
                   <button
                     key={h.id}
                     onClick={() => {
-                      setActiveHubId(h.id);
+                      setSelectedHub(h);
                       setHubOpen(false);
                     }}
                     className={`w-full text-left px-4 py-2.5 text-sm font-syne hover:bg-surface-2 transition-colors flex items-center justify-between ${
-                      h.id === hub?.id ? "text-electric font-semibold" : "text-ink"
+                      h.id === selectedHub?.id ? "text-electric font-semibold" : "text-ink"
                     }`}
                   >
                     <span>{h.marca}</span>
@@ -108,20 +92,20 @@ export function Topbar({ section }: { section: string }) {
               </div>
             )}
           </div>
-        ) : hub ? (
+        ) : selectedHub ? (
           <span className="hidden md:inline-flex items-center gap-2 px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface border border-hairline rounded">
             <span className="size-1.5 bg-electric rounded-full" />
-            Hub {hub.marca}
+            {selectedHub.marca}
           </span>
         ) : null}
 
-        {/* User avatar */}
+        {/* Avatar */}
         <div ref={menuRef} className="relative">
           <button
             onClick={() => setMenuOpen((o) => !o)}
-            className="size-9 rounded-full bg-ink text-white font-syne font-bold text-xs flex items-center justify-center hover:brightness-110 transition-all"
+            className="size-9 rounded-full bg-ink text-white font-syne font-bold text-sm flex items-center justify-center hover:brightness-110 transition-all"
           >
-            {initials || "?"}
+            {initial}
           </button>
           {menuOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-background border border-hairline rounded-md shadow-lg overflow-hidden z-50">
@@ -130,6 +114,24 @@ export function Topbar({ section }: { section: string }) {
                 <div className="font-mono text-[10px] text-muted-text uppercase tracking-widest mt-0.5 truncate">
                   {user?.email}
                 </div>
+                {role && (
+                  <div className="font-mono text-[10px] text-electric uppercase tracking-widest mt-1">
+                    {ROLE_LABEL[role]}
+                  </div>
+                )}
+              </div>
+              {/* Mobile nav inside menu */}
+              <div className="md:hidden border-b border-hairline py-1">
+                {navItems.map((n) => (
+                  <Link
+                    key={n.to}
+                    to={n.to as "/"}
+                    onClick={() => setMenuOpen(false)}
+                    className="block px-4 py-2 text-sm font-syne text-ink hover:bg-surface-2"
+                  >
+                    {n.label}
+                  </Link>
+                ))}
               </div>
               <button
                 onClick={handleLogout}

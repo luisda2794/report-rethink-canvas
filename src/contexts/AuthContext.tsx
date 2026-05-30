@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import type { Role } from "@/lib/roles";
 
 export type Hub = {
   id: string;
@@ -14,22 +15,22 @@ export type Profile = {
   id: string;
   hub_id: string | null;
   full_name: string | null;
+  role: Role;
 };
-
-export type Role = "admin" | "operator";
 
 type AuthContextValue = {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
-  hub: Hub | null;
-  hubs: Hub[];
   role: Role | null;
   isAdmin: boolean;
+  hubs: Hub[];
+  selectedHub: Hub | null;
+  setSelectedHub: (hub: Hub) => void;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  setActiveHubId: (id: string) => void;
   refresh: () => Promise<void>;
 };
 
@@ -40,38 +41,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [hubs, setHubs] = useState<Hub[]>([]);
-  const [role, setRole] = useState<Role | null>(null);
-  const [activeHubId, setActiveHubId] = useState<string | null>(null);
+  const [selectedHubId, setSelectedHubId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadAll = async (uid: string) => {
-    const [{ data: prof }, { data: roleRows }, { data: hubRows }] = await Promise.all([
-      supabase.from("profiles").select("id, hub_id, full_name").eq("id", uid).maybeSingle(),
-      supabase.from("user_roles").select("role").eq("user_id", uid),
+    const [profRes, hubsJoinRes, allHubsRes] = await Promise.all([
+      supabase.from("profiles").select("id, hub_id, full_name, role").eq("id", uid).maybeSingle(),
+      supabase.from("usuario_hubs").select("hub:hubs(id, nombre, marca, ciudad, activo)").eq("user_id", uid),
       supabase.from("hubs").select("id, nombre, marca, ciudad, activo").order("marca"),
     ]);
-    setProfile((prof as Profile) ?? null);
-    const roles = (roleRows ?? []).map((r) => r.role as Role);
-    setRole(roles.includes("admin") ? "admin" : roles.includes("operator") ? "operator" : null);
-    setHubs((hubRows as Hub[]) ?? []);
-    setActiveHubId((prev) => prev ?? (prof as Profile | null)?.hub_id ?? null);
+
+    const prof = (profRes.data ?? null) as Profile | null;
+    setProfile(prof);
+
+    // Admins see all hubs; everyone else sees their assigned hubs only
+    if (prof?.role === "admin") {
+      setHubs(((allHubsRes.data ?? []) as Hub[]));
+    } else {
+      const list = (hubsJoinRes.data ?? [])
+        .map((r) => (r as { hub: Hub | null }).hub)
+        .filter((h): h is Hub => !!h);
+      setHubs(list);
+    }
+
+    setSelectedHubId((prev) => {
+      if (prev) return prev;
+      if (prof?.hub_id) return prof.hub_id;
+      const fromList =
+        prof?.role === "admin"
+          ? ((allHubsRes.data ?? [])[0] as Hub | undefined)?.id
+          : ((hubsJoinRes.data ?? [])[0] as { hub: Hub | null } | undefined)?.hub?.id;
+      return fromList ?? null;
+    });
   };
 
   useEffect(() => {
-    // Set up listener first
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
       if (s?.user) {
-        // defer to avoid potential recursion
-        setTimeout(() => {
-          void loadAll(s.user.id);
-        }, 0);
+        setTimeout(() => void loadAll(s.user.id), 0);
       } else {
         setProfile(null);
         setHubs([]);
-        setRole(null);
-        setActiveHubId(null);
+        setSelectedHubId(null);
       }
     });
 
@@ -85,28 +98,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const hub =
-    hubs.find((h) => h.id === activeHubId) ??
-    hubs.find((h) => h.id === profile?.hub_id) ??
-    null;
+  const selectedHub =
+    hubs.find((h) => h.id === selectedHubId) ?? hubs[0] ?? null;
 
   const value: AuthContextValue = {
     user,
     session,
     profile,
-    hub,
+    role: profile?.role ?? null,
+    isAdmin: profile?.role === "admin",
     hubs,
-    role,
-    isAdmin: role === "admin",
+    selectedHub,
+    setSelectedHub: (hub) => setSelectedHubId(hub.id),
     loading,
     signIn: async (email, password) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       return { error: error?.message ?? null };
     },
+    signUp: async (email, password, fullName) => {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+          data: { full_name: fullName },
+        },
+      });
+      return { error: error?.message ?? null };
+    },
     signOut: async () => {
       await supabase.auth.signOut();
     },
-    setActiveHubId: (id) => setActiveHubId(id),
     refresh: async () => {
       if (user) await loadAll(user.id);
     },
