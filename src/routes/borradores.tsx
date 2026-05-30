@@ -448,16 +448,19 @@ function TarifasSection({ hubId }: { hubId: string }) {
 // SECTION 2: GENERADOR
 // ============================================================
 
+function isoToday() { return new Date().toISOString().slice(0, 10); }
+function isoDaysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+
 function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
+  const [fromDate, setFromDate] = useState<string>(isoDaysAgo(7));
+  const [toDate, setToDate] = useState<string>(isoToday());
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<DraftResult[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [tarifasCount, setTarifasCount] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [periodCount, setPeriodCount] = useState<number | null>(null);
 
   useEffect(() => {
     supabase
@@ -467,20 +470,42 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
       .then(({ count }) => setTarifasCount(count ?? 0));
   }, [hubId]);
 
-  const handleFile = (f: File | null | undefined) => {
-    if (!f) return;
-    if (!/\.(xlsx|xls)$/i.test(f.name)) {
-      setError("Por favor sube un archivo Excel (.xlsx)");
-      return;
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { count } = await supabase
+        .from("entregas")
+        .select("id", { count: "exact", head: true })
+        .eq("hub_id", hubId)
+        .gte("fecha", fromDate)
+        .lte("fecha", toDate);
+      if (!cancelled) setPeriodCount(count ?? 0);
+    })();
+    return () => { cancelled = true; };
+  }, [hubId, fromDate, toDate]);
+
+  const fetchEntregas = async (): Promise<EntregaRow[]> => {
+    const all: EntregaRow[] = [];
+    const pageSize = 1000;
+    let from = 0;
+    for (;;) {
+      const { data, error: qErr } = await supabase
+        .from("entregas")
+        .select("driver, fecha, cp, tipo, tipo_norm, es_aa")
+        .eq("hub_id", hubId)
+        .gte("fecha", fromDate)
+        .lte("fecha", toDate)
+        .range(from, from + pageSize - 1);
+      if (qErr) throw qErr;
+      const rows = (data ?? []) as EntregaRow[];
+      all.push(...rows);
+      if (rows.length < pageSize) break;
+      from += pageSize;
     }
-    setError(null);
-    setFile(f);
-    setResults([]);
-    setSavedIds(new Set());
+    return all;
   };
 
   const generate = async () => {
-    if (!file) return;
     setGenerating(true);
     setError(null);
     try {
@@ -497,16 +522,16 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
         precio_pudo: Number(t.precio_pudo),
         precio_aa: Number(t.precio_aa),
       }));
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" });
-      const res = processEpod(rows, tarifas);
+      const rows = await fetchEntregas();
+      const res = processEntregas(rows, tarifas);
+      // Override fecha_desde/hasta with chosen period for consistency
+      for (const r of res) { r.fecha_desde = fromDate; r.fecha_hasta = toDate; }
       setResults(res);
-      if (res.length === 0) toast.warning("No se encontraron entregas en el ePOD");
+      setSavedIds(new Set());
+      if (res.length === 0) toast.warning("No hay entregas en el período seleccionado");
       else toast.success(`${res.length} borrador(es) generados`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error procesando el archivo";
+      const msg = e instanceof Error ? e.message : "Error generando borradores";
       setError(msg);
       toast.error(msg);
     } finally {
@@ -517,8 +542,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
   const toggleExpand = (driver: string) => {
     setExpanded((prev) => {
       const n = new Set(prev);
-      if (n.has(driver)) n.delete(driver);
-      else n.add(driver);
+      if (n.has(driver)) n.delete(driver); else n.add(driver);
       return n;
     });
   };
@@ -539,10 +563,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
       })
       .select("id")
       .single();
-    if (bErr || !b) {
-      toast.error(bErr?.message ?? "Error guardando borrador");
-      return false;
-    }
+    if (bErr || !b) { toast.error(bErr?.message ?? "Error guardando borrador"); return false; }
     const lineas = d.lineas.map((l) => ({
       borrador_id: b.id,
       codigo_postal: l.cp,
@@ -553,10 +574,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
     }));
     if (lineas.length > 0) {
       const { error: lErr } = await supabase.from("borrador_lineas").insert(lineas);
-      if (lErr) {
-        toast.error(lErr.message);
-        return false;
-      }
+      if (lErr) { toast.error(lErr.message); return false; }
     }
     setSavedIds((prev) => new Set(prev).add(d.driver_nombre));
     return true;
@@ -577,7 +595,8 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
 
   const downloadAll = () => results.forEach((d) => exportBorradorExcel(d, hubMarca));
 
-  const canGenerate = !!file && tarifasCount > 0 && !generating;
+  const hasData = (periodCount ?? 0) > 0;
+  const canGenerate = hasData && tarifasCount > 0 && !generating;
 
   return (
     <section className="animate-fade-up">
@@ -586,73 +605,65 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
           Generar borradores
         </h2>
         <p className="text-muted-text text-sm mt-1">
-          Sube el ePOD y genera los borradores por driver automáticamente.
+          Selecciona el período y genera los borradores por driver desde los datos cargados en{" "}
+          <Link to="/epod" className="text-electric hover:underline">/epod</Link>.
         </p>
       </div>
 
-      {!file ? (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOver(false);
-            handleFile(e.dataTransfer.files?.[0]);
-          }}
-          onClick={() => inputRef.current?.click()}
-          className={`group relative border-2 border-dashed transition-colors p-10 flex flex-col items-center justify-center rounded-lg cursor-pointer ${
-            dragOver
-              ? "border-electric bg-electric/[0.04]"
-              : "border-surface-3 hover:border-electric/50 hover:bg-ink/[0.02]"
-          }`}
-        >
+      <div className="p-4 bg-surface border border-hairline rounded-lg flex flex-wrap items-center gap-3">
+        <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text inline-flex items-center gap-1.5">
+          <CalendarIcon className="size-3.5 text-electric" /> Período
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-text">Desde</span>
           <input
-            ref={inputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            className="sr-only"
-            onChange={(e) => handleFile(e.target.files?.[0])}
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
           />
-          <div className="size-12 bg-surface-2 rounded-md flex items-center justify-center mb-4 ring-1 ring-hairline">
-            <Upload className="size-5 text-electric" strokeWidth={1.75} />
-          </div>
-          <h3 className="font-syne text-lg mb-1.5 text-ink">Cargar archivo ePOD .xlsx</h3>
-          <p className="text-muted-text text-xs font-mono tracking-widest uppercase">
-            Arrastra o haz click para seleccionar
-          </p>
         </div>
-      ) : (
-        <div className="flex items-center gap-4 p-5 bg-surface border border-hairline rounded-lg">
-          <div className="size-10 bg-electric/10 border border-electric/30 rounded flex items-center justify-center shrink-0">
-            <Check className="size-4 text-electric" strokeWidth={2.5} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="font-mono text-sm text-ink truncate">{file.name}</div>
-            <div className="font-mono text-[10px] text-muted-text tracking-widest uppercase mt-0.5">
-              LISTO PARA PROCESAR
-            </div>
-          </div>
-          <button
-            onClick={() => {
-              setFile(null);
-              setResults([]);
-              if (inputRef.current) inputRef.current.value = "";
-            }}
-            className="size-8 rounded grid place-items-center text-muted-text hover:text-ink hover:bg-ink/5 transition-colors"
-            aria-label="Quitar archivo"
-          >
-            <X className="size-4" />
-          </button>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-text">Hasta</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
+          />
         </div>
-      )}
+        <button
+          onClick={generate}
+          disabled={!canGenerate}
+          className="ml-auto inline-flex items-center gap-2 px-4 py-2 bg-electric text-white rounded font-mono text-xs tracking-widest uppercase hover:bg-electric/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {generating ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
+          Generar borradores
+        </button>
+      </div>
+
+      {/* Status indicator */}
+      <div className="mt-3">
+        {periodCount === null ? (
+          <div className="px-4 py-2.5 border-l-2 border-hairline bg-surface text-muted-text font-mono text-xs rounded-r inline-flex items-center gap-2">
+            <Loader2 className="size-3.5 animate-spin" /> Comprobando entregas…
+          </div>
+        ) : hasData ? (
+          <div className="px-4 py-2.5 border-l-2 border-emerald-500 bg-emerald-500/10 text-emerald-700 font-mono text-xs rounded-r inline-flex items-center gap-2">
+            <span className="size-2 rounded-full bg-emerald-500" />
+            <span><span className="font-bold">{periodCount.toLocaleString("es-ES")}</span> paquetes entregados en el período</span>
+          </div>
+        ) : (
+          <div className="px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r inline-flex items-center gap-2">
+            <span className="size-2 rounded-full bg-amber-500" />
+            <span>Sin entregas en el período · <Link to="/epod" className="underline hover:text-amber-900">Sube un ePOD</Link></span>
+          </div>
+        )}
+      </div>
 
       {error && (
         <div className="mt-3 px-4 py-2.5 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs rounded-r flex items-center gap-2">
-          <AlertCircle className="size-4 shrink-0" />
-          {error}
+          <AlertCircle className="size-4 shrink-0" /> {error}
         </div>
       )}
 
@@ -662,17 +673,6 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
           Configura al menos un CP en tarifas antes de generar.
         </div>
       )}
-
-      <div className="mt-4 flex justify-end">
-        <button
-          onClick={generate}
-          disabled={!canGenerate}
-          className="inline-flex items-center gap-2 px-6 py-2.5 bg-electric text-white rounded font-mono text-xs tracking-widest uppercase hover:bg-electric/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {generating ? <Loader2 className="size-4 animate-spin" /> : <FileSpreadsheet className="size-4" />}
-          Generar borradores
-        </button>
-      </div>
 
       {results.length > 0 && (
         <div className="mt-10 space-y-4">
