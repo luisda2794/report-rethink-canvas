@@ -76,6 +76,92 @@ export type Database = {
           },
         ]
       }
+      reclamaciones: {
+        Row: {
+          comentarios: string | null
+          cp: string | null
+          created_at: string
+          created_by: string | null
+          driver_nombre: string | null
+          driver_telefono: string | null
+          estado: string
+          evidencia: string | null
+          evidencia_driver: string | null
+          fecha_entrega: string | null
+          fecha_envio_whatsapp: string | null
+          fecha_respuesta: string | null
+          hub_id: string
+          id: string
+          importe: number | null
+          lp_no: string | null
+          nombre_driver_resp: string | null
+          ref: string
+          respuesta_driver: string | null
+          tipo: string
+          token: string
+          updated_at: string
+          waybill: string | null
+        }
+        Insert: {
+          comentarios?: string | null
+          cp?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_nombre?: string | null
+          driver_telefono?: string | null
+          estado?: string
+          evidencia?: string | null
+          evidencia_driver?: string | null
+          fecha_entrega?: string | null
+          fecha_envio_whatsapp?: string | null
+          fecha_respuesta?: string | null
+          hub_id: string
+          id?: string
+          importe?: number | null
+          lp_no?: string | null
+          nombre_driver_resp?: string | null
+          ref?: string
+          respuesta_driver?: string | null
+          tipo: string
+          token?: string
+          updated_at?: string
+          waybill?: string | null
+        }
+        Update: {
+          comentarios?: string | null
+          cp?: string | null
+          created_at?: string
+          created_by?: string | null
+          driver_nombre?: string | null
+          driver_telefono?: string | null
+          estado?: string
+          evidencia?: string | null
+          evidencia_driver?: string | null
+          fecha_entrega?: string | null
+          fecha_envio_whatsapp?: string | null
+          fecha_respuesta?: string | null
+          hub_id?: string
+          id?: string
+          importe?: number | null
+          lp_no?: string | null
+          nombre_driver_resp?: string | null
+          ref?: string
+          respuesta_driver?: string | null
+          tipo?: string
+          token?: string
+          updated_at?: string
+          waybill?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reclamaciones_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_hubs: {
         Row: {
           created_at: string
