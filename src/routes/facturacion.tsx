@@ -340,6 +340,26 @@ function FacturacionPage() {
           .insert(lines.slice(i, i + chunk));
         if (cErr) throw cErr;
       }
+
+      // Upsert all parsed rows into entregas (powers /dashboard).
+      const entregas = [...result.unpaidRows, ...result.paidRows].map((r) => ({
+        hub_id: selectedHub.id,
+        lp_no: r.lp,
+        waybill: r.waybill || null,
+        driver: r.driver || null,
+        fecha: toIso(r.fecha),
+        cp: r.cp || null,
+        tipo: r.tipo || null,
+        estado: "entregado",
+        source: "epod",
+      }));
+      for (let i = 0; i < entregas.length; i += chunk) {
+        const { error: eErr } = await supabase
+          .from("entregas")
+          .upsert(entregas.slice(i, i + chunk), { onConflict: "hub_id,lp_no" });
+        if (eErr) throw eErr;
+      }
+
       toast.success("Análisis guardado");
       await loadHistory();
     } catch (e) {
