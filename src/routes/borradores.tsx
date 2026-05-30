@@ -78,116 +78,40 @@ type SavedBorrador = {
 };
 
 // ============================================================
-// EPOD PARSING
+// ENTREGAS PROCESSING (from Supabase)
 // ============================================================
 
-const COL_DRIVER = ["Nombre del Repartidor", "Courier Name"];
-const COL_CP = ["Código postal", "Zip Code"];
-const COL_TIPO = ["Tipo de Entrega", "Delivery Type"];
-const COL_ESTADO = ["Estado de la Tarea", "Task Status"];
-const COL_FECHA = ["Fecha de la tarea", "Task Date"];
-const COL_CONTACTO = ["Contacto", "Contact"];
-const COL_DIR = ["Dirección detallada", "Detailed address"];
+type EntregaRow = {
+  driver: string | null;
+  fecha: string | null;
+  cp: string | null;
+  tipo: string | null;
+  tipo_norm: string | null;
+  es_aa: boolean | null;
+};
 
-function findKey(row: Record<string, unknown>, candidates: string[]) {
-  const keys = Object.keys(row);
-  for (const c of candidates) {
-    const k = keys.find((k) => k.trim().toLowerCase() === c.toLowerCase());
-    if (k) return k;
-  }
-  // partial match
-  for (const c of candidates) {
-    const k = keys.find((k) => k.toLowerCase().includes(c.toLowerCase()));
-    if (k) return k;
-  }
-  return null;
-}
-
-function normalizeTipo(t: string): "PUDO" | "TO_DOOR" {
-  const v = (t || "").trim().toUpperCase();
-  if (["PUDO", "TO_LOCKER", "PICK_UP_PUDO", "PICU_UP_PUDO"].includes(v)) return "PUDO";
-  return "TO_DOOR";
-}
-
-function isDelivered(s: string) {
-  const v = (s || "").trim().toLowerCase();
-  return v === "entregado" || v === "delivered";
-}
-
-function parseDate(v: unknown): string {
-  if (!v) return "";
-  if (v instanceof Date) return v.toISOString().slice(0, 10);
-  if (typeof v === "number") {
-    // Excel serial date
-    const d = XLSX.SSF.parse_date_code(v);
-    if (d) return `${d.y}-${String(d.m).padStart(2, "0")}-${String(d.d).padStart(2, "0")}`;
-  }
-  const s = String(v).trim();
-  // try dd/mm/yyyy
-  const m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/.exec(s);
-  if (m) {
-    const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
-    return `${yr}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-  }
-  const m2 = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (m2) return m2[0];
-  return s.slice(0, 10);
-}
-
-function processEpod(rows: Record<string, unknown>[], tarifas: Tarifa[]): DraftResult[] {
+function processEntregas(rows: EntregaRow[], tarifas: Tarifa[]): DraftResult[] {
   if (rows.length === 0) return [];
-  const sample = rows[0];
-  const kDriver = findKey(sample, COL_DRIVER);
-  const kCp = findKey(sample, COL_CP);
-  const kTipo = findKey(sample, COL_TIPO);
-  const kEstado = findKey(sample, COL_ESTADO);
-  const kFecha = findKey(sample, COL_FECHA);
-  const kContacto = findKey(sample, COL_CONTACTO);
-  const kDir = findKey(sample, COL_DIR);
-
-  if (!kDriver || !kCp || !kTipo || !kEstado) {
-    throw new Error(
-      "No se detectaron las columnas necesarias en el ePOD (Driver, CP, Tipo, Estado).",
-    );
-  }
 
   const tarifaMap = new Map(tarifas.map((t) => [t.codigo_postal.trim(), t]));
 
-  type Row = {
-    driver: string;
-    cp: string;
-    tipo: "PUDO" | "TO_DOOR";
-    fecha: string;
-    contacto: string;
-    direccion: string;
-  };
-
+  type Row = { driver: string; cp: string; tipo: "PUDO" | "TO_DOOR" | "AA"; fecha: string };
   const filtered: Row[] = [];
   for (const r of rows) {
-    if (!isDelivered(String(r[kEstado] ?? ""))) continue;
-    const rawDriver = String(r[kDriver] ?? "").trim();
+    const rawDriver = (r.driver ?? "").trim();
     if (!rawDriver) continue;
     const driver = rawDriver.split(" | ")[0].trim();
+    const tn = (r.tipo_norm ?? r.tipo ?? "").trim().toUpperCase();
+    const base: "PUDO" | "TO_DOOR" = tn === "PUDO" ? "PUDO" : "TO_DOOR";
+    const tipo: "PUDO" | "TO_DOOR" | "AA" = r.es_aa && base === "TO_DOOR" ? "AA" : base;
     filtered.push({
       driver,
-      cp: String(r[kCp] ?? "").trim(),
-      tipo: normalizeTipo(String(r[kTipo] ?? "")),
-      fecha: kFecha ? parseDate(r[kFecha]) : "",
-      contacto: kContacto ? String(r[kContacto] ?? "").trim().toLowerCase() : "",
-      direccion: kDir ? String(r[kDir] ?? "").trim().toLowerCase() : "",
+      cp: (r.cp ?? "").trim(),
+      tipo,
+      fecha: r.fecha ?? "",
     });
   }
 
-  // Detect AA: TO_DOOR rows where (driver, contacto, direccion, fecha) appears 2+ times
-  const aaKey = (r: Row) => `${r.driver}|${r.contacto}|${r.direccion}|${r.fecha}`;
-  const aaCount = new Map<string, number>();
-  for (const r of filtered) {
-    if (r.tipo === "TO_DOOR" && r.contacto && r.direccion && r.fecha) {
-      aaCount.set(aaKey(r), (aaCount.get(aaKey(r)) ?? 0) + 1);
-    }
-  }
-
-  // Group by driver
   const byDriver = new Map<string, Row[]>();
   for (const r of filtered) {
     if (!byDriver.has(r.driver)) byDriver.set(r.driver, []);
@@ -200,20 +124,13 @@ function processEpod(rows: Record<string, unknown>[], tarifas: Tarifa[]): DraftR
 
   const results: DraftResult[] = [];
   for (const [driver, rs] of byDriver) {
-    // Aggregate by (cp, tipo)
     const agg = new Map<string, { cp: string; tipo: "TO_DOOR" | "PUDO" | "AA"; cantidad: number }>();
     const warningsSet = new Set<string>();
-
     for (const r of rs) {
-      let effTipo: "TO_DOOR" | "PUDO" | "AA" = r.tipo;
-      if (r.tipo === "TO_DOOR" && (aaCount.get(aaKey(r)) ?? 0) >= 2) {
-        effTipo = "AA";
-      }
-      const key = `${r.cp}|${effTipo}`;
-      if (!agg.has(key)) agg.set(key, { cp: r.cp, tipo: effTipo, cantidad: 0 });
+      const key = `${r.cp}|${r.tipo}`;
+      if (!agg.has(key)) agg.set(key, { cp: r.cp, tipo: r.tipo, cantidad: 0 });
       agg.get(key)!.cantidad++;
     }
-
     const lineas: DraftLine[] = [];
     let base = 0;
     let total_paquetes = 0;
@@ -250,7 +167,6 @@ function processEpod(rows: Record<string, unknown>[], tarifas: Tarifa[]): DraftR
       warnings: [...warningsSet],
     });
   }
-
   results.sort((a, b) => b.total - a.total);
   return results;
 }
