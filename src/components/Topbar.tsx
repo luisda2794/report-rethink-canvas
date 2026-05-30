@@ -153,9 +153,12 @@ export function Topbar({ section }: { section: string }) {
                     key={n.to}
                     to={n.to as "/"}
                     onClick={() => setMenuOpen(false)}
-                    className="block px-4 py-2 text-sm font-syne text-ink hover:bg-surface-2"
+                    className="px-4 py-2 text-sm font-syne text-ink hover:bg-surface-2 flex items-center gap-2"
                   >
                     {n.label}
+                    {n.to === "/epod" && epodPending && (
+                      <span className="size-1.5 rounded-full bg-amber-500" aria-hidden />
+                    )}
                   </Link>
                 ))}
               </div>
