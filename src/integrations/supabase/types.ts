@@ -111,6 +111,66 @@ export type Database = {
           },
         ]
       }
+      conciliacion: {
+        Row: {
+          cp: string | null
+          created_at: string
+          driver: string | null
+          factura_id: string | null
+          fecha: string | null
+          hub_id: string
+          id: string
+          importe: number
+          lp_no: string
+          pagado: boolean
+          tipo: string | null
+          waybill: string | null
+        }
+        Insert: {
+          cp?: string | null
+          created_at?: string
+          driver?: string | null
+          factura_id?: string | null
+          fecha?: string | null
+          hub_id: string
+          id?: string
+          importe?: number
+          lp_no: string
+          pagado?: boolean
+          tipo?: string | null
+          waybill?: string | null
+        }
+        Update: {
+          cp?: string | null
+          created_at?: string
+          driver?: string | null
+          factura_id?: string | null
+          fecha?: string | null
+          hub_id?: string
+          id?: string
+          importe?: number
+          lp_no?: string
+          pagado?: boolean
+          tipo?: string | null
+          waybill?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conciliacion_factura_id_fkey"
+            columns: ["factura_id"]
+            isOneToOne: false
+            referencedRelation: "facturas_cainiao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conciliacion_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_tarifas: {
         Row: {
           codigo_postal: string
@@ -148,6 +208,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "driver_tarifas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      facturas_cainiao: {
+        Row: {
+          bill_id: string | null
+          created_at: string
+          fecha_factura: string | null
+          filename: string | null
+          hub_id: string
+          id: string
+          importe_estimado_no_cobrado: number
+          importe_total: number
+          no_pagados: number
+          pagados: number
+          total_paquetes: number
+          user_id: string | null
+        }
+        Insert: {
+          bill_id?: string | null
+          created_at?: string
+          fecha_factura?: string | null
+          filename?: string | null
+          hub_id: string
+          id?: string
+          importe_estimado_no_cobrado?: number
+          importe_total?: number
+          no_pagados?: number
+          pagados?: number
+          total_paquetes?: number
+          user_id?: string | null
+        }
+        Update: {
+          bill_id?: string | null
+          created_at?: string
+          fecha_factura?: string | null
+          filename?: string | null
+          hub_id?: string
+          id?: string
+          importe_estimado_no_cobrado?: number
+          importe_total?: number
+          no_pagados?: number
+          pagados?: number
+          total_paquetes?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "facturas_cainiao_hub_id_fkey"
             columns: ["hub_id"]
             isOneToOne: false
             referencedRelation: "hubs"
