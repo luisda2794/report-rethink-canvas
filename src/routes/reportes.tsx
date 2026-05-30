@@ -1,19 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Upload,
   ArrowDown,
-  X,
   Check,
   Loader2,
   AlertCircle,
   Database,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
@@ -27,7 +25,7 @@ export const Route = createFileRoute("/reportes")({
       {
         name: "description",
         content:
-          "Sube tu ePOD y descarga cada reporte de Cainiao: DSR, CD4, CD6, OOH, ROP y PFM.",
+          "Genera reportes Cainiao (DSR, CD4, CD6, OOH, ROP, PFM) a partir de los datos guardados en la nube.",
       },
     ],
   }),
@@ -54,142 +52,90 @@ const TABS = {
   carretera: {
     label: "En Carretera",
     reportes: [
-      {
-        id: "riesgo",
-        code: "ROP",
-        name: "Riesgo Operativo",
-        desc: "En reparto hoy con 3+ incidencias previas.",
-        freq: "DIARIO" as const,
-        target: "CRÍTICO",
-      },
-      {
-        id: "preflow",
-        code: "PFM",
-        name: "Pre Flow Meeting",
-        desc: "PUDO por driver · Puntos y paquetes de hoy.",
-        freq: "DIARIO" as const,
-        target: "OPERATIVO",
-      },
+      { id: "riesgo", code: "ROP", name: "Riesgo Operativo", desc: "En reparto hoy con 3+ incidencias previas.", freq: "DIARIO" as const, target: "CRÍTICO" },
+      { id: "preflow", code: "PFM", name: "Pre Flow Meeting", desc: "PUDO por driver · Puntos y paquetes de hoy.", freq: "DIARIO" as const, target: "OPERATIVO" },
     ],
   },
   kpis: {
     label: "KPIs Flota",
     reportes: [
-      {
-        id: "dsr",
-        code: "DSR",
-        name: "Tasa de entrega",
-        desc: "Éxito diario por driver y CP · Solo L–V.",
-        freq: "SEMANAL" as const,
-        target: "TGT ≥ 90%",
-      },
-      {
-        id: "cd4",
-        code: "CD4",
-        name: "Alerta preventiva",
-        desc: "Paquetes en riesgo antes de D+4.",
-        freq: "DIARIO" as const,
-        target: "PREVENTIVO",
-      },
-      {
-        id: "cd6",
-        code: "CD6",
-        name: "Plazo crítico",
-        desc: "Entrega antes D+6 · Target 99.5%.",
-        freq: "DIARIO" as const,
-        target: "TGT ≥ 99.5%",
-      },
-      {
-        id: "ooh",
-        code: "OOH",
-        name: "PUDO / Out of Home",
-        desc: "Uso de puntos de recogida semanal.",
-        freq: "SEMANAL" as const,
-        target: "TGT ≥ 95%",
-      },
+      { id: "dsr", code: "DSR", name: "Tasa de entrega", desc: "Éxito diario por driver y CP · Solo L–V.", freq: "SEMANAL" as const, target: "TGT ≥ 90%" },
+      { id: "cd4", code: "CD4", name: "Alerta preventiva", desc: "Paquetes en riesgo antes de D+4.", freq: "DIARIO" as const, target: "PREVENTIVO" },
+      { id: "cd6", code: "CD6", name: "Plazo crítico", desc: "Entrega antes D+6 · Target 99.5%.", freq: "DIARIO" as const, target: "TGT ≥ 99.5%" },
+      { id: "ooh", code: "OOH", name: "PUDO / Out of Home", desc: "Uso de puntos de recogida semanal.", freq: "SEMANAL" as const, target: "TGT ≥ 95%" },
     ],
   },
 } as const;
 
-function formatSize(b: number) {
-  if (b < 1024) return `${b} B`;
-  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
-  return `${(b / 1048576).toFixed(1)} MB`;
-}
-
 function filenameFromDisposition(header: string | null, fallback: string) {
   if (!header) return fallback;
-  const m =
-    /filename\*=UTF-8''([^;]+)/i.exec(header) ||
-    /filename="?([^";]+)"?/i.exec(header);
+  const m = /filename\*=UTF-8''([^;]+)/i.exec(header) || /filename="?([^";]+)"?/i.exec(header);
   if (!m) return fallback;
-  try {
-    return decodeURIComponent(m[1]);
-  } catch {
-    return m[1];
-  }
+  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
 }
 
-function isoToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-function isoDaysAgo(n: number) {
+function iso(d: Date) { return d.toISOString().slice(0, 10); }
+function isoToday() { return iso(new Date()); }
+function isoDaysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); }
+function startOfWeek() {
   const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  const day = d.getDay(); // 0 sun .. 6 sat
+  const diff = (day === 0 ? -6 : 1 - day); // monday
+  d.setDate(d.getDate() + diff);
+  return iso(d);
 }
+function startOfMonth() { const d = new Date(); d.setDate(1); return iso(d); }
+function lastMonthRange() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0);
+  return { from: iso(first), to: iso(last) };
+}
+
+function fmtES(d: string) {
+  if (!d) return "—";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+}
+
+type Preset = "semana" | "mes" | "ultimo_mes" | "custom";
 
 function ReportesPage() {
   const { selectedHub } = useAuth();
-  const [file, setFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<keyof typeof TABS>("carretera");
   const [states, setStates] = useState<Record<string, ReportState>>({});
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  const [useStored, setUseStored] = useState<boolean>(true);
-  const [storedCount, setStoredCount] = useState<number | null>(null);
-  const [fromDate, setFromDate] = useState<string>(isoDaysAgo(7));
+  const [preset, setPreset] = useState<Preset>("semana");
+  const [fromDate, setFromDate] = useState<string>(startOfWeek());
   const [toDate, setToDate] = useState<string>(isoToday());
 
-  // Probe entregas count for this hub; default toggle accordingly.
+  const [stats, setStats] = useState<{ count: number; min: string | null; max: string | null } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  // Load availability stats for this hub
   useEffect(() => {
-    if (!selectedHub) {
-      setStoredCount(0);
-      setUseStored(false);
-      return;
-    }
+    if (!selectedHub) { setStats({ count: 0, min: null, max: null }); setStatsLoading(false); return; }
     let cancelled = false;
+    setStatsLoading(true);
     void (async () => {
-      const { count } = await supabase
-        .from("entregas")
-        .select("id", { count: "exact", head: true })
-        .eq("hub_id", selectedHub.id);
+      const [{ count }, { data: minRow }, { data: maxRow }] = await Promise.all([
+        supabase.from("entregas").select("id", { count: "exact", head: true }).eq("hub_id", selectedHub.id),
+        supabase.from("entregas").select("fecha").eq("hub_id", selectedHub.id).not("fecha", "is", null).order("fecha", { ascending: true }).limit(1).maybeSingle(),
+        supabase.from("entregas").select("fecha").eq("hub_id", selectedHub.id).not("fecha", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle(),
+      ]);
       if (cancelled) return;
-      setStoredCount(count ?? 0);
-      setUseStored((count ?? 0) > 0);
+      setStats({ count: count ?? 0, min: (minRow?.fecha as string | null) ?? null, max: (maxRow?.fecha as string | null) ?? null });
+      setStatsLoading(false);
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [selectedHub?.id]);
 
-  const handleFile = (f: File | null | undefined) => {
-    if (!f) return;
-    if (!/\.(xlsx|xls)$/i.test(f.name)) {
-      setError("Por favor sube un archivo Excel (.xlsx)");
-      return;
-    }
-    setError(null);
-    setFile(f);
+  const applyPreset = (p: Preset) => {
+    setPreset(p);
     setStates({});
-  };
-
-  const clearFile = () => {
-    setFile(null);
-    setStates({});
-    if (inputRef.current) inputRef.current.value = "";
+    if (p === "semana") { setFromDate(startOfWeek()); setToDate(isoToday()); }
+    else if (p === "mes") { setFromDate(startOfMonth()); setToDate(isoToday()); }
+    else if (p === "ultimo_mes") { const r = lastMonthRange(); setFromDate(r.from); setToDate(r.to); }
   };
 
   const fetchEntregas = async () => {
@@ -200,9 +146,7 @@ function ReportesPage() {
     for (;;) {
       const { data, error: qErr } = await supabase
         .from("entregas")
-        .select(
-          "lp_no, waybill, driver, fecha, fecha_inbound, cp, tipo, tipo_norm, estado, es_aa, direccion, contacto, pop_station_id",
-        )
+        .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, tipo, tipo_norm, estado, es_aa, direccion, contacto, pop_station_id")
         .eq("hub_id", selectedHub.id)
         .gte("fecha", fromDate)
         .lte("fecha", toDate)
@@ -217,93 +161,54 @@ function ReportesPage() {
   };
 
   const descargar = async (r: Reporte) => {
-    if (useStored ? !selectedHub : !file) return;
+    if (!selectedHub) return;
     setStates((s) => ({ ...s, [r.id]: { kind: "loading" } }));
     try {
-      let res: Response;
-      if (useStored) {
-        const entregas = await fetchEntregas();
-        if (entregas.length === 0) {
-          setStates((s) => ({
-            ...s,
-            [r.id]: { kind: "error", message: "Sin datos en el período seleccionado" },
-          }));
-          return;
-        }
-        res = await fetch(`${API_BASE}/reporte/${r.id}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            hub: selectedHub!.nombre,
-            hub_id: selectedHub!.id,
-            hub_marca: selectedHub!.marca,
-            hub_ciudad: selectedHub!.ciudad ?? null,
-            fecha_desde: fromDate,
-            fecha_hasta: toDate,
-            entregas,
-          }),
-        });
-      } else {
-        const fd = new FormData();
-        fd.append("file", file!);
-        if (selectedHub) {
-          fd.append("hub_id", selectedHub.id);
-          fd.append("hub_nombre", selectedHub.nombre);
-          fd.append("hub_marca", selectedHub.marca);
-          if (selectedHub.ciudad) fd.append("hub_ciudad", selectedHub.ciudad);
-        }
-        res = await fetch(`${API_BASE}/reporte/${r.id}`, {
-          method: "POST",
-          body: fd,
-        });
+      const entregas = await fetchEntregas();
+      if (entregas.length === 0) {
+        setStates((s) => ({ ...s, [r.id]: { kind: "error", message: "Sin datos en el período seleccionado" } }));
+        return;
       }
+      const res = await fetch(`${API_BASE}/reporte/${r.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hub: selectedHub.nombre,
+          hub_id: selectedHub.id,
+          hub_marca: selectedHub.marca,
+          hub_ciudad: selectedHub.ciudad ?? null,
+          fecha_desde: fromDate,
+          fecha_hasta: toDate,
+          entregas,
+        }),
+      });
       if (!res.ok) {
         let msg = `Error ${res.status}`;
-        try {
-          const j = await res.json();
-          msg = (j as { detail?: string; message?: string }).detail ||
-            (j as { message?: string }).message || msg;
-        } catch {
-          // ignore
-        }
+        try { const j = await res.json(); msg = (j as { detail?: string; message?: string }).detail || (j as { message?: string }).message || msg; } catch { /* ignore */ }
         setStates((s) => ({ ...s, [r.id]: { kind: "error", message: msg } }));
         return;
       }
       const blob = await res.blob();
-      const filename = filenameFromDisposition(
-        res.headers.get("Content-Disposition"),
-        `${r.code}_${new Date().toISOString().slice(0, 10)}.xlsx`,
-      );
+      const filename = filenameFromDisposition(res.headers.get("Content-Disposition"), `${r.code}_${isoToday()}.xlsx`);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       setStates((s) => ({ ...s, [r.id]: { kind: "done" } }));
     } catch {
-      setStates((s) => ({
-        ...s,
-        [r.id]: {
-          kind: "error",
-          message: "No se puede conectar con el servidor",
-        },
-      }));
+      setStates((s) => ({ ...s, [r.id]: { kind: "error", message: "No se puede conectar con el servidor" } }));
     }
   };
 
-
   const reportes = TABS[tab].reportes;
+  const hasData = (stats?.count ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
       <Topbar section="Reportes" />
 
-      {/* CONTENT */}
       <div className="flex-1 flex overflow-hidden">
-        {/* WORKSPACE */}
         <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14 min-w-0">
           <div className="max-w-3xl mx-auto">
             <header className="mb-12 animate-fade-up">
@@ -319,143 +224,81 @@ function ReportesPage() {
                 </span>
               </h1>
               <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
-                Genera reportes Cainiao desde el ePOD del Hub <HubLabel />. Por defecto leemos los datos
-                ya cargados en{" "}
-                <Link to="/epod" className="text-electric hover:underline">
-                  /epod
-                </Link>
-                .
+                Reportes del Hub <HubLabel /> generados a partir de los datos cargados en{" "}
+                <Link to="/epod" className="text-electric hover:underline">/epod</Link>.
               </p>
-
             </header>
 
-            {/* MODE BAR */}
+            {/* DATE RANGE */}
             <section className="mb-6 animate-fade-up" style={{ animationDelay: "40ms" }}>
-              <div className="flex flex-wrap items-center gap-4 p-4 bg-surface border border-hairline rounded-lg">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-electric"
-                    checked={useStored}
-                    onChange={(e) => {
-                      setUseStored(e.target.checked);
-                      setStates({});
-                    }}
-                  />
-                  <span className="font-mono text-[11px] tracking-widest uppercase text-ink inline-flex items-center gap-1.5">
-                    <Database className="size-3.5 text-electric" />
-                    Usar datos guardados
+              <div className="p-4 bg-surface border border-hairline rounded-lg space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text inline-flex items-center gap-1.5">
+                    <CalendarIcon className="size-3.5 text-electric" />
+                    Período
                   </span>
-                  {storedCount != null && (
-                    <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text">
-                      ({storedCount.toLocaleString("es-ES")} entregas)
+                  {([
+                    ["semana", "Esta semana"],
+                    ["mes", "Este mes"],
+                    ["ultimo_mes", "Último mes"],
+                    ["custom", "Personalizado"],
+                  ] as Array<[Preset, string]>).map(([k, label]) => (
+                    <button
+                      key={k}
+                      onClick={() => applyPreset(k)}
+                      className={`px-3 py-1 rounded-full font-mono text-[10px] tracking-widest uppercase border transition-colors ${
+                        preset === k
+                          ? "bg-ink text-white border-ink"
+                          : "bg-background text-muted-text border-hairline hover:border-electric hover:text-ink"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => { setFromDate(e.target.value); setPreset("custom"); setStates({}); }}
+                    className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
+                  />
+                  <span className="text-muted-text">—</span>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => { setToDate(e.target.value); setPreset("custom"); setStates({}); }}
+                    className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* STATUS INDICATOR */}
+              <div className="mt-3">
+                {statsLoading ? (
+                  <div className="px-4 py-2.5 border-l-2 border-hairline bg-surface text-muted-text font-mono text-xs rounded-r inline-flex items-center gap-2">
+                    <Loader2 className="size-3.5 animate-spin" /> Comprobando datos disponibles…
+                  </div>
+                ) : hasData ? (
+                  <div className="px-4 py-2.5 border-l-2 border-emerald-500 bg-emerald-500/10 text-emerald-700 font-mono text-xs rounded-r inline-flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                    <span>
+                      Datos disponibles: <span className="font-bold">{stats!.count.toLocaleString("es-ES")}</span> paquetes
+                      {stats!.min && stats!.max && (
+                        <> del <span className="font-bold">{fmtES(stats!.min)}</span> al <span className="font-bold">{fmtES(stats!.max)}</span></>
+                      )}
                     </span>
-                  )}
-                </label>
-                {useStored && (
-                  <div className="flex items-center gap-2 ml-auto">
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted-text">
-                      Período
+                  </div>
+                ) : (
+                  <div className="px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r inline-flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-amber-500" />
+                    <span>
+                      Sin datos · <Link to="/epod" className="underline hover:text-amber-900">Sube un ePOD primero</Link>
                     </span>
-                    <input
-                      type="date"
-                      value={fromDate}
-                      onChange={(e) => {
-                        setFromDate(e.target.value);
-                        setStates({});
-                      }}
-                      className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
-                    />
-                    <span className="text-muted-text">—</span>
-                    <input
-                      type="date"
-                      value={toDate}
-                      onChange={(e) => {
-                        setToDate(e.target.value);
-                        setStates({});
-                      }}
-                      className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
-                    />
                   </div>
                 )}
               </div>
-              {useStored && storedCount === 0 && (
-                <div className="mt-3 px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r flex items-center gap-2">
-                  <AlertCircle className="size-3.5" />
-                  Aún no hay entregas para este hub. Sube un ePOD desde{" "}
-                  <Link to="/epod" className="underline">/epod</Link>.
-                </div>
-              )}
             </section>
-
-            {/* UPLOAD (fallback) */}
-            {!useStored && (
-              <section className="mb-12 animate-fade-up" style={{ animationDelay: "60ms" }}>
-                {!file ? (
-                  <div
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragOver(false);
-                      handleFile(e.dataTransfer.files?.[0]);
-                    }}
-                    onClick={() => inputRef.current?.click()}
-                    className={`group relative border-2 border-dashed transition-colors p-10 flex flex-col items-center justify-center rounded-lg cursor-pointer ${
-                      dragOver
-                        ? "border-electric bg-electric/[0.04]"
-                        : "border-surface-3 hover:border-electric/50 hover:bg-ink/[0.02]"
-                    }`}
-                  >
-                    <input
-                      ref={inputRef}
-                      type="file"
-                      accept=".xlsx,.xls"
-                      className="sr-only"
-                      onChange={(e) => handleFile(e.target.files?.[0])}
-                    />
-                    <div className="size-12 bg-surface-2 rounded-md flex items-center justify-center mb-4 ring-1 ring-hairline">
-                      <Upload className="size-5 text-electric" strokeWidth={1.75} />
-                    </div>
-                    <h3 className="font-syne text-lg mb-1.5 text-ink">
-                      Cargar archivo ePOD .xlsx
-                    </h3>
-                    <p className="text-muted-text text-xs font-mono tracking-widest uppercase">
-                      Arrastra o haz click para seleccionar
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4 p-5 bg-surface border border-hairline rounded-lg">
-                    <div className="size-10 bg-electric/10 border border-electric/30 rounded flex items-center justify-center shrink-0">
-                      <Check className="size-4 text-electric" strokeWidth={2.5} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm text-ink truncate">{file.name}</div>
-                      <div className="font-mono text-[10px] text-muted-text tracking-widest uppercase mt-0.5">
-                        {formatSize(file.size)} · LISTO PARA PROCESAR
-                      </div>
-                    </div>
-                    <button
-                      onClick={clearFile}
-                      className="size-8 rounded grid place-items-center text-muted-text hover:text-ink hover:bg-ink/5 transition-colors"
-                      aria-label="Quitar archivo"
-                    >
-                      <X className="size-4" />
-                    </button>
-                  </div>
-                )}
-
-                {error && (
-                  <div className="mt-3 px-4 py-2.5 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs rounded-r">
-                    {error}
-                  </div>
-                )}
-              </section>
-            )}
-
 
             {/* TABS */}
             <section className="animate-fade-up" style={{ animationDelay: "120ms" }}>
@@ -471,9 +314,7 @@ function ReportesPage() {
                       }`}
                     >
                       {TABS[key].label}
-                      {active && (
-                        <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-electric" />
-                      )}
+                      {active && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-electric" />}
                     </button>
                   );
                 })}
@@ -485,10 +326,7 @@ function ReportesPage() {
               <div className="space-y-2">
                 {reportes.map((r) => {
                   const state = states[r.id] ?? { kind: "idle" as const };
-                  const disabled =
-                    (useStored ? !selectedHub || storedCount === 0 : !file) ||
-                    state.kind === "loading";
-
+                  const disabled = !selectedHub || !hasData || state.kind === "loading";
                   return (
                     <article
                       key={r.id}
@@ -499,9 +337,7 @@ function ReportesPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-                          <h3 className="font-syne font-bold text-[15px] text-ink tracking-tight">
-                            {r.name}
-                          </h3>
+                          <h3 className="font-syne font-bold text-[15px] text-ink tracking-tight">{r.name}</h3>
                           <span
                             className={`px-1.5 py-0.5 text-[9px] font-mono tracking-widest border rounded ${
                               r.freq === "DIARIO"
@@ -540,16 +376,8 @@ function ReportesPage() {
                       >
                         {state.kind === "loading" && <Loader2 className="size-3.5 animate-spin" />}
                         {state.kind === "done" && <Check className="size-3.5" />}
-                        {(state.kind === "idle" || state.kind === "error") && (
-                          <ArrowDown className="size-3.5" />
-                        )}
-                        {state.kind === "done"
-                          ? "Listo"
-                          : state.kind === "loading"
-                            ? "Generando"
-                            : state.kind === "error"
-                              ? "Reintentar"
-                              : "Descargar"}
+                        {(state.kind === "idle" || state.kind === "error") && <ArrowDown className="size-3.5" />}
+                        {state.kind === "done" ? "Listo" : state.kind === "loading" ? "Generando" : state.kind === "error" ? "Reintentar" : "Descargar"}
                       </button>
                     </article>
                   );
@@ -593,9 +421,9 @@ function ReportesPage() {
                 Protocolo · 3 pasos
               </div>
               <ol className="space-y-4 text-[13px] text-ink/80">
-                <Step n="01" title="Sube tu ePOD" sub="Archivo Excel de Cainiao." />
-                <Step n="02" title="Descarga cada reporte" sub="Un botón por reporte." />
-                <Step n="03" title="Envía a Cainiao" sub="Listos con el formato correcto." />
+                <Step n="01" title="Sube tu ePOD en /epod" sub="Solo una vez por período." />
+                <Step n="02" title="Elige período aquí" sub="Esta semana, este mes o personalizado." />
+                <Step n="03" title="Descarga cada reporte" sub="Listos con el formato Cainiao." />
               </ol>
             </div>
           </div>
@@ -605,31 +433,15 @@ function ReportesPage() {
   );
 }
 
-function Kpi({
-  label,
-  value,
-  suffix,
-  hint,
-}: {
-  label: string;
-  value: string;
-  suffix?: string;
-  hint?: string;
-}) {
+function Kpi({ label, value, suffix, hint }: { label: string; value: string; suffix?: string; hint?: string }) {
   return (
     <div className="bg-background p-5">
-      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-text mb-3">
-        {label}
-      </div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-text mb-3">{label}</div>
       <div className="font-mono font-medium tracking-tighter text-ink flex items-baseline gap-0.5">
         <span className="text-2xl">{value}</span>
         {suffix && <span className="text-base text-muted-text/70">{suffix}</span>}
       </div>
-      {hint && (
-        <div className="font-mono text-[9px] text-muted-text/70 tracking-widest uppercase mt-2">
-          {hint}
-        </div>
-      )}
+      {hint && <div className="font-mono text-[9px] text-muted-text/70 tracking-widest uppercase mt-2">{hint}</div>}
     </div>
   );
 }
