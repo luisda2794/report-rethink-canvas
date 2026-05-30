@@ -14,7 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
-    <RequireAuth>
+    <RequireAuth path="/reportes">
       <ReportesPage />
     </RequireAuth>
   ),
