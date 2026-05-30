@@ -125,6 +125,15 @@ type ParsedRow = {
   pop_station_id: string | null;
 };
 
+function rawField(row: Record<string, unknown>, candidates: string[]): unknown {
+  const keys = Object.keys(row);
+  for (const c of candidates) {
+    const k = keys.find((kk) => normalizeKey(kk) === normalizeKey(c));
+    if (k != null && row[k] !== "" && row[k] != null) return row[k];
+  }
+  return null;
+}
+
 function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
   const out: ParsedRow[] = [];
   for (const r of rows) {
@@ -136,8 +145,8 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
     out.push({
       lp_no: lp,
       waybill: pickField(r, COL.waybill) || null,
-      fecha: parseDate(r[Object.keys(r).find((k) => COL.fecha.some((c) => normalizeKey(c) === normalizeKey(k))) ?? ""] ?? pickField(r, COL.fecha)),
-      fecha_inbound: parseDate(r[Object.keys(r).find((k) => COL.fecha_inbound.some((c) => normalizeKey(c) === normalizeKey(k))) ?? ""] ?? pickField(r, COL.fecha_inbound)),
+      fecha: parseDate(rawField(r, COL.fecha)),
+      fecha_inbound: parseDate(rawField(r, COL.fecha_inbound)),
       estado: normalizeEstado(pickField(r, COL.estado)),
       tipo_entrega: rawTipo || null,
       tipo_norm: normalizeTipo(rawTipo),
@@ -149,6 +158,7 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
       pop_station_id: pickField(r, COL.popStationId) || null,
     });
   }
+
 
   // AA modelo detection (TO_DOOR only, same contacto+direccion+fecha)
   const aaCount = new Map<string, number>();
