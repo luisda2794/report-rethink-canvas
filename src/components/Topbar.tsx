@@ -65,16 +65,26 @@ export function Topbar({ section }: { section: string }) {
 
       <div className="flex items-center gap-2">
         <nav className="hidden md:flex items-center gap-1">
-          {navItems.map((n) => (
-            <Link
-              key={n.to}
-              to={n.to as "/"}
-              className="px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors"
-              activeProps={{ className: "px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded" }}
-            >
-              {n.label}
-            </Link>
-          ))}
+          {navItems.map((n) => {
+            const showDot = n.to === "/epod" && epodPending;
+            return (
+              <Link
+                key={n.to}
+                to={n.to as "/"}
+                className="relative px-3 py-1.5 text-xs font-syne font-semibold text-muted-text hover:text-ink rounded transition-colors inline-flex items-center gap-1.5"
+                activeProps={{ className: "relative px-3 py-1.5 text-xs font-syne font-semibold text-ink bg-surface-2 rounded inline-flex items-center gap-1.5" }}
+              >
+                {n.label}
+                {showDot && (
+                  <span
+                    className="size-1.5 rounded-full bg-amber-500"
+                    title="Sube un ePOD para empezar"
+                    aria-label="Pendiente: subir ePOD"
+                  />
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Hub selector / badge */}
