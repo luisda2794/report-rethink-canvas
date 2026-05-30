@@ -14,6 +14,147 @@ export type Database = {
   }
   public: {
     Tables: {
+      borrador_lineas: {
+        Row: {
+          borrador_id: string
+          cantidad: number
+          codigo_postal: string
+          created_at: string
+          id: string
+          precio_unitario: number
+          subtotal: number
+          tipo_entrega: string
+        }
+        Insert: {
+          borrador_id: string
+          cantidad?: number
+          codigo_postal: string
+          created_at?: string
+          id?: string
+          precio_unitario?: number
+          subtotal?: number
+          tipo_entrega: string
+        }
+        Update: {
+          borrador_id?: string
+          cantidad?: number
+          codigo_postal?: string
+          created_at?: string
+          id?: string
+          precio_unitario?: number
+          subtotal?: number
+          tipo_entrega?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "borrador_lineas_borrador_id_fkey"
+            columns: ["borrador_id"]
+            isOneToOne: false
+            referencedRelation: "borradores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      borradores: {
+        Row: {
+          base_imponible: number
+          created_at: string
+          created_by: string | null
+          driver_nombre: string
+          estado: string
+          fecha_desde: string
+          fecha_hasta: string
+          hub_id: string
+          id: string
+          iva_21: number
+          total: number
+          total_paquetes: number
+          updated_at: string
+        }
+        Insert: {
+          base_imponible?: number
+          created_at?: string
+          created_by?: string | null
+          driver_nombre: string
+          estado?: string
+          fecha_desde: string
+          fecha_hasta: string
+          hub_id: string
+          id?: string
+          iva_21?: number
+          total?: number
+          total_paquetes?: number
+          updated_at?: string
+        }
+        Update: {
+          base_imponible?: number
+          created_at?: string
+          created_by?: string | null
+          driver_nombre?: string
+          estado?: string
+          fecha_desde?: string
+          fecha_hasta?: string
+          hub_id?: string
+          id?: string
+          iva_21?: number
+          total?: number
+          total_paquetes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "borradores_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_tarifas: {
+        Row: {
+          codigo_postal: string
+          created_at: string
+          hub_id: string
+          id: string
+          precio_aa: number
+          precio_door: number
+          precio_pudo: number
+          updated_at: string
+          vigente_desde: string
+        }
+        Insert: {
+          codigo_postal: string
+          created_at?: string
+          hub_id: string
+          id?: string
+          precio_aa?: number
+          precio_door?: number
+          precio_pudo?: number
+          updated_at?: string
+          vigente_desde?: string
+        }
+        Update: {
+          codigo_postal?: string
+          created_at?: string
+          hub_id?: string
+          id?: string
+          precio_aa?: number
+          precio_door?: number
+          precio_pudo?: number
+          updated_at?: string
+          vigente_desde?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_tarifas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hubs: {
         Row: {
           activo: boolean
