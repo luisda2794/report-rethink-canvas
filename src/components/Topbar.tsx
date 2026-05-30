@@ -31,6 +31,21 @@ export function Topbar({ section }: { section: string }) {
   const initial = (displayName[0] ?? "?").toUpperCase();
   const navItems = navForRole(role);
 
+  // Pending indicator: amber dot on /epod when hub has no entregas yet
+  const [epodPending, setEpodPending] = useState(false);
+  useEffect(() => {
+    if (!selectedHub) { setEpodPending(false); return; }
+    let cancelled = false;
+    void (async () => {
+      const { count } = await supabase
+        .from("entregas")
+        .select("id", { count: "exact", head: true })
+        .eq("hub_id", selectedHub.id);
+      if (!cancelled) setEpodPending((count ?? 0) === 0);
+    })();
+    return () => { cancelled = true; };
+  }, [selectedHub?.id]);
+
   return (
     <header className="h-16 border-b border-hairline flex items-center justify-between px-6 lg:px-10 shrink-0 sticky top-0 bg-background/80 backdrop-blur-md z-40">
       <div className="flex items-center gap-3 min-w-0">
