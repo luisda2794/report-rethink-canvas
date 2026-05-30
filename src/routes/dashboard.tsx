@@ -350,14 +350,15 @@ function DashboardPage() {
             </div>
             <h2 className="font-syne text-xl text-ink mb-2">Sin datos para el período seleccionado</h2>
             <p className="text-muted-text text-sm mb-6 max-w-md mx-auto">
-              Sube un ePOD desde Facturación para empezar a ver el dashboard.
+              Sube un ePOD desde la página de ingesta para empezar a ver el dashboard.
             </p>
             <Link
-              to="/facturacion"
+              to="/epod"
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md bg-electric text-white"
             >
               Subir ePOD <ArrowUpRight className="size-3.5" />
             </Link>
+
           </div>
         ) : (
           <>
