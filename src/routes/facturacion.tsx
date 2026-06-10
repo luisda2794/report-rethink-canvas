@@ -430,7 +430,7 @@ function FacturacionPage() {
       <Topbar section="Facturación" />
 
       <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_300px] gap-10">
+        <div className="max-w-6xl mx-auto">
           {/* MAIN */}
           <div className="min-w-0">
             <header className="mb-8">
@@ -643,27 +643,6 @@ function FacturacionPage() {
               )}
             </section>
           </div>
-
-          {/* RIGHT PANEL */}
-          <aside className="hidden lg:block space-y-4">
-            <InfoCard title="Cómo funciona">
-              <Step n="01" text="Sube tu ePOD (.xlsx) del periodo" />
-              <Step n="02" text="Sube la factura (.csv)" />
-              <Step n="03" text="Analiza, descarga y guarda" />
-            </InfoCard>
-            <InfoCard title="Qué detecta">
-              <Bullet color="danger">NO PAGADOS · entregados sin factura</Bullet>
-              <Bullet color="success">PAGADOS · correctamente incluidos</Bullet>
-              <Bullet color="amber">REZAGADOS · pueden aparecer en el siguiente ciclo</Bullet>
-            </InfoCard>
-            <InfoCard title="Campo de cruce">
-              <p className="text-xs text-muted-text leading-relaxed">
-                <span className="font-mono text-ink">LP No.</span> del ePOD
-                <br />vs<br />
-                <span className="font-mono text-ink">Logistics Treasure Order Number</span> del CSV
-              </p>
-            </InfoCard>
-          </aside>
         </div>
       </div>
 
@@ -804,30 +783,4 @@ function Th({ children }: { children: React.ReactNode }) {
 }
 function Td({ children, mono, className = "" }: { children: React.ReactNode; mono?: boolean; className?: string }) {
   return <td className={`px-4 py-2.5 text-ink ${mono ? "font-mono text-[12px]" : ""} ${className}`}>{children}</td>;
-}
-
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="border border-hairline rounded-lg bg-surface p-5">
-      <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-3">{title}</div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-function Step({ n, text }: { n: string; text: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="font-mono text-[10px] text-electric tracking-widest">{n}</span>
-      <span className="text-xs text-ink leading-relaxed">{text}</span>
-    </div>
-  );
-}
-function Bullet({ color, children }: { color: "danger" | "success" | "amber"; children: React.ReactNode }) {
-  const c = color === "danger" ? "bg-danger" : color === "success" ? "bg-success" : "bg-[#a16207]";
-  return (
-    <div className="flex items-start gap-2">
-      <span className={`size-1.5 rounded-full mt-1.5 shrink-0 ${c}`} />
-      <span className="text-xs text-muted-text leading-relaxed">{children}</span>
-    </div>
-  );
 }
