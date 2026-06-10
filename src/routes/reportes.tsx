@@ -191,7 +191,14 @@ function ReportesPage() {
       });
       if (!res.ok) {
         let msg = `Error ${res.status}`;
-        try { const j = await res.json(); msg = (j as { detail?: string; message?: string }).detail || (j as { message?: string }).message || msg; } catch { /* ignore */ }
+        try {
+          const j = await res.json() as { detail?: unknown; message?: unknown };
+          const d = j.detail;
+          if (typeof d === "string") msg = d;
+          else if (Array.isArray(d)) msg = d.map((it) => (it && typeof it === "object" && "msg" in it ? `${(it as { loc?: unknown[] }).loc?.join(".") ?? ""}: ${(it as { msg?: string }).msg}` : JSON.stringify(it))).join("; ");
+          else if (d && typeof d === "object") msg = JSON.stringify(d);
+          else if (typeof j.message === "string") msg = j.message;
+        } catch { /* ignore */ }
         setStates((s) => ({ ...s, [r.id]: { kind: "error", message: msg } }));
         return;
       }
