@@ -378,87 +378,8 @@ function ReportesPage() {
             </section>
           </div>
         </div>
-
-        {/* RIGHT PANEL */}
-        <aside className="w-96 border-l border-hairline bg-surface p-8 hidden xl:block overflow-y-auto shrink-0">
-          <div className="space-y-10">
-            <div>
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-6">
-                KPI Targets
-              </div>
-              <div className="grid grid-cols-2 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
-                <Kpi label="DSR" value="≥ 90" suffix="%" hint="Tasa de entrega" />
-                <Kpi label="CD6" value="≥ 99.5" suffix="%" hint="Plazo crítico" />
-                <Kpi label="CD4" value="Alerta" hint="Preventivo" />
-                <Kpi label="OOH" value="≥ 95" suffix="%" hint="Out of Home" />
-              </div>
-            </div>
-
-            <div className="bg-background border border-hairline p-6 rounded-lg">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-4">
-                Qué incluye cada reporte
-              </div>
-              <ul className="space-y-3.5 text-[13px] text-ink/80 leading-relaxed">
-                <InfoLine code="ROP" text="En reparto con 3+ incidencias previas." />
-                <InfoLine code="PFM" text="PUDO por driver, puntos y paquetes del día." />
-                <InfoLine code="DSR" text="Tasa de éxito por driver y CP, L–V." />
-                <InfoLine code="CD4" text="Paquetes en riesgo antes de D+4." />
-                <InfoLine code="CD6" text="Entregados antes D+6 por CP y driver." />
-                <InfoLine code="OOH" text="Uso de puntos de recogida por semana." />
-              </ul>
-            </div>
-
-            <div className="bg-background border border-hairline p-6 rounded-lg">
-              <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-4">
-                Protocolo · 3 pasos
-              </div>
-              <ol className="space-y-4 text-[13px] text-ink/80">
-                <Step n="01" title="Sube tu ePOD en /epod" sub="Solo una vez por período." />
-                <Step n="02" title="Elige período aquí" sub="Esta semana, este mes o personalizado." />
-                <Step n="03" title="Descarga cada reporte" sub="Listos con el formato." />
-              </ol>
-            </div>
-          </div>
-        </aside>
       </div>
     </div>
-  );
-}
-
-function Kpi({ label, value, suffix, hint }: { label: string; value: string; suffix?: string; hint?: string }) {
-  return (
-    <div className="bg-background p-5">
-      <div className="font-mono text-[9px] uppercase tracking-[0.25em] text-muted-text mb-3">{label}</div>
-      <div className="font-mono font-medium tracking-tighter text-ink flex items-baseline gap-0.5">
-        <span className="text-2xl">{value}</span>
-        {suffix && <span className="text-base text-muted-text/70">{suffix}</span>}
-      </div>
-      {hint && <div className="font-mono text-[9px] text-muted-text/70 tracking-widest uppercase mt-2">{hint}</div>}
-    </div>
-  );
-}
-
-function InfoLine({ code, text }: { code: string; text: string }) {
-  return (
-    <li className="flex gap-3">
-      <span className="size-1.5 rounded-full bg-electric mt-2 shrink-0" />
-      <span>
-        <span className="font-mono text-[11px] tracking-widest text-ink mr-2">{code}</span>
-        <span className="text-muted-text">{text}</span>
-      </span>
-    </li>
-  );
-}
-
-function Step({ n, title, sub }: { n: string; title: string; sub: string }) {
-  return (
-    <li className="flex gap-4">
-      <span className="font-mono text-[11px] text-electric tracking-widest pt-0.5">{n}</span>
-      <span>
-        <span className="block text-ink font-syne text-sm font-semibold">{title}</span>
-        <span className="block text-muted-text text-xs mt-0.5">{sub}</span>
-      </span>
-    </li>
   );
 }
 
