@@ -1,126 +1,75 @@
 import type { ReactNode } from "react";
-import { LayoutGridIcon, BarChart3Icon, BriefcaseIcon, UsersIcon, PlugIcon, KeyRoundIcon, SettingsIcon, CreditCardIcon, HelpCircleIcon, BookOpenIcon } from "lucide-react";
+import {
+  LayoutGridIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  FileEditIcon,
+  ReceiptIcon,
+  AlertOctagonIcon,
+  ShieldIcon,
+  HelpCircleIcon,
+  BookOpenIcon,
+} from "lucide-react";
+import { navForRole, type Role } from "@/lib/roles";
 
 export type SidebarNavItem = {
-	title: string;
-	path?: string;
-	icon?: ReactNode;
-	isActive?: boolean;
-	subItems?: SidebarNavItem[];
+  title: string;
+  path?: string;
+  icon?: ReactNode;
+  isActive?: boolean;
+  subItems?: SidebarNavItem[];
 };
 
 export type SidebarNavGroup = {
-	label?: string;
-	items: SidebarNavItem[];
+  label?: string;
+  items: SidebarNavItem[];
 };
 
-export const navGroups: SidebarNavGroup[] = [
-	{
-		label: "Product",
-		items: [
-			{
-				title: "Dashboard",
-				path: "#/dashboard",
-				icon: (
-					<LayoutGridIcon
-					/>
-				),
-				isActive: true,
-			},
-			{
-				title: "Analytics",
-				path: "#/analytics",
-				icon: (
-					<BarChart3Icon
-					/>
-				),
-			},
-			{
-				title: "Projects",
-				path: "#/projects",
-				icon: (
-					<BriefcaseIcon
-					/>
-				),
-			},
-		],
-	},
-	{
-		label: "Workspace",
-		items: [
-			{
-				title: "Team",
-				path: "#/team",
-				icon: (
-					<UsersIcon
-					/>
-				),
-			},
-			{
-				title: "Integrations",
-				path: "#/integrations",
-				icon: (
-					<PlugIcon
-					/>
-				),
-			},
-			{
-				title: "API Keys",
-				path: "#/api-keys",
-				icon: (
-					<KeyRoundIcon
-					/>
-				),
-			},
-		],
-	},
-	{
-		label: "Administration",
-		items: [
-			{
-				title: "Settings",
-				path: "#/settings",
-				icon: (
-					<SettingsIcon
-					/>
-				),
-			},
-			{
-				title: "Billing",
-				path: "#/billing",
-				icon: (
-					<CreditCardIcon
-					/>
-				),
-			},
-		],
-	},
-];
+const ICONS: Record<string, ReactNode> = {
+  "/dashboard": <LayoutGridIcon />,
+  "/epod": <FileSpreadsheetIcon />,
+  "/reportes": <FileTextIcon />,
+  "/borradores": <FileEditIcon />,
+  "/facturacion": <ReceiptIcon />,
+  "/reclamaciones": <AlertOctagonIcon />,
+  "/admin": <ShieldIcon />,
+};
+
+const GROUP_OF: Record<string, string> = {
+  "/dashboard": "Operación",
+  "/epod": "Operación",
+  "/reportes": "Operación",
+  "/borradores": "Facturación",
+  "/facturacion": "Facturación",
+  "/reclamaciones": "Soporte",
+  "/admin": "Administración",
+};
+
+export function buildNavGroups(role: Role | null | undefined, currentPath: string): SidebarNavGroup[] {
+  const items = navForRole(role);
+  const byGroup = new Map<string, SidebarNavItem[]>();
+  for (const it of items) {
+    const group = GROUP_OF[it.to] ?? "General";
+    const arr = byGroup.get(group) ?? [];
+    arr.push({
+      title: it.label,
+      path: it.to,
+      icon: ICONS[it.to],
+      isActive: currentPath === it.to || currentPath.startsWith(it.to + "/"),
+    });
+    byGroup.set(group, arr);
+  }
+  return Array.from(byGroup.entries()).map(([label, items]) => ({ label, items }));
+}
 
 export const footerNavLinks: SidebarNavItem[] = [
-	{
-		title: "Help Center",
-		path: "#/help",
-		icon: (
-			<HelpCircleIcon
-			/>
-		),
-	},
-	{
-		title: "Documentation",
-		path: "#/documentation",
-		icon: (
-			<BookOpenIcon
-			/>
-		),
-	},
+  { title: "Ayuda", path: "#", icon: <HelpCircleIcon /> },
+  { title: "Documentación", path: "#", icon: <BookOpenIcon /> },
 ];
 
-export const navLinks: SidebarNavItem[] = [
-	...navGroups.flatMap((group) =>
-		group.items.flatMap((item) =>
-			item.subItems?.length ? [item, ...item.subItems] : [item]
-		)
-	),
-	...footerNavLinks,
-];
+export function findActive(groups: SidebarNavGroup[]): SidebarNavItem | undefined {
+  for (const g of groups) {
+    for (const it of g.items) if (it.isActive) return it;
+  }
+  return undefined;
+}
