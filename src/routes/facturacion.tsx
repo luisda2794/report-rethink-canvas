@@ -430,7 +430,7 @@ function FacturacionPage() {
       <Topbar section="Facturación" />
 
       <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_300px] gap-10">
+        <div className="max-w-6xl mx-auto">
           {/* MAIN */}
           <div className="min-w-0">
             <header className="mb-8">
@@ -643,27 +643,6 @@ function FacturacionPage() {
               )}
             </section>
           </div>
-
-          {/* RIGHT PANEL */}
-          <aside className="hidden lg:block space-y-4">
-            <InfoCard title="Cómo funciona">
-              <Step n="01" text="Sube tu ePOD (.xlsx) del periodo" />
-              <Step n="02" text="Sube la factura (.csv)" />
-              <Step n="03" text="Analiza, descarga y guarda" />
-            </InfoCard>
-            <InfoCard title="Qué detecta">
-              <Bullet color="danger">NO PAGADOS · entregados sin factura</Bullet>
-              <Bullet color="success">PAGADOS · correctamente incluidos</Bullet>
-              <Bullet color="amber">REZAGADOS · pueden aparecer en el siguiente ciclo</Bullet>
-            </InfoCard>
-            <InfoCard title="Campo de cruce">
-              <p className="text-xs text-muted-text leading-relaxed">
-                <span className="font-mono text-ink">LP No.</span> del ePOD
-                <br />vs<br />
-                <span className="font-mono text-ink">Logistics Treasure Order Number</span> del CSV
-              </p>
-            </InfoCard>
-          </aside>
         </div>
       </div>
 
