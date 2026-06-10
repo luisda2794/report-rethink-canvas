@@ -98,6 +98,18 @@
   --sidebar-accent-foreground: hsl(240 5.9% 10%);
   --sidebar-border: hsl(220 13% 91%);
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
+
+  /* Chart palette */
+  --chart-1: oklch(0.55 0.20 265);
+  --chart-2: oklch(0.65 0.18 150);
+  --chart-3: oklch(0.70 0.18 70);
+  --chart-4: oklch(0.62 0.22 25);
+  --chart-5: oklch(0.60 0.18 320);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
 }
 
 @layer base {
