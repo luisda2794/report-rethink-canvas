@@ -203,8 +203,9 @@ function ReportesPage() {
       document.body.appendChild(a); a.click(); a.remove();
       URL.revokeObjectURL(url);
       setStates((s) => ({ ...s, [r.id]: { kind: "done" } }));
-    } catch {
-      setStates((s) => ({ ...s, [r.id]: { kind: "error", message: "No se puede conectar con el servidor" } }));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error inesperado";
+      setStates((s) => ({ ...s, [r.id]: { kind: "error", message: msg } }));
     }
   };
 
