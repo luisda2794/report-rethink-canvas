@@ -30,7 +30,7 @@ export const Route = createFileRoute("/facturacion")({
       {
         name: "description",
         content:
-          "Cruza tu ePOD con la factura de Cainiao y detecta paquetes no pagados.",
+          "Cruza tu ePOD con la factura y detecta paquetes no pagados.",
       },
     ],
   }),
@@ -196,7 +196,7 @@ function FacturacionPage() {
           "LogisticsTreasureOrderNumber",
         ])
       ) {
-        throw new Error("Formato de factura Cainiao no reconocido");
+        throw new Error("Formato de factura no reconocido");
       }
 
       const facturaSet = new Set<string>();
@@ -436,7 +436,7 @@ function FacturacionPage() {
             <header className="mb-12 animate-fade-up">
               <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
                 <span className="size-1 bg-electric rounded-full" />
-                Conciliación · Cainiao vs ePOD
+                Conciliación · Factura vs ePOD
               </div>
               <h1 className="text-4xl lg:text-6xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
                 Control de
@@ -446,7 +446,7 @@ function FacturacionPage() {
                 </span>
               </h1>
               <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
-                Cruza tu ePOD con la factura de Cainiao y detecta los paquetes
+                Cruza tu ePOD con la factura y detecta los paquetes
                 que no te están pagando.
                 {selectedHub && (
                   <span className="block mt-1 font-mono text-[11px] tracking-widest uppercase text-muted-text/80">
@@ -474,7 +474,7 @@ function FacturacionPage() {
                 inputRef={epodRef}
               />
               <UploadZone
-                label="Archivo 2 · Factura Cainiao"
+                label="Archivo 2 · Factura"
                 hint=".csv"
                 accept=".csv"
                 file={factura}
@@ -657,7 +657,7 @@ function FacturacionPage() {
           <aside className="hidden lg:block space-y-4">
             <InfoCard title="Cómo funciona">
               <Step n="01" text="Sube tu ePOD (.xlsx) del periodo" />
-              <Step n="02" text="Sube la factura de Cainiao (.csv)" />
+              <Step n="02" text="Sube la factura (.csv)" />
               <Step n="03" text="Analiza, descarga y guarda" />
             </InfoCard>
             <InfoCard title="Qué detecta">

@@ -62,7 +62,7 @@ function LoginPage() {
         <div className="relative z-10 max-w-md">
           <div className="font-mono text-[10px] tracking-[0.25em] text-white/40 uppercase mb-5 flex items-center gap-2">
             <span className="size-1 bg-electric rounded-full" />
-            DSP · Cainiao · Last-mile
+            DSP · Last-mile
           </div>
           <h1 className="text-4xl lg:text-5xl font-syne font-extrabold leading-[0.95] tracking-tighter">
             Operaciones last-mile,

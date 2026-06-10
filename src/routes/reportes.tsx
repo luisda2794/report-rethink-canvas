@@ -25,7 +25,7 @@ export const Route = createFileRoute("/reportes")({
       {
         name: "description",
         content:
-          "Genera reportes Cainiao (DSR, CD4, CD6, OOH, ROP, PFM) a partir de los datos guardados en la nube.",
+          "Genera reportes (DSR, CD4, CD6, OOH, ROP, PFM) a partir de los datos guardados en la nube.",
       },
     ],
   }),
@@ -220,7 +220,7 @@ function ReportesPage() {
                 Genera tus
                 <br />
                 <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                  reportes Cainiao
+                  reportes
                 </span>
               </h1>
               <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
@@ -392,7 +392,7 @@ function ReportesPage() {
           <div className="space-y-10">
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.25em] text-muted-text mb-6">
-                KPI Targets · Cainiao
+                KPI Targets
               </div>
               <div className="grid grid-cols-2 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
                 <Kpi label="DSR" value="≥ 90" suffix="%" hint="Tasa de entrega" />
@@ -423,7 +423,7 @@ function ReportesPage() {
               <ol className="space-y-4 text-[13px] text-ink/80">
                 <Step n="01" title="Sube tu ePOD en /epod" sub="Solo una vez por período." />
                 <Step n="02" title="Elige período aquí" sub="Esta semana, este mes o personalizado." />
-                <Step n="03" title="Descarga cada reporte" sub="Listos con el formato Cainiao." />
+                <Step n="03" title="Descarga cada reporte" sub="Listos con el formato." />
               </ol>
             </div>
           </div>
