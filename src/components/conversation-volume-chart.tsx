@@ -222,8 +222,7 @@ export function ConversationVolumeChart({
 				>
 					<SelectTrigger
 						aria-label="Conversation volume time range"
-						className="w-full min-w-36 sm:w-fit"
-						size="sm"
+						className="w-full min-w-36 sm:w-fit h-8"
 					>
 						<SelectValue placeholder="Range" />
 					</SelectTrigger>

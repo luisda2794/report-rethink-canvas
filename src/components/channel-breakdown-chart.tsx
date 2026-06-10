@@ -92,7 +92,7 @@ export function ChannelBreakdownChart({
 								dataKey="share"
 								fill="currentColor"
 								fontWeight={500}
-								formatter={(label) => {
+								formatter={(label: unknown) => {
 									const n = Number(label);
 									return Number.isFinite(n) ? `${n}%` : String(label ?? "");
 								}}

@@ -100,7 +100,7 @@ export function FirstReplyTimeChart({
 								className="fill-foreground"
 								dataKey="minutes"
 								fontSize={12}
-								formatter={(label) => {
+								formatter={(label: unknown) => {
 									const n = Number(label);
 									return Number.isFinite(n)
 										? `${n.toFixed(1)}m`
