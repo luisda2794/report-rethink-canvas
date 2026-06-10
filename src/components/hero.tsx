@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
 import { RocketIcon, ArrowRightIcon, PhoneCallIcon } from "lucide-react";
 
 export function HeroSection() {
@@ -41,10 +42,10 @@ export function HeroSection() {
 						"group mx-auto flex w-fit items-center gap-3 rounded-full border bg-card px-3 py-1 shadow",
 						"fade-in slide-in-from-bottom-10 animate-in fill-mode-backwards transition-all delay-500 duration-500 ease-out"
 					)}
-					href="#link"
+					href="#features"
 				>
 					<RocketIcon className="size-3 text-muted-foreground" />
-					<span className="text-xs">shipped new features!</span>
+					<span className="text-xs">Nuevo dashboard operativo</span>
 					<span className="block h-5 border-l" />
 
 					<ArrowRightIcon className="size-3 duration-150 ease-out group-hover:translate-x-1" />
@@ -56,22 +57,23 @@ export function HeroSection() {
 						"text-shadow-[0_0px_50px_theme(--color-foreground/.2)]"
 					)}
 				>
-					Building Teams Help <br /> You Scale and Lead
+					Inteligencia operativa <br /> para flotas last-mile
 				</h1>
 
 				<p className="fade-in slide-in-from-bottom-10 mx-auto max-w-md animate-in fill-mode-backwards text-center text-base text-foreground/80 tracking-wider delay-200 duration-500 ease-out sm:text-lg md:text-xl">
-					Conecting you with world-class talent <br /> to scale, innovate and
-					lead
+					Reportes KPI, riesgo operativo y pre flow <br /> automáticos desde tu ePOD
 				</p>
 
 				<div className="fade-in slide-in-from-bottom-10 flex animate-in flex-row flex-wrap items-center justify-center gap-3 fill-mode-backwards pt-2 delay-300 duration-500 ease-out">
-					<Button className="rounded-full" size="lg" variant="secondary">
-						<PhoneCallIcon data-icon="inline-start" />{" "}
-						Book a Call
+					<Button asChild className="rounded-full" size="lg" variant="secondary">
+						<Link to="/login">
+							<PhoneCallIcon data-icon="inline-start" /> Iniciar sesión
+						</Link>
 					</Button>
-					<Button className="rounded-full" size="lg">
-						Get started{" "}
-						<ArrowRightIcon data-icon="inline-end" />
+					<Button asChild className="rounded-full" size="lg">
+						<Link to="/reportes">
+							Acceder al panel <ArrowRightIcon data-icon="inline-end" />
+						</Link>
 					</Button>
 				</div>
 			</div>
