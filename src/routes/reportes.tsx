@@ -1,17 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
 import {
   ArrowDown,
   Check,
   Loader2,
   AlertCircle,
-  Database,
-  Calendar as CalendarIcon,
+  Upload,
+  FileSpreadsheet,
+  X,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
@@ -32,7 +32,7 @@ export const Route = createFileRoute("/reportes")({
       {
         name: "description",
         content:
-          "Genera reportes (DSR, CD4, CD6, OOH, ROP, PFM) a partir de los datos guardados en la nube.",
+          "Genera reportes (DSR, CD4, CD6, OOH, ROP, PFM) subiendo el archivo de Cainiao.",
       },
     ],
   }),
@@ -81,113 +81,30 @@ function filenameFromDisposition(header: string | null, fallback: string) {
   try { return decodeURIComponent(m[1]); } catch { return m[1]; }
 }
 
-function iso(d: Date) { return d.toISOString().slice(0, 10); }
-function isoToday() { return iso(new Date()); }
-function isoDaysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); }
-function startOfWeek() {
-  const d = new Date();
-  const day = d.getDay(); // 0 sun .. 6 sat
-  const diff = (day === 0 ? -6 : 1 - day); // monday
-  d.setDate(d.getDate() + diff);
-  return iso(d);
-}
-function startOfMonth() { const d = new Date(); d.setDate(1); return iso(d); }
-function lastMonthRange() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const last = new Date(now.getFullYear(), now.getMonth(), 0);
-  return { from: iso(first), to: iso(last) };
-}
-
-function fmtES(d: string) {
-  if (!d) return "—";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
-
-type Preset = "semana" | "mes" | "ultimo_mes" | "custom";
+function isoToday() { return new Date().toISOString().slice(0, 10); }
 
 function ReportesPage() {
   const { selectedHub } = useAuth();
   const [tab, setTab] = useState<keyof typeof TABS>("carretera");
   const [states, setStates] = useState<Record<string, ReportState>>({});
+  const [file, setFile] = useState<File | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
 
-  const [preset, setPreset] = useState<Preset>("semana");
-  const [fromDate, setFromDate] = useState<string>(startOfWeek());
-  const [toDate, setToDate] = useState<string>(isoToday());
-
-  const [stats, setStats] = useState<{ count: number; min: string | null; max: string | null } | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  // Load availability stats for this hub
-  useEffect(() => {
-    if (!selectedHub) { setStats({ count: 0, min: null, max: null }); setStatsLoading(false); return; }
-    let cancelled = false;
-    setStatsLoading(true);
-    void (async () => {
-      const [{ count }, { data: minRow }, { data: maxRow }] = await Promise.all([
-        supabase.from("entregas").select("id", { count: "exact", head: true }).eq("hub_id", selectedHub.id),
-        supabase.from("entregas").select("fecha").eq("hub_id", selectedHub.id).not("fecha", "is", null).order("fecha", { ascending: true }).limit(1).maybeSingle(),
-        supabase.from("entregas").select("fecha").eq("hub_id", selectedHub.id).not("fecha", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle(),
-      ]);
-      if (cancelled) return;
-      setStats({ count: count ?? 0, min: (minRow?.fecha as string | null) ?? null, max: (maxRow?.fecha as string | null) ?? null });
-      setStatsLoading(false);
-    })();
-    return () => { cancelled = true; };
-  }, [selectedHub?.id]);
-
-  const applyPreset = (p: Preset) => {
-    setPreset(p);
+  const onPickFile = (f: File | null) => {
+    setFile(f);
     setStates({});
-    if (p === "semana") { setFromDate(startOfWeek()); setToDate(isoToday()); }
-    else if (p === "mes") { setFromDate(startOfMonth()); setToDate(isoToday()); }
-    else if (p === "ultimo_mes") { const r = lastMonthRange(); setFromDate(r.from); setToDate(r.to); }
-  };
-
-  const fetchEntregas = async () => {
-    if (!selectedHub) return [];
-    const all: Record<string, unknown>[] = [];
-    const pageSize = 1000;
-    let from = 0;
-    for (;;) {
-      const { data, error: qErr } = await supabase
-        .from("entregas")
-        .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, tipo, tipo_norm, estado, es_aa, direccion, contacto, pop_station_id")
-        .eq("hub_id", selectedHub.id)
-        .gte("fecha", fromDate)
-        .lte("fecha", toDate)
-        .range(from, from + pageSize - 1);
-      if (qErr) throw qErr;
-      const rows = (data ?? []) as Record<string, unknown>[];
-      all.push(...rows);
-      if (rows.length < pageSize) break;
-      from += pageSize;
-    }
-    return all;
   };
 
   const descargar = async (r: Reporte) => {
-    if (!selectedHub) return;
+    if (!file) return;
     setStates((s) => ({ ...s, [r.id]: { kind: "loading" } }));
     try {
-      const entregas = await fetchEntregas();
-      if (entregas.length === 0) {
-        setStates((s) => ({ ...s, [r.id]: { kind: "error", message: "Sin datos en el período seleccionado" } }));
-        return;
-      }
+      const fd = new FormData();
+      fd.append("file", file, file.name);
       const res = await fetch(`${API_BASE}/reporte/${r.id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hub: selectedHub.nombre,
-          hub_id: selectedHub.id,
-          hub_marca: selectedHub.marca,
-          hub_ciudad: selectedHub.ciudad ?? null,
-          fecha_desde: fromDate,
-          fecha_hasta: toDate,
-          entregas,
-        }),
+        body: fd,
       });
       if (!res.ok) {
         let msg = `Error ${res.status}`;
@@ -195,7 +112,7 @@ function ReportesPage() {
           const j = await res.json() as { detail?: unknown; message?: unknown };
           const d = j.detail;
           if (typeof d === "string") msg = d;
-          else if (Array.isArray(d)) msg = d.map((it) => (it && typeof it === "object" && "msg" in it ? `${(it as { loc?: unknown[] }).loc?.join(".") ?? ""}: ${(it as { msg?: string }).msg}` : JSON.stringify(it))).join("; ");
+          else if (Array.isArray(d)) msg = d.map((it) => (it && typeof it === "object" && "msg" in it ? `${((it as { loc?: unknown[] }).loc ?? []).join(".")}: ${(it as { msg?: string }).msg}` : JSON.stringify(it))).join("; ");
           else if (d && typeof d === "object") msg = JSON.stringify(d);
           else if (typeof j.message === "string") msg = j.message;
         } catch { /* ignore */ }
@@ -217,7 +134,6 @@ function ReportesPage() {
   };
 
   const reportes = TABS[tab].reportes;
-  const hasData = (stats?.count ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
@@ -231,77 +147,56 @@ function ReportesPage() {
                 Reportes
               </h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Reportes del Hub <HubLabel /> generados a partir de los datos cargados en{" "}
-                <Link to="/epod" className="underline underline-offset-2">/epod</Link>.
+                Reportes del Hub <HubLabel /> generados a partir del archivo de Cainiao que subas.
               </p>
             </header>
 
-            {/* DATE RANGE */}
+            {/* FILE PICKER */}
             <section className="mb-6 animate-fade-up" style={{ animationDelay: "40ms" }}>
-              <div className="p-4 bg-surface border border-hairline rounded-lg space-y-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text inline-flex items-center gap-1.5">
-                    <CalendarIcon className="size-3.5 text-electric" />
-                    Período
-                  </span>
-                  {([
-                    ["semana", "Esta semana"],
-                    ["mes", "Este mes"],
-                    ["ultimo_mes", "Último mes"],
-                    ["custom", "Personalizado"],
-                  ] as Array<[Preset, string]>).map(([k, label]) => (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault(); setDragOver(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) onPickFile(f);
+                }}
+                onClick={() => inputRef.current?.click()}
+                className={`p-5 bg-surface border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                  dragOver ? "border-electric bg-electric/5" : "border-hairline hover:border-electric/50"
+                }`}
+              >
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className="hidden"
+                  onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+                />
+                {file ? (
+                  <div className="flex items-center gap-3">
+                    <FileSpreadsheet className="size-6 text-electric shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-ink truncate">{file.name}</div>
+                      <div className="text-[11px] text-muted-text font-mono">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                    </div>
                     <button
-                      key={k}
-                      onClick={() => applyPreset(k)}
-                      className={`px-3 py-1 rounded-full font-mono text-[10px] tracking-widest uppercase border transition-colors ${
-                        preset === k
-                          ? "bg-ink text-white border-ink"
-                          : "bg-background text-muted-text border-hairline hover:border-electric hover:text-ink"
-                      }`}
+                      onClick={(e) => { e.stopPropagation(); onPickFile(null); if (inputRef.current) inputRef.current.value = ""; }}
+                      className="p-1.5 rounded hover:bg-surface-2 text-muted-text hover:text-ink"
+                      aria-label="Quitar archivo"
                     >
-                      {label}
+                      <X className="size-4" />
                     </button>
-                  ))}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => { setFromDate(e.target.value); setPreset("custom"); setStates({}); }}
-                    className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
-                  />
-                  <span className="text-muted-text">—</span>
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => { setToDate(e.target.value); setPreset("custom"); setStates({}); }}
-                    className="border border-hairline rounded px-2 py-1 text-xs bg-background font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* STATUS INDICATOR */}
-              <div className="mt-3">
-                {statsLoading ? (
-                  <div className="px-4 py-2.5 border-l-2 border-hairline bg-surface text-muted-text font-mono text-xs rounded-r inline-flex items-center gap-2">
-                    <Loader2 className="size-3.5 animate-spin" /> Comprobando datos disponibles…
-                  </div>
-                ) : hasData ? (
-                  <div className="px-4 py-2.5 border-l-2 border-emerald-500 bg-emerald-500/10 text-emerald-700 font-mono text-xs rounded-r inline-flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-emerald-500" />
-                    <span>
-                      Datos disponibles: <span className="font-bold">{stats!.count.toLocaleString("es-ES")}</span> paquetes
-                      {stats!.min && stats!.max && (
-                        <> del <span className="font-bold">{fmtES(stats!.min)}</span> al <span className="font-bold">{fmtES(stats!.max)}</span></>
-                      )}
-                    </span>
                   </div>
                 ) : (
-                  <div className="px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r inline-flex items-center gap-2">
-                    <span className="size-2 rounded-full bg-amber-500" />
-                    <span>
-                      Sin datos · <Link to="/epod" className="underline hover:text-amber-900">Sube un ePOD primero</Link>
-                    </span>
+                  <div className="flex items-center gap-3 text-muted-text">
+                    <Upload className="size-6 text-electric" />
+                    <div>
+                      <div className="text-sm font-semibold text-ink">Sube el archivo de Cainiao</div>
+                      <div className="text-[11px] font-mono">Arrastra aquí o haz clic · .xlsx, .xls, .csv</div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -333,7 +228,7 @@ function ReportesPage() {
               <div className="space-y-2">
                 {reportes.map((r) => {
                   const state = states[r.id] ?? { kind: "idle" as const };
-                  const disabled = !selectedHub || !hasData || state.kind === "loading";
+                  const disabled = !selectedHub || !file || state.kind === "loading";
                   return (
                     <article
                       key={r.id}
@@ -362,9 +257,9 @@ function ReportesPage() {
                         </div>
                         <p className="text-muted-text text-[13px] truncate">{r.desc}</p>
                         {state.kind === "error" && (
-                          <p className="mt-1.5 text-danger text-[12px] font-mono flex items-center gap-1.5">
-                            <AlertCircle className="size-3" />
-                            {state.message}
+                          <p className="mt-1.5 text-danger text-[12px] font-mono flex items-start gap-1.5">
+                            <AlertCircle className="size-3 mt-0.5 shrink-0" />
+                            <span className="break-words">{state.message}</span>
                           </p>
                         )}
                       </div>
