@@ -784,29 +784,3 @@ function Th({ children }: { children: React.ReactNode }) {
 function Td({ children, mono, className = "" }: { children: React.ReactNode; mono?: boolean; className?: string }) {
   return <td className={`px-4 py-2.5 text-ink ${mono ? "font-mono text-[12px]" : ""} ${className}`}>{children}</td>;
 }
-
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="border border-hairline rounded-lg bg-surface p-5">
-      <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-3">{title}</div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  );
-}
-function Step({ n, text }: { n: string; text: string }) {
-  return (
-    <div className="flex items-start gap-3">
-      <span className="font-mono text-[10px] text-electric tracking-widest">{n}</span>
-      <span className="text-xs text-ink leading-relaxed">{text}</span>
-    </div>
-  );
-}
-function Bullet({ color, children }: { color: "danger" | "success" | "amber"; children: React.ReactNode }) {
-  const c = color === "danger" ? "bg-danger" : color === "success" ? "bg-success" : "bg-[#a16207]";
-  return (
-    <div className="flex items-start gap-2">
-      <span className={`size-1.5 rounded-full mt-1.5 shrink-0 ${c}`} />
-      <span className="text-xs text-muted-text leading-relaxed">{children}</span>
-    </div>
-  );
-}
