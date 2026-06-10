@@ -114,16 +114,11 @@ function AdminPage() {
       <Topbar section="Administración" />
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
         <div className="max-w-6xl mx-auto">
-          <header className="mb-10">
-            <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
-              <span className="size-1 bg-electric rounded-full" /> Panel de administración
-            </div>
-            <h1 className="text-4xl lg:text-5xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-              Hubs y{" "}
-              <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                usuarios
-              </span>
+          <header className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Hubs y usuarios
             </h1>
+            <p className="mt-2 text-sm text-muted-foreground">Panel de administración.</p>
           </header>
 
           <div className="flex items-center gap-1 border-b border-hairline mb-8">
