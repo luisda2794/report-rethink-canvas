@@ -433,23 +433,14 @@ function FacturacionPage() {
         <div className="max-w-7xl mx-auto grid lg:grid-cols-[1fr_300px] gap-10">
           {/* MAIN */}
           <div className="min-w-0">
-            <header className="mb-12 animate-fade-up">
-              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
-                <span className="size-1 bg-electric rounded-full" />
-                Conciliación · Factura vs ePOD
-              </div>
-              <h1 className="text-4xl lg:text-6xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-                Control de
-                <br />
-                <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                  facturación
-                </span>
+            <header className="mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Facturación
               </h1>
-              <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
-                Cruza tu ePOD con la factura y detecta los paquetes
-                que no te están pagando.
+              <p className="mt-2 text-sm text-muted-foreground">
+                Cruza tu ePOD con la factura y detecta los paquetes que no te están pagando.
                 {selectedHub && (
-                  <span className="block mt-1 font-mono text-[11px] tracking-widest uppercase text-muted-text/80">
+                  <span className="block mt-1 text-xs text-muted-foreground/80">
                     Hub: {selectedHub.marca} · {selectedHub.nombre}
                   </span>
                 )}

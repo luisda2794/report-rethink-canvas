@@ -363,21 +363,14 @@ function EpodPage() {
 
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
         <div className="max-w-4xl mx-auto space-y-12">
-          <header className="animate-fade-up">
-            <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
-              <span className="size-1 bg-electric rounded-full" />
-              Producción diaria · Ingesta de datos
-            </div>
-            <h1 className="text-4xl lg:text-6xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-              Subir{" "}
-              <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                ePOD
-              </span>
+          <header>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Subir ePOD
             </h1>
-            <p className="mt-6 text-muted-text text-pretty max-w-[60ch] text-[15px] leading-relaxed">
+            <p className="mt-2 text-sm text-muted-foreground">
               Sube el ePOD diario para actualizar el dashboard, reportes y borradores automáticamente.
               {selectedHub && (
-                <span className="block mt-1 font-mono text-[11px] tracking-widest uppercase text-muted-text/80">
+                <span className="block mt-1 text-xs text-muted-foreground/80">
                   Hub: {selectedHub.marca} · {selectedHub.nombre}
                 </span>
               )}
@@ -504,7 +497,7 @@ function EpodPage() {
 
               {/* HISTORY */}
               <section className="animate-fade-up">
-                <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase mb-4">
+                <h2 className="text-base font-semibold tracking-tight text-foreground mb-4">
                   Historial de uploads
                 </h2>
                 <div className="bg-surface border border-hairline rounded-lg overflow-hidden">

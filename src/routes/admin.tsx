@@ -114,16 +114,11 @@ function AdminPage() {
       <Topbar section="Administración" />
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
         <div className="max-w-6xl mx-auto">
-          <header className="mb-10">
-            <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
-              <span className="size-1 bg-electric rounded-full" /> Panel de administración
-            </div>
-            <h1 className="text-4xl lg:text-5xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-              Hubs y{" "}
-              <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                usuarios
-              </span>
+          <header className="mb-8">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Hubs y usuarios
             </h1>
+            <p className="mt-2 text-sm text-muted-foreground">Panel de administración.</p>
           </header>
 
           <div className="flex items-center gap-1 border-b border-hairline mb-8">
@@ -212,7 +207,7 @@ function HubsTab({ hubs, onChange }: { hubs: HubRow[]; onChange: () => Promise<v
               key={h.id}
               className={`flex flex-wrap items-center gap-4 p-4 ${i > 0 ? "border-t border-hairline" : ""}`}
             >
-              <div className="font-playfair italic font-extrabold text-electric text-2xl w-10 leading-none">
+              <div className="font-semibold text-foreground text-lg tabular-nums w-10 leading-none">
                 {h.marca[0]}
               </div>
               <div className="flex-1 min-w-[180px]">

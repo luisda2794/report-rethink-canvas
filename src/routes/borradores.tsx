@@ -207,19 +207,13 @@ function BorradoresPage() {
       <Topbar section="Borradores" />
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
         <div className="max-w-6xl mx-auto space-y-16">
-          <header className="animate-fade-up">
-            <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
-              <span className="size-1 bg-electric rounded-full" /> Contabilidad
-            </div>
-            <h1 className="text-4xl lg:text-6xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-              Borradores de{" "}
-              <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                factura
-              </span>
+          <header>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Borradores de factura
             </h1>
-            <p className="mt-6 text-muted-text max-w-2xl text-[15px] leading-relaxed">
+            <p className="mt-2 text-sm text-muted-foreground">
               Hub:{" "}
-              <span className="text-ink font-medium">
+              <span className="text-foreground font-medium">
                 {selectedHub ? `${selectedHub.marca} · ${selectedHub.nombre}` : "—"}
               </span>
             </p>
@@ -350,7 +344,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
   return (
     <section className="animate-fade-up">
       <div className="mb-6">
-        <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
           Tarifas por CP
         </h2>
         <p className="text-muted-text text-sm mt-1">
@@ -601,7 +595,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
   return (
     <section className="animate-fade-up">
       <div className="mb-6">
-        <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
           Generar borradores
         </h2>
         <p className="text-muted-text text-sm mt-1">
@@ -887,7 +881,7 @@ function SavedBorradoresSection({ hubId, hubMarca }: { hubId: string; hubMarca: 
     <section className="animate-fade-up">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
             Borradores guardados
           </h2>
           <p className="text-muted-text text-sm mt-1">Historial de borradores generados.</p>

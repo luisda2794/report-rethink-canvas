@@ -211,21 +211,13 @@ function ReportesPage() {
       <div className="flex-1 flex overflow-hidden">
         <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14 min-w-0">
           <div className="max-w-3xl mx-auto">
-            <header className="mb-12 animate-fade-up">
-              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-4 flex items-center gap-2">
-                <span className="size-1 bg-electric rounded-full" />
-                Centro de operaciones
-              </div>
-              <h1 className="text-4xl lg:text-6xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-                Genera tus
-                <br />
-                <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">
-                  reportes
-                </span>
+            <header className="mb-8">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Reportes
               </h1>
-              <p className="mt-6 text-muted-text text-pretty max-w-[52ch] text-[15px] leading-relaxed">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Reportes del Hub <HubLabel /> generados a partir de los datos cargados en{" "}
-                <Link to="/epod" className="text-electric hover:underline">/epod</Link>.
+                <Link to="/epod" className="underline underline-offset-2">/epod</Link>.
               </p>
             </header>
 
@@ -332,7 +324,7 @@ function ReportesPage() {
                       key={r.id}
                       className="group flex items-center gap-5 p-5 bg-surface hover:bg-surface-2 border border-hairline rounded-lg transition-colors"
                     >
-                      <div className="font-playfair italic font-extrabold text-electric text-2xl w-14 leading-none">
+                      <div className="font-semibold text-foreground text-lg tabular-nums w-14 leading-none">
                         {r.code}
                       </div>
                       <div className="flex-1 min-w-0">
