@@ -377,6 +377,7 @@ function ReportesPage() {
               </div>
             </section>
           </div>
+        </div>
       </div>
     </div>
   );
