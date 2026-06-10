@@ -19,6 +19,13 @@ export const Route = createFileRoute("/reportes")({
       <ReportesPage />
     </RequireAuth>
   ),
+  errorComponent: ({ error, reset }) => (
+    <div className="p-8 max-w-xl mx-auto space-y-3">
+      <h2 className="text-lg font-semibold">Algo falló al cargar reportes</h2>
+      <pre className="text-xs bg-muted p-3 rounded overflow-auto">{String(error?.message ?? error)}</pre>
+      <button onClick={reset} className="px-3 py-1.5 text-xs bg-ink text-white rounded">Reintentar</button>
+    </div>
+  ),
   head: () => ({
     meta: [
       { title: "Menssajero — Reportes" },
