@@ -9,10 +9,10 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Reportes KPI, riesgo operativo y pre flow automáticos para DSPs de Cainiao. Sube tu ePOD y descarga cada reporte listo para enviar.",
+          "Reportes KPI, riesgo operativo y pre flow automáticos para DSPs. Sube tu ePOD y descarga cada reporte listo para enviar.",
       },
       { property: "og:title", content: "Menssajero — Inteligencia operativa" },
-      { property: "og:description", content: "Reportes KPI y operativos para DSPs de Cainiao." },
+      { property: "og:description", content: "Reportes KPI y operativos para DSPs." },
     ],
   }),
 });
@@ -21,12 +21,12 @@ const FEATURES = [
   {
     icon: FileSpreadsheet,
     title: "Reportes automáticos desde ePOD",
-    desc: "Sube tu Excel de Cainiao una vez y genera cada reporte por separado, sin retoques manuales.",
+    desc: "Sube tu Excel una vez y genera cada reporte por separado, sin retoques manuales.",
   },
   {
     icon: Activity,
-    title: "KPIs Cainiao en tiempo real",
-    desc: "DSR, CD4, CD6 y OOH con los formatos y umbrales exactos que pide Cainiao cada semana.",
+    title: "KPIs en tiempo real",
+    desc: "DSR, CD4, CD6 y OOH con los formatos y umbrales exactos que se piden cada semana.",
   },
   {
     icon: Users,
@@ -81,7 +81,7 @@ function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-6 flex items-center gap-2">
             <span className="size-1 bg-electric rounded-full" />
-            DSP · Cainiao · Last-mile
+            DSP · Last-mile
           </div>
           <h1 className="text-6xl lg:text-8xl font-syne font-extrabold leading-[0.9] text-ink tracking-tighter uppercase text-balance">
             Inteligencia
@@ -93,8 +93,8 @@ function LandingPage() {
             </span>
           </h1>
           <p className="mt-8 text-muted-text text-pretty max-w-[60ch] text-lg leading-relaxed">
-            Reportes KPI, riesgo operativo y pre flow automáticos para DSPs de
-            Cainiao. Sube tu ePOD y descarga cada reporte listo para enviar.
+            Reportes KPI, riesgo operativo y pre flow automáticos para DSPs.
+            Sube tu ePOD y descarga cada reporte listo para enviar.
           </p>
           <div className="mt-10">
             <Link
@@ -134,7 +134,7 @@ function LandingPage() {
       <section className="px-6 lg:px-10 py-24 border-t border-hairline bg-surface">
         <div className="max-w-6xl mx-auto">
           <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-10">
-            KPI Targets · Cainiao
+            KPI Targets
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-hairline border border-hairline rounded-lg overflow-hidden">
             {TARGETS.map((t) => (
