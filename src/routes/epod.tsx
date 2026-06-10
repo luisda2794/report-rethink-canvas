@@ -360,7 +360,7 @@ function EpodPage() {
         duplicados,
         aaModelo,
       });
-      toast.success(`ePOD procesado: ${fresh.length} nuevos paquetes`);
+      toast.success(`ePOD procesado: ${inserted} nuevos paquetes`);
       await loadHistory();
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
