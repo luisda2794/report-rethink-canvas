@@ -223,14 +223,12 @@ function ReclamacionesPage() {
           {/* HEADER */}
           <header className="mb-8 flex items-end justify-between gap-4 flex-wrap">
             <div>
-              <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase mb-3 flex items-center gap-2">
-                <span className="size-1 bg-electric rounded-full" />
-                {selectedHub ? `${selectedHub.marca} · ${selectedHub.nombre}` : "Sin hub"}
-              </div>
-              <h1 className="text-4xl lg:text-5xl font-syne font-extrabold leading-[0.95] text-ink tracking-tighter uppercase">
-                Reclama
-                <span className="font-playfair italic font-medium text-electric normal-case tracking-normal">ciones</span>
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+                Reclamaciones
               </h1>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {selectedHub ? `${selectedHub.marca} · ${selectedHub.nombre}` : "Sin hub"}
+              </p>
             </div>
             <button
               onClick={() => setOpenModal({ mode: "create" })}
