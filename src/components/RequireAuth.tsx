@@ -45,5 +45,5 @@ export function RequireAuth({
       </div>
     );
   }
-  return <>{children}</>;
+  return <AppShell>{children}</AppShell>;
 }
