@@ -344,7 +344,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
   return (
     <section className="animate-fade-up">
       <div className="mb-6">
-        <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
           Tarifas por CP
         </h2>
         <p className="text-muted-text text-sm mt-1">
@@ -595,7 +595,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
   return (
     <section className="animate-fade-up">
       <div className="mb-6">
-        <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">
           Generar borradores
         </h2>
         <p className="text-muted-text text-sm mt-1">
@@ -881,7 +881,7 @@ function SavedBorradoresSection({ hubId, hubMarca }: { hubId: string; hubMarca: 
     <section className="animate-fade-up">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
             Borradores guardados
           </h2>
           <p className="text-muted-text text-sm mt-1">Historial de borradores generados.</p>

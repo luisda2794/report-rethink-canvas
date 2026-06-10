@@ -212,7 +212,7 @@ function HubsTab({ hubs, onChange }: { hubs: HubRow[]; onChange: () => Promise<v
               key={h.id}
               className={`flex flex-wrap items-center gap-4 p-4 ${i > 0 ? "border-t border-hairline" : ""}`}
             >
-              <div className="font-playfair italic font-extrabold text-electric text-2xl w-10 leading-none">
+              <div className="font-semibold text-foreground text-lg tabular-nums w-10 leading-none">
                 {h.marca[0]}
               </div>
               <div className="flex-1 min-w-[180px]">

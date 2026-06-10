@@ -324,7 +324,7 @@ function ReportesPage() {
                       key={r.id}
                       className="group flex items-center gap-5 p-5 bg-surface hover:bg-surface-2 border border-hairline rounded-lg transition-colors"
                     >
-                      <div className="font-playfair italic font-extrabold text-electric text-2xl w-14 leading-none">
+                      <div className="font-semibold text-foreground text-lg tabular-nums w-14 leading-none">
                         {r.code}
                       </div>
                       <div className="flex-1 min-w-0">

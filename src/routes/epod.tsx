@@ -497,7 +497,7 @@ function EpodPage() {
 
               {/* HISTORY */}
               <section className="animate-fade-up">
-                <h2 className="text-2xl font-syne font-bold text-ink tracking-tight uppercase mb-4">
+                <h2 className="text-base font-semibold tracking-tight text-foreground mb-4">
                   Historial de uploads
                 </h2>
                 <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
