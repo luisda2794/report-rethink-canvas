@@ -1,132 +1,75 @@
 import type { ReactNode } from "react";
-import { LayoutGridIcon, ListChecksIcon, BarChart3Icon, MessageSquareTextIcon, UsersIcon, PlugIcon, SettingsIcon, HelpCircleIcon, ActivityIcon } from "lucide-react";
+import {
+  LayoutGridIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  FileEditIcon,
+  ReceiptIcon,
+  AlertOctagonIcon,
+  ShieldIcon,
+  HelpCircleIcon,
+  BookOpenIcon,
+} from "lucide-react";
+import { navForRole, type Role } from "@/lib/roles";
 
 export type SidebarNavItem = {
-	title: string;
-	path?: string;
-	icon?: ReactNode;
-	isActive?: boolean;
-	subItems?: SidebarNavItem[];
+  title: string;
+  path?: string;
+  icon?: ReactNode;
+  isActive?: boolean;
+  subItems?: SidebarNavItem[];
 };
 
 export type SidebarNavGroup = {
-	label?: string;
-	items: SidebarNavItem[];
+  label?: string;
+  items: SidebarNavItem[];
 };
 
-export const navGroups: SidebarNavGroup[] = [
-	{
-		items: [
-			{
-				title: "Overview",
-				path: "#/overview",
-				icon: (
-					<LayoutGridIcon
-					/>
-				),
-				isActive: true,
-			},
-		],
-	},
-	{
-		label: "Today",
-		items: [
-			{
-				title: "Queue",
-				path: "#/queue",
-				icon: (
-					<ListChecksIcon
-					/>
-				),
-			},
-			{
-				title: "Team insights",
-				path: "#/team-insights",
-				icon: (
-					<BarChart3Icon
-					/>
-				),
-			},
-		],
-	},
-	{
-		label: "Inbox",
-		items: [
-			{
-				title: "Conversations",
-				icon: (
-					<MessageSquareTextIcon
-					/>
-				),
-				subItems: [
-					{ title: "Unassigned", path: "#/inbox/unassigned" },
-					{ title: "Assigned to me", path: "#/inbox/assigned" },
-					{ title: "Recently closed", path: "#/inbox/closed" },
-				],
-			},
-			{
-				title: "Customers",
-				path: "#/customers",
-				icon: (
-					<UsersIcon
-					/>
-				),
-			},
-			{
-				title: "Channels",
-				path: "#/channels",
-				icon: (
-					<PlugIcon
-					/>
-				),
-			},
-		],
-	},
-	{
-		label: "Organization",
-		items: [
-			{
-				title: "Workspace",
-				icon: (
-					<SettingsIcon
-					/>
-				),
-				subItems: [
-					{ title: "Branding", path: "#/workspace/branding" },
-					{ title: "Team & roles", path: "#/workspace/team" },
-					{ title: "API keys", path: "#/workspace/api-keys" },
-					{ title: "Webhooks", path: "#/workspace/webhooks" },
-					{ title: "Billing", path: "#/workspace/billing" },
-				],
-			},
-		],
-	},
-];
+const ICONS: Record<string, ReactNode> = {
+  "/dashboard": <LayoutGridIcon />,
+  "/epod": <FileSpreadsheetIcon />,
+  "/reportes": <FileTextIcon />,
+  "/borradores": <FileEditIcon />,
+  "/facturacion": <ReceiptIcon />,
+  "/reclamaciones": <AlertOctagonIcon />,
+  "/admin": <ShieldIcon />,
+};
+
+const GROUP_OF: Record<string, string> = {
+  "/dashboard": "Operación",
+  "/epod": "Operación",
+  "/reportes": "Operación",
+  "/borradores": "Facturación",
+  "/facturacion": "Facturación",
+  "/reclamaciones": "Soporte",
+  "/admin": "Administración",
+};
+
+export function buildNavGroups(role: Role | null | undefined, currentPath: string): SidebarNavGroup[] {
+  const items = navForRole(role);
+  const byGroup = new Map<string, SidebarNavItem[]>();
+  for (const it of items) {
+    const group = GROUP_OF[it.to] ?? "General";
+    const arr = byGroup.get(group) ?? [];
+    arr.push({
+      title: it.label,
+      path: it.to,
+      icon: ICONS[it.to],
+      isActive: currentPath === it.to || currentPath.startsWith(it.to + "/"),
+    });
+    byGroup.set(group, arr);
+  }
+  return Array.from(byGroup.entries()).map(([label, items]) => ({ label, items }));
+}
 
 export const footerNavLinks: SidebarNavItem[] = [
-	{
-		title: "Help Center",
-		path: "#/help",
-		icon: (
-			<HelpCircleIcon
-			/>
-		),
-	},
-	{
-		title: "System status",
-		path: "#/status",
-		icon: (
-			<ActivityIcon
-			/>
-		),
-	},
+  { title: "Ayuda", path: "#", icon: <HelpCircleIcon /> },
+  { title: "Documentación", path: "#", icon: <BookOpenIcon /> },
 ];
 
-export const navLinks: SidebarNavItem[] = [
-	...navGroups.flatMap((group) =>
-		group.items.flatMap((item) =>
-			item.subItems?.length ? [item, ...item.subItems] : [item]
-		)
-	),
-	...footerNavLinks,
-];
+export function findActive(groups: SidebarNavGroup[]): SidebarNavItem | undefined {
+  for (const g of groups) {
+    for (const it of g.items) if (it.isActive) return it;
+  }
+  return undefined;
+}
