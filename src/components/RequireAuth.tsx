@@ -2,6 +2,7 @@ import { useEffect, type ReactNode } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/contexts/AuthContext";
 import { canAccess, firstAllowedRoute } from "@/lib/roles";
+import { AppShell } from "@/components/app-shell";
 
 export function RequireAuth({
   children,
@@ -44,5 +45,5 @@ export function RequireAuth({
       </div>
     );
   }
-  return <>{children}</>;
+  return <AppShell>{children}</AppShell>;
 }
