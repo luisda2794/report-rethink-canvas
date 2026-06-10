@@ -467,7 +467,12 @@ function EpodPage() {
                   </div>
                 )}
 
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex items-center justify-end gap-3">
+                  {processing && progress && (
+                    <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text">
+                      Subiendo {progress.done}/{progress.total} lotes
+                    </span>
+                  )}
                   <button
                     onClick={procesar}
                     disabled={!file || processing}
@@ -478,10 +483,11 @@ function EpodPage() {
                     ) : (
                       <Check className="size-4" />
                     )}
-                    Procesar ePOD
+                    {processing ? "Procesando..." : "Procesar ePOD"}
                   </button>
                 </div>
               </section>
+
 
               {/* RESULTS */}
               {result && (
