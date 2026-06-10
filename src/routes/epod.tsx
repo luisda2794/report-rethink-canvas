@@ -214,6 +214,7 @@ function EpodPage() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [history, setHistory] = useState<UploadHistory[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadHistory = async () => {
