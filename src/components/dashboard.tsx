@@ -69,16 +69,25 @@ function useDashboardData() {
   const since180 = daysAgo(180);
 
   const entregasQ = useQuery({
-    queryKey: ["dash-entregas", hubId],
+    queryKey: ["dash-entregas", hubId, since60],
     enabled: !!hubId,
     queryFn: async (): Promise<Entrega[]> => {
-      const { data, error } = await supabase
-        .from("entregas")
-        .select("fecha, tipo_norm, tipo, es_aa, estado")
-        .eq("hub_id", hubId!)
-        .gte("fecha", since60);
-      if (error) throw error;
-      return (data ?? []) as Entrega[];
+      const pageSize = 1000;
+      const all: Entrega[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("entregas")
+          .select("fecha, tipo_norm, tipo, es_aa, estado")
+          .eq("hub_id", hubId!)
+          .gte("fecha", since60)
+          .order("fecha", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const rows = (data ?? []) as Entrega[];
+        all.push(...rows);
+        if (rows.length < pageSize) break;
+      }
+      return all;
     },
   });
 
