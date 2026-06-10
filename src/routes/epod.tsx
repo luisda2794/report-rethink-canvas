@@ -257,6 +257,7 @@ function EpodPage() {
     setProcessing(true);
     setError(null);
     setResult(null);
+    setProgress(null);
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
