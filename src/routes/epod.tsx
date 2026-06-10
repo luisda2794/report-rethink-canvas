@@ -214,6 +214,7 @@ function EpodPage() {
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [history, setHistory] = useState<UploadHistory[]>([]);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadHistory = async () => {
@@ -256,6 +257,7 @@ function EpodPage() {
     setProcessing(true);
     setError(null);
     setResult(null);
+    setProgress(null);
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
@@ -268,23 +270,6 @@ function EpodPage() {
         throw new Error("No se detectaron filas válidas en el ePOD (LP No. requerido)");
       }
 
-      // Duplicate detection: fetch existing lp_no for this hub
-      const lpNos = parsed.map((r) => r.lp_no);
-      const existing = new Set<string>();
-      const lookupChunk = 800;
-      for (let i = 0; i < lpNos.length; i += lookupChunk) {
-        const slice = lpNos.slice(i, i + lookupChunk);
-        const { data, error: lErr } = await supabase
-          .from("entregas")
-          .select("lp_no")
-          .eq("hub_id", selectedHub.id)
-          .in("lp_no", slice);
-        if (lErr) throw lErr;
-        for (const row of data ?? []) existing.add(row.lp_no);
-      }
-
-      const fresh = parsed.filter((r) => !existing.has(r.lp_no));
-      const duplicados = parsed.length - fresh.length;
       const entregados = parsed.filter((r) => r.estado === "Entregado").length;
       const fallos = parsed.filter((r) => r.estado === "Attempt Failure").length;
       const aaModelo = parsed.filter((r) => r.es_aa).length;
@@ -293,7 +278,7 @@ function EpodPage() {
       const dates = parsed.map((r) => r.fecha).filter((d): d is string => !!d).sort();
       const fecha_epod = dates[0] ?? null;
 
-      // Insert upload record
+      // Insert upload record (duplicados counted after upsert)
       const { data: upload, error: uErr } = await supabase
         .from("epod_uploads")
         .insert({
@@ -303,15 +288,22 @@ function EpodPage() {
           fecha_epod,
           total_paquetes: parsed.length,
           total_entregados: entregados,
-          total_duplicados: duplicados,
+          total_duplicados: 0,
           procesado: true,
         })
         .select("id")
         .single();
       if (uErr || !upload) throw uErr ?? new Error("No se pudo registrar el upload");
 
-      // Batch insert fresh rows
-      const payload = fresh.map((r) => ({
+      // De-duplicate within this file (keep first occurrence per lp_no)
+      const seen = new Set<string>();
+      const unique = parsed.filter((r) => {
+        if (seen.has(r.lp_no)) return false;
+        seen.add(r.lp_no);
+        return true;
+      });
+
+      const payload = unique.map((r) => ({
         hub_id: selectedHub.id,
         epod_upload_id: upload.id,
         lp_no: r.lp_no,
@@ -329,13 +321,39 @@ function EpodPage() {
         pop_station_id: r.pop_station_id,
         source: "epod",
       }));
-      const chunk = 500;
+
+      // Upsert in parallel batches; ignore-duplicates returns only inserted rows
+      const chunk = 1000;
+      const concurrency = 4;
+      const chunks: typeof payload[] = [];
       for (let i = 0; i < payload.length; i += chunk) {
-        const { error: iErr } = await supabase
-          .from("entregas")
-          .insert(payload.slice(i, i + chunk));
-        if (iErr) throw iErr;
+        chunks.push(payload.slice(i, i + chunk));
       }
+      let inserted = 0;
+      setProgress({ done: 0, total: chunks.length });
+      for (let i = 0; i < chunks.length; i += concurrency) {
+        const batch = chunks.slice(i, i + concurrency);
+        const results = await Promise.all(
+          batch.map((c) =>
+            supabase
+              .from("entregas")
+              .upsert(c, { onConflict: "hub_id,lp_no", ignoreDuplicates: true })
+              .select("lp_no"),
+          ),
+        );
+        for (const { data, error: iErr } of results) {
+          if (iErr) throw iErr;
+          inserted += data?.length ?? 0;
+        }
+        setProgress({ done: Math.min(i + concurrency, chunks.length), total: chunks.length });
+      }
+      const duplicados = parsed.length - inserted;
+
+      // Update upload record with final duplicados count
+      await supabase
+        .from("epod_uploads")
+        .update({ total_duplicados: duplicados })
+        .eq("id", upload.id);
 
       setResult({
         total: parsed.length,
@@ -344,7 +362,7 @@ function EpodPage() {
         duplicados,
         aaModelo,
       });
-      toast.success(`ePOD procesado: ${fresh.length} nuevos paquetes`);
+      toast.success(`ePOD procesado: ${inserted} nuevos paquetes`);
       await loadHistory();
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
@@ -449,7 +467,12 @@ function EpodPage() {
                   </div>
                 )}
 
-                <div className="mt-4 flex justify-end">
+                <div className="mt-4 flex items-center justify-end gap-3">
+                  {processing && progress && (
+                    <span className="font-mono text-[10px] tracking-widest uppercase text-muted-text">
+                      Subiendo {progress.done}/{progress.total} lotes
+                    </span>
+                  )}
                   <button
                     onClick={procesar}
                     disabled={!file || processing}
@@ -460,10 +483,11 @@ function EpodPage() {
                     ) : (
                       <Check className="size-4" />
                     )}
-                    Procesar ePOD
+                    {processing ? "Procesando..." : "Procesar ePOD"}
                   </button>
                 </div>
               </section>
+
 
               {/* RESULTS */}
               {result && (
