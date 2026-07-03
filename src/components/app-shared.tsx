@@ -6,6 +6,7 @@ import {
   FileEditIcon,
   ReceiptIcon,
   AlertOctagonIcon,
+  MapIcon,
   ShieldIcon,
   HelpCircleIcon,
   BookOpenIcon,
@@ -32,6 +33,7 @@ const ICONS: Record<string, ReactNode> = {
   "/borradores": <FileEditIcon />,
   "/facturacion": <ReceiptIcon />,
   "/reclamaciones": <AlertOctagonIcon />,
+  "/mapas-provincia": <MapIcon />,
   "/admin": <ShieldIcon />,
 };
 
@@ -42,10 +44,14 @@ const GROUP_OF: Record<string, string> = {
   "/borradores": "Facturación",
   "/facturacion": "Facturación",
   "/reclamaciones": "Soporte",
+  "/mapas-provincia": "Operación",
   "/admin": "Administración",
 };
 
-export function buildNavGroups(role: Role | null | undefined, currentPath: string): SidebarNavGroup[] {
+export function buildNavGroups(
+  role: Role | null | undefined,
+  currentPath: string,
+): SidebarNavGroup[] {
   const items = navForRole(role);
   const byGroup = new Map<string, SidebarNavItem[]>();
   for (const it of items) {
