@@ -1,0 +1,1 @@
+CREATE POLICY "Public read mapas" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'mapas');
