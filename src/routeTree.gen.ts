@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
+import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
@@ -28,6 +29,11 @@ const ReportesRoute = ReportesRouteImport.update({
 const ReclamacionesRoute = ReclamacionesRouteImport.update({
   id: '/reclamaciones',
   path: '/reclamaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapasProvinciaRoute = MapasProvinciaRouteImport.update({
+  id: '/mapas-provincia',
+  path: '/mapas-provincia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -91,6 +98,7 @@ export interface FileRoutesByTo {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -104,6 +112,7 @@ export interface FileRoutesById {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -118,6 +127,7 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -130,6 +140,7 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -142,6 +153,7 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -155,6 +167,7 @@ export interface RootRouteChildren {
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
   LoginRoute: typeof LoginRoute
+  MapasProvinciaRoute: typeof MapasProvinciaRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/reclamaciones'
       fullPath: '/reclamaciones'
       preLoaderRoute: typeof ReclamacionesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapas-provincia': {
+      id: '/mapas-provincia'
+      path: '/mapas-provincia'
+      fullPath: '/mapas-provincia'
+      preLoaderRoute: typeof MapasProvinciaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -243,6 +263,7 @@ const rootRouteChildren: RootRouteChildren = {
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
   LoginRoute: LoginRoute,
+  MapasProvinciaRoute: MapasProvinciaRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,

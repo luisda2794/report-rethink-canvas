@@ -19,17 +19,26 @@ export const ALL_NAV: NavItem[] = [
   { to: "/borradores", label: "Borradores" },
   { to: "/facturacion", label: "Facturación" },
   { to: "/reclamaciones", label: "Reclamaciones" },
+  { to: "/mapas-provincia", label: "Mapas Provincia" },
   { to: "/admin", label: "Admin" },
 ];
 
 export const ROUTE_ACCESS: Record<Role, string[]> = {
-  admin: ["/epod", "/dashboard", "/reportes", "/borradores", "/facturacion", "/reclamaciones", "/admin"],
-  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones"],
+  admin: [
+    "/epod",
+    "/dashboard",
+    "/reportes",
+    "/borradores",
+    "/facturacion",
+    "/reclamaciones",
+    "/mapas-provincia",
+    "/admin",
+  ],
+  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia"],
   jefe_flota: ["/epod", "/dashboard", "/reportes", "/reclamaciones"],
   contable: ["/borradores", "/facturacion"],
   customer: ["/reclamaciones"],
 };
-
 
 export function navForRole(role: Role | null | undefined): NavItem[] {
   if (!role) return [];
