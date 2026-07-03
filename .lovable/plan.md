@@ -1,26 +1,42 @@
-## Diagnóstico
+# Plan: Ruta "Mapas Provincia" con mapa coroplético de Alicante
 
-Hay 2 perfiles en la base de datos y los dos tienen `role = jefe_flota`:
+## 1. Dependencias
+Instalar con `bun add`:
+- `leaflet@^1.9.4`
+- `react-leaflet@^5.0.0`
+- `@types/leaflet@^1.9.20` (dev)
 
-- `ldsequeira27@gmail.com` — creado el 28/05 (antes de la lógica de "primer usuario = admin")
-- `sendilydeliverypl@gmail.com` (Luis) — creado hoy
+## 2. Archivos nuevos
+Crearé estos 8 archivos con el contenido que me pegarás:
+- `src/components/mapas/types.ts`
+- `src/components/mapas/leaflet-icons.ts`
+- `src/components/mapas/use-mapa-dsp.ts`
+- `src/components/mapas/mapa.css`
+- `src/components/mapas/mapa-view.tsx`
+- `src/components/mapas/mapa-sidebar.tsx`
+- `src/components/mapas/mapa-dsp-alicante.tsx`
+- `src/routes/mapas-provincia.tsx` (usará `createFileRoute("/mapas-provincia")` y `RequireAuth` con `path="/mapas-provincia"`)
 
-Por eso no puedes crear más usuarios: `/admin` requiere `role = admin`, y la política RLS `Admin or self insert profile` solo deja insertar perfiles ajenos a un admin.
+## 3. Modificaciones
+- **`src/lib/roles.ts`**:
+  - Añadir `{ to: "/mapas-provincia", label: "Mapas Provincia" }` a `ALL_NAV`.
+  - Añadir `"/mapas-provincia"` a `ROUTE_ACCESS.admin` y `ROUTE_ACCESS.manager`.
+- **`src/components/app-shared.tsx`**:
+  - Importar `MapIcon` de `lucide-react`.
+  - Añadir `"/mapas-provincia": <MapIcon />` a `ICONS`.
+  - Añadir `"/mapas-provincia": "Operación"` a `GROUP_OF`.
 
-## Plan
+## 4. Sidebar y acceso
+La ruta aparecerá automáticamente en el grupo "Operación" del sidebar (vía `buildNavGroups`) solo para admin/manager, gracias a los cambios en `roles.ts` + `app-shared.tsx`.
 
-1. Actualizar el perfil de `sendilydeliverysl@gmail.com` (la cuenta con la que acabas de iniciar sesión) a `role = 'admin'`.
-2. Cerrar sesión y volver a entrar para que el `AuthContext` recargue el rol.
-3. Ya podrás entrar a `/admin` y crear hubs y usuarios.
+## 5. GeoJSON desde Storage
+El hook `use-mapa-dsp.ts` leerá:
+- `import.meta.env.VITE_MAPAS_BUCKET` (default `"mapas"`)
+- `import.meta.env.VITE_MAPA_ALICANTE_PATH` (default `"alicante.geojson"`)
 
-Si prefieres que el admin sea `ldsequeira27@gmail.com`, dímelo y promociono ese en su lugar.
+Notas de backend (fuera del scope de esta tarea, para tener en cuenta después):
+- El bucket `mapas` no existe todavía en el proyecto (solo hay `rec-evidencias`). Habrá que crearlo (público o con policy de lectura para authenticated) y subir `alicante.geojson` para que el mapa cargue datos. Puedo hacerlo en un turno posterior si quieres.
 
-## Detalle técnico
+---
 
-```sql
-UPDATE public.profiles
-SET role = 'admin'
-WHERE id = '5a1f8ec6-a5cd-4c5a-ae6d-e13d9db0634d';
-```
-
-Sin cambios de código ni de esquema.
+Cuando apruebes el plan, pégame el contenido de los 8 archivos y lo aplico tal cual (más los 2 edits de `roles.ts` y `app-shared.tsx`).
