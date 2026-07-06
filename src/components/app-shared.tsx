@@ -35,6 +35,7 @@ const ICONS: Record<string, ReactNode> = {
   "/facturacion": <ReceiptIcon />,
   "/reclamaciones": <AlertOctagonIcon />,
   "/mapas-provincia": <MapIcon />,
+  "/mapas-admin": <SettingsIcon />,
   "/admin": <ShieldIcon />,
 };
 
