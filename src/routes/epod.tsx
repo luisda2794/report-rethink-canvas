@@ -236,6 +236,32 @@ function EpodPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedHub?.id]);
 
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const deleteUpload = async (u: UploadHistory) => {
+    if (!selectedHub) return;
+    if (!confirm(`¿Eliminar ePOD "${u.filename}" y todas sus entregas asociadas? Esta acción no se puede deshacer.`)) return;
+    setDeletingId(u.id);
+    try {
+      const { error: eErr } = await supabase
+        .from("entregas")
+        .delete()
+        .eq("hub_id", selectedHub.id)
+        .eq("epod_upload_id", u.id);
+      if (eErr) throw eErr;
+      const { error: uErr } = await supabase
+        .from("epod_uploads")
+        .delete()
+        .eq("id", u.id);
+      if (uErr) throw uErr;
+      toast.success("ePOD eliminado");
+      await loadHistory();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const handleFile = (f: File | null | undefined) => {
     if (!f) return;
     if (!/\.(xlsx|xls)$/i.test(f.name)) {
