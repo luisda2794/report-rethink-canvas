@@ -1,15 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Loader2 } from "lucide-react";
 
 // ============================================================
-// CONFIGURACIÓN — ajusta aquí umbrales y origen de datos
+// CONFIGURACIÓN — umbrales de color del mapa
 // ============================================================
 const UMBRAL_NARANJA_DESDE = 1; // >=1 paquete CD5 -> naranja
 const UMBRAL_ROJO_DESDE = 5; // >=5 paquetes CD5 -> rojo
 
-// Ruta del GeoJSON de fronteras (estático, no cambia).
-// Colócalo en /public/geo/alicante_cp_geometry.json
 const GEO_URL = "/geo/alicante_cp_geometry.json";
 
 function colorFor(count: number): string {
@@ -25,10 +24,6 @@ interface CD5Row {
 }
 
 interface CD5HeatMapProps {
-  // Inyecta aquí tu cliente Supabase (el de Lovable ya trae uno integrado,
-  // normalmente en "@/integrations/supabase/client").
-  // Se espera un array de filas { cp, count, updated_at } ya calculado
-  // en la tabla cd5_snapshots (ver prompt de configuración de base de datos).
   fetchCD5Snapshot: () => Promise<CD5Row[]>;
 }
 
@@ -36,14 +31,13 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
+  const countsRef = useRef<Record<string, number>>({});
 
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layerReady, setLayerReady] = useState(false);
-  const countsRef = useRef<Record<string, number>>({});
-
 
   // --- Carga inicial del mapa y la geometría ---
   useEffect(() => {
@@ -60,7 +54,12 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
       .then((res) => res.json())
       .then((geojson) => {
         const layer = L.geoJSON(geojson, {
-          style: () => ({ fillColor: "#9ca3af", weight: 1, color: "#fff", fillOpacity: 0.75 }),
+          style: () => ({
+            fillColor: "#9ca3af",
+            weight: 1,
+            color: "#ffffff",
+            fillOpacity: 0.75,
+          }),
           onEachFeature: (feature, lyr) => {
             const path = lyr as L.Path;
             path.bindPopup("");
@@ -70,7 +69,6 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
               path.setStyle(styleForCp(cp));
             });
           },
-
         }).addTo(map);
         layerRef.current = layer;
         map.fitBounds(layer.getBounds().pad(0.02));
@@ -87,7 +85,12 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
 
   function styleForCp(cp: string) {
     const count = countsRef.current[cp] ?? 0;
-    return { fillColor: colorFor(count), weight: 1, color: "#fff", fillOpacity: 0.75 };
+    return {
+      fillColor: colorFor(count),
+      weight: 1,
+      color: "#ffffff",
+      fillOpacity: 0.75,
+    };
   }
 
   // --- Carga / refresco de los datos CD5 ---
@@ -116,9 +119,6 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
 
   useEffect(() => {
     refresh();
-    // Los datos se recalculan 2x/día (10:00 y 12:00) en el backend,
-    // así que en el frontend basta con refrescar cada pocos minutos
-    // por si el usuario deja la pestaña abierta durante el cambio.
     const interval = setInterval(refresh, 5 * 60 * 1000);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,7 +138,12 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   }, [counts, layerReady]);
 
   function popupHTML(cp: string, count: number) {
-    const estado = count >= UMBRAL_ROJO_DESDE ? "Crítico" : count >= UMBRAL_NARANJA_DESDE ? "Alerta" : "OK";
+    const estado =
+      count >= UMBRAL_ROJO_DESDE
+        ? "Crítico"
+        : count >= UMBRAL_NARANJA_DESDE
+          ? "Alerta"
+          : "OK";
     return `<div style="font-weight:700;font-size:14px;margin-bottom:6px">${cp}</div>
       <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
         <span style="color:#6b7280">CD5 en reparto</span><span style="font-weight:600">${count}</span>
@@ -152,76 +157,52 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const rojos = Object.values(counts).filter((c) => c >= UMBRAL_ROJO_DESDE).length;
   const naranjas = Object.values(counts).filter((c) => c >= UMBRAL_NARANJA_DESDE && c < UMBRAL_ROJO_DESDE).length;
   const verdes = Object.keys(counts).length - rojos - naranjas;
-  const ranking = Object.entries(counts)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+
+  const legend = [
+    { color: "#16a34a", label: "0", count: verdes },
+    { color: "#f59e0b", label: "1-4", count: naranjas },
+    { color: "#dc2626", label: "5+", count: rojos },
+  ];
 
   return (
-    <div style={{ display: "flex", height: "100%", minHeight: 500 }}>
-      <div ref={mapContainerRef} style={{ flex: 1, background: "#f8fafc" }} />
-      <div
-        style={{
-          width: 320,
-          borderLeft: "1px solid #e5e7eb",
-          background: "#fafafa",
-          padding: 16,
-          overflowY: "auto",
-          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-        }}
-      >
-        <h2 style={{ fontSize: 17, margin: "0 0 2px 0" }}>🔥 Mapa de calor CD5</h2>
-        <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>
-          Alicante · paquetes &gt;5 días en almacén, en reparto
-        </div>
+    <div className="relative h-full w-full">
+      <div ref={mapContainerRef} className="h-full w-full bg-muted" />
 
-        {error && (
-          <div style={{ background: "#fef2f2", color: "#991b1b", fontSize: 12, padding: 8, borderRadius: 6, marginBottom: 12 }}>
-            {error}
+      {/* Loading */}
+      {loading && total === 0 && (
+        <div className="absolute inset-0 z-[500] flex items-center justify-center bg-background/70">
+          <Loader2 className="text-muted-foreground h-8 w-8 animate-spin" />
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="absolute top-3 left-3 z-[500] max-w-[70%] rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {error}
+        </div>
+      )}
+
+      {/* Compact legend overlay */}
+      <div className="absolute bottom-3 right-3 z-[500] rounded-md border border-border bg-background/95 px-3 py-2 shadow-sm">
+        <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          CD5 en reparto
+        </div>
+        <div className="flex items-center gap-3">
+          {legend.map((row) => (
+            <div key={row.label} className="flex items-center gap-1.5">
+              <span
+                className="inline-block rounded-sm"
+                style={{ width: 10, height: 10, background: row.color }}
+              />
+              <span className="text-xs font-medium tabular-nums">{row.label}</span>
+            </div>
+          ))}
+        </div>
+        {lastUpdated && (
+          <div className="mt-1.5 text-[10px] text-muted-foreground">
+            {new Date(lastUpdated).toLocaleString("es-ES")}
           </div>
         )}
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{loading ? "–" : total}</div>
-            <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>CD5 en reparto</div>
-          </div>
-          <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{loading ? "–" : rojos}</div>
-            <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>CPs en rojo</div>
-          </div>
-        </div>
-
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#9ca3af", fontWeight: 600, margin: "16px 0 8px" }}>
-          Umbrales
-        </div>
-        {[
-          { color: "#16a34a", label: "Verde", val: `${verdes} CPs` },
-          { color: "#f59e0b", label: "Naranja", val: `${naranjas} CPs (1-4)` },
-          { color: "#dc2626", label: "Rojo", val: `${rojos} CPs (5+)` },
-        ].map((row) => (
-          <div key={row.label} style={{ display: "flex", alignItems: "center", padding: "8px 10px", borderRadius: 6, marginBottom: 4, background: "white", border: "1px solid #e5e7eb" }}>
-            <div style={{ width: 16, height: 16, borderRadius: 4, marginRight: 10, background: row.color }} />
-            <div style={{ flex: 1, fontSize: 12.5, fontWeight: 500 }}>{row.label}</div>
-            <div style={{ fontSize: 12, fontWeight: 700 }}>{row.val}</div>
-          </div>
-        ))}
-
-        <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#9ca3af", fontWeight: 600, margin: "16px 0 8px" }}>
-          CPs con más CD5
-        </div>
-        {ranking.map(([cp, count]) => (
-          <div key={cp} style={{ display: "flex", justifyContent: "space-between", padding: "6px 4px", borderBottom: "1px solid #f3f4f6", fontSize: 12 }}>
-            <span>
-              <span style={{ width: 8, height: 8, borderRadius: 2, display: "inline-block", marginRight: 6, background: colorFor(count) }} />
-              {cp}
-            </span>
-            <strong>{count}</strong>
-          </div>
-        ))}
-
-        <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 12 }}>
-          {lastUpdated ? `Última actualización: ${new Date(lastUpdated).toLocaleString("es-ES")}` : "Sin datos aún"}
-        </div>
       </div>
     </div>
   );
