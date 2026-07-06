@@ -23,19 +23,12 @@ import { Delta, DeltaIcon, DeltaValue } from "@/components/delta";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import CD5HeatMap from "@/components/mapas/cd5-heat-map";
 
 function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString().slice(0, 10);
-}
-
-function fmtEUR(n: number) {
-  return new Intl.NumberFormat("es-ES", {
-    style: "currency",
-    currency: "EUR",
-    maximumFractionDigits: 0,
-  }).format(n);
 }
 
 type Entrega = {
@@ -52,21 +45,12 @@ type Reclamacion = {
   fecha_entrega: string | null;
 };
 
-type Factura = {
-  fecha_factura: string | null;
-  importe_total: number | null;
-  importe_estimado_no_cobrado: number | null;
-  total_paquetes: number | null;
-  pagados: number | null;
-};
-
 function useDashboardData() {
   const { selectedHub } = useAuth();
   const hubId = selectedHub?.id ?? null;
 
   const since30 = daysAgo(30);
   const since60 = daysAgo(60);
-  const since180 = daysAgo(180);
 
   const entregasQ = useQuery({
     queryKey: ["dash-entregas", hubId, since60],
@@ -105,32 +89,15 @@ function useDashboardData() {
     },
   });
 
-  const facturasQ = useQuery({
-    queryKey: ["dash-facturas", hubId],
-    enabled: !!hubId,
-    queryFn: async (): Promise<Factura[]> => {
-      const { data, error } = await supabase
-        .from("facturas_cainiao")
-        .select(
-          "fecha_factura, importe_total, importe_estimado_no_cobrado, total_paquetes, pagados",
-        )
-        .eq("hub_id", hubId!)
-        .gte("fecha_factura", since180);
-      if (error) throw error;
-      return (data ?? []) as Factura[];
-    },
-  });
-
-  return { entregasQ, reclamacionesQ, facturasQ, since30 };
+  return { entregasQ, reclamacionesQ, since30 };
 }
 
 /* ---------------- KPIs ---------------- */
 
 function Stats() {
-  const { entregasQ, reclamacionesQ, facturasQ, since30 } = useDashboardData();
+  const { entregasQ, reclamacionesQ, since30 } = useDashboardData();
   const entregas = entregasQ.data ?? [];
   const reclamaciones = reclamacionesQ.data ?? [];
-  const facturas = facturasQ.data ?? [];
 
   const last30 = entregas.filter((e) => (e.fecha ?? "") >= since30);
   const prev30 = entregas.filter((e) => (e.fecha ?? "") < since30);
@@ -147,29 +114,19 @@ function Stats() {
     (r) => (r.estado ?? "").toLowerCase() === "pendiente",
   ).length;
 
-  const importeMesActual = facturas
-    .filter((f) => (f.fecha_factura ?? "") >= since30)
-    .reduce((s, f) => s + Number(f.importe_total ?? 0), 0);
-
-  const noCobrado = facturas.reduce(
-    (s, f) => s + Number(f.importe_estimado_no_cobrado ?? 0),
-    0,
-  );
-
   const stats = [
     {
       label: "Entregas (30d)",
       value: total30.toLocaleString("es-ES"),
       delta: deltaEntregas,
       footnote: "vs 30d previos",
-      lowerIsBetter: false,
+      hideDelta: false,
     },
     {
       label: "% AA (30d)",
       value: `${aaPct.toFixed(1)}%`,
       delta: 0,
       footnote: `${aa30} entregas AA`,
-      lowerIsBetter: true,
       hideDelta: true,
     },
     {
@@ -177,15 +134,6 @@ function Stats() {
       value: recPend.toLocaleString("es-ES"),
       delta: 0,
       footnote: "abiertas ahora",
-      lowerIsBetter: true,
-      hideDelta: true,
-    },
-    {
-      label: "Facturado (30d)",
-      value: fmtEUR(importeMesActual),
-      delta: 0,
-      footnote: `No cobrado: ${fmtEUR(noCobrado)}`,
-      lowerIsBetter: false,
       hideDelta: true,
     },
   ];
@@ -367,62 +315,24 @@ function ReclamacionesEstado() {
   );
 }
 
-/* ---------------- Facturación mensual ---------------- */
+/* ---------------- Mapa CD5 ---------------- */
 
-function FacturacionMensual() {
-  const { facturasQ } = useDashboardData();
-  const data = useMemo(() => {
-    const buckets = new Map<string, { mes: string; total: number; noCobrado: number }>();
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const k = d.toISOString().slice(0, 7);
-      buckets.set(k, { mes: k, total: 0, noCobrado: 0 });
-    }
-    for (const f of facturasQ.data ?? []) {
-      if (!f.fecha_factura) continue;
-      const k = f.fecha_factura.slice(0, 7);
-      const b = buckets.get(k);
-      if (!b) continue;
-      b.total += Number(f.importe_total ?? 0);
-      b.noCobrado += Number(f.importe_estimado_no_cobrado ?? 0);
-    }
-    return Array.from(buckets.values());
-  }, [facturasQ.data]);
+async function fetchCD5Snapshot() {
+  const res = await fetch("/api/public/cd5");
+  if (!res.ok) throw new Error("No se pudo cargar CD5");
+  return res.json();
+}
 
-  const config = {
-    total: { label: "Facturado", color: "var(--chart-1)" },
-    noCobrado: { label: "No cobrado", color: "var(--chart-4)" },
-  } satisfies ChartConfig;
-
+function MapaCD5Card() {
   return (
-    <Card className="shadow-none sm:col-span-2 lg:col-span-2">
+    <Card className="shadow-none sm:col-span-2 lg:col-span-3">
       <CardHeader>
-        <CardTitle>Facturación mensual (6m)</CardTitle>
+        <CardTitle>Mapa de calor CD5</CardTitle>
       </CardHeader>
-      <CardContent>
-        <ChartContainer className="h-[220px] w-full" config={config}>
-          <BarChart data={data} margin={{ left: 8, right: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={11} />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              fontSize={11}
-              width={48}
-              tickFormatter={(v: number) => `${Math.round(v / 1000)}k`}
-            />
-            <ChartTooltip
-              content={
-                <ChartTooltipContent
-                  formatter={(value, name) => [fmtEUR(Number(value)), String(name)]}
-                />
-              }
-            />
-            <Bar dataKey="total" fill="var(--color-total)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="noCobrado" fill="var(--color-noCobrado)" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ChartContainer>
+      <CardContent className="p-0">
+        <div className="h-[360px] w-full overflow-hidden rounded-b-lg">
+          <CD5HeatMap fetchCD5Snapshot={fetchCD5Snapshot} />
+        </div>
       </CardContent>
     </Card>
   );
@@ -445,7 +355,7 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4")}>
+      <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3")}>
         <Stats />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -453,7 +363,7 @@ export function Dashboard() {
         <TipoEntrega />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <FacturacionMensual />
+        <MapaCD5Card />
         <ReclamacionesEstado />
       </div>
     </div>
