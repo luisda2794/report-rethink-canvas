@@ -172,14 +172,18 @@ function MapasAdminPage() {
     }
     setBusyImport(true);
     try {
-      const rows = csvRows.map((r) => ({
-        cp: String(r.cp),
-        dsp: r.dsp ? String(r.dsp) : null,
-        hub: r.hub ? String(r.hub) : null,
-        sla_teorico: r.sla_teorico ? String(r.sla_teorico) : null,
-        sla_fijo: r.sla_fijo ? String(r.sla_fijo) : null,
-        volumen: typeof r.volumen === "number" ? r.volumen : null,
-      }));
+      const rows = csvRows.map((r) => {
+        const volRaw = r.volumen?.trim();
+        const volumen = volRaw ? Number(volRaw) : null;
+        return {
+          cp: r.cp.trim(),
+          dsp: r.dsp?.trim() || null,
+          hub: r.hub?.trim() || null,
+          sla_teorico: r.sla_teorico?.trim() || null,
+          sla_fijo: r.sla_fijo?.trim() || null,
+          volumen: Number.isFinite(volumen) && volumen >= 0 ? volumen : null,
+        };
+      });
       await upsertFn({ data: { version_id: activeVersion.id, rows } });
       toast.success(`${rows.length} códigos postales importados`);
       setCsvText("");
