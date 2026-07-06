@@ -18,10 +18,10 @@ export const Route = createFileRoute("/cd5")({
   ),
   head: () => ({
     meta: [
-      { title: "Mapa de calor CD5 — Menssajero" },
+      { title: "Mapa de calor CD5 Alicante y Toledo — Menssajero" },
       {
         name: "description",
-        content: "Mapa de calor de paquetes CD5 (>5 días en almacén) por código postal en Alicante.",
+        content: "Mapa de calor de paquetes CD5 (>5 días en almacén) por código postal en Alicante y Toledo.",
       },
     ],
   }),
