@@ -23,7 +23,6 @@ import { Delta, DeltaIcon, DeltaValue } from "@/components/delta";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import CD5HeatMap from "@/components/mapas/cd5-heat-map";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -37,12 +36,6 @@ type Entrega = {
   tipo: string | null;
   es_aa: boolean | null;
   estado: string | null;
-};
-
-type Reclamacion = {
-  estado: string | null;
-  importe: number | null;
-  fecha_entrega: string | null;
 };
 
 function useDashboardData() {
@@ -75,29 +68,14 @@ function useDashboardData() {
     },
   });
 
-  const reclamacionesQ = useQuery({
-    queryKey: ["dash-reclamaciones", hubId],
-    enabled: !!hubId,
-    queryFn: async (): Promise<Reclamacion[]> => {
-      const { data, error } = await supabase
-        .from("reclamaciones")
-        .select("estado, importe, fecha_entrega")
-        .eq("hub_id", hubId!)
-        .gte("fecha_entrega", since60);
-      if (error) throw error;
-      return (data ?? []) as Reclamacion[];
-    },
-  });
-
-  return { entregasQ, reclamacionesQ, since30 };
+  return { entregasQ, since30 };
 }
 
 /* ---------------- KPIs ---------------- */
 
 function Stats() {
-  const { entregasQ, reclamacionesQ, since30 } = useDashboardData();
+  const { entregasQ, since30 } = useDashboardData();
   const entregas = entregasQ.data ?? [];
-  const reclamaciones = reclamacionesQ.data ?? [];
 
   const last30 = entregas.filter((e) => (e.fecha ?? "") >= since30);
   const prev30 = entregas.filter((e) => (e.fecha ?? "") < since30);
@@ -110,30 +88,18 @@ function Stats() {
   const aa30 = last30.filter((e) => e.es_aa).length;
   const aaPct = total30 ? (aa30 / total30) * 100 : 0;
 
-  const recPend = reclamaciones.filter(
-    (r) => (r.estado ?? "").toLowerCase() === "pendiente",
-  ).length;
-
   const stats = [
     {
       label: "Entregas (30d)",
       value: total30.toLocaleString("es-ES"),
       delta: deltaEntregas,
       footnote: "vs 30d previos",
-      hideDelta: false,
     },
     {
       label: "% AA (30d)",
       value: `${aaPct.toFixed(1)}%`,
       delta: 0,
       footnote: `${aa30} entregas AA`,
-      hideDelta: true,
-    },
-    {
-      label: "Reclamaciones pendientes",
-      value: recPend.toLocaleString("es-ES"),
-      delta: 0,
-      footnote: "abiertas ahora",
       hideDelta: true,
     },
   ];
@@ -278,66 +244,6 @@ function TipoEntrega() {
   );
 }
 
-/* ---------------- Reclamaciones por estado ---------------- */
-
-function ReclamacionesEstado() {
-  const { reclamacionesQ } = useDashboardData();
-  const data = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const r of reclamacionesQ.data ?? []) {
-      const k = (r.estado ?? "sin estado").toLowerCase();
-      counts.set(k, (counts.get(k) ?? 0) + 1);
-    }
-    return Array.from(counts, ([estado, n]) => ({ estado, n }));
-  }, [reclamacionesQ.data]);
-
-  const config = {
-    n: { label: "Reclamaciones", color: "var(--chart-2)" },
-  } satisfies ChartConfig;
-
-  return (
-    <Card className="shadow-none">
-      <CardHeader>
-        <CardTitle>Reclamaciones por estado (60d)</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer className="h-[220px] w-full" config={config}>
-          <BarChart data={data} margin={{ left: 8, right: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="estado" tickLine={false} axisLine={false} fontSize={11} />
-            <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="n" fill="var(--color-n)" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
-  );
-}
-
-/* ---------------- Mapa CD5 ---------------- */
-
-async function fetchCD5Snapshot() {
-  const res = await fetch("/api/public/cd5");
-  if (!res.ok) throw new Error("No se pudo cargar CD5");
-  return res.json();
-}
-
-function MapaCD5Card() {
-  return (
-    <Card className="shadow-none sm:col-span-2 lg:col-span-3">
-      <CardHeader>
-        <CardTitle>Mapa de calor CD5</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <div className="h-[360px] w-full overflow-hidden rounded-b-lg">
-          <CD5HeatMap fetchCD5Snapshot={fetchCD5Snapshot} />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 /* ---------------- Dashboard ---------------- */
 
 export function Dashboard() {
@@ -361,10 +267,6 @@ export function Dashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <EntregasPorDia />
         <TipoEntrega />
-      </div>
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <MapaCD5Card />
-        <ReclamacionesEstado />
       </div>
     </div>
   );
