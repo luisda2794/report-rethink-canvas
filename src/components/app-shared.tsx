@@ -7,6 +7,7 @@ import {
   ReceiptIcon,
   AlertOctagonIcon,
   MapIcon,
+  SettingsIcon,
   ShieldIcon,
   HelpCircleIcon,
   BookOpenIcon,
@@ -34,6 +35,7 @@ const ICONS: Record<string, ReactNode> = {
   "/facturacion": <ReceiptIcon />,
   "/reclamaciones": <AlertOctagonIcon />,
   "/mapas-provincia": <MapIcon />,
+  "/mapas-admin": <SettingsIcon />,
   "/admin": <ShieldIcon />,
 };
 
@@ -45,6 +47,7 @@ const GROUP_OF: Record<string, string> = {
   "/facturacion": "Facturación",
   "/reclamaciones": "Soporte",
   "/mapas-provincia": "Operación",
+  "/mapas-admin": "Operación",
   "/admin": "Administración",
 };
 
