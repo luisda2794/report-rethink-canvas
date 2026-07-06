@@ -21,6 +21,7 @@ import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
+import { Route as ApiPublicCd13RouteImport } from './routes/api/public/cd13'
 
 const ReportesRoute = ReportesRouteImport.update({
   id: '/reportes',
@@ -82,6 +83,11 @@ const RecTokenRoute = RecTokenRouteImport.update({
   path: '/rec/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicCd13Route = ApiPublicCd13RouteImport.update({
+  id: '/api/public/cd13',
+  path: '/api/public/cd13',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/api/public/cd13': typeof ApiPublicCd13Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/api/public/cd13': typeof ApiPublicCd13Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/api/public/cd13': typeof ApiPublicCd13Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/api/public/cd13'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/api/public/cd13'
   id:
     | '__root__'
     | '/'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/api/public/cd13'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -184,6 +196,7 @@ export interface RootRouteChildren {
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
+  ApiPublicCd13Route: typeof ApiPublicCd13Route
 }
 
 declare module '@tanstack/react-router' {
@@ -272,6 +285,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cd13': {
+      id: '/api/public/cd13'
+      path: '/api/public/cd13'
+      fullPath: '/api/public/cd13'
+      preLoaderRoute: typeof ApiPublicCd13RouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -288,6 +308,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
+  ApiPublicCd13Route: ApiPublicCd13Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
