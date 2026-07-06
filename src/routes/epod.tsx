@@ -562,13 +562,14 @@ function EpodPage() {
                           <th className="text-right px-4 py-3">Entregados</th>
                           <th className="text-right px-4 py-3">Dupes</th>
                           <th className="text-left px-4 py-3">Estado</th>
+                          <th className="text-right px-4 py-3 w-12"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {history.length === 0 ? (
                           <tr>
                             <td
-                              colSpan={6}
+                              colSpan={7}
                               className="px-4 py-8 text-center text-muted-text font-mono text-xs"
                             >
                               Sin uploads aún
@@ -608,6 +609,21 @@ function EpodPage() {
                                     "Pendiente"
                                   )}
                                 </span>
+                              </td>
+                              <td className="px-2 py-2.5 text-right">
+                                <button
+                                  onClick={() => void deleteUpload(h)}
+                                  disabled={deletingId === h.id}
+                                  className="size-7 rounded grid place-items-center text-muted-text hover:text-danger hover:bg-danger/10 transition-colors disabled:opacity-40"
+                                  aria-label="Eliminar ePOD"
+                                  title="Eliminar ePOD"
+                                >
+                                  {deletingId === h.id ? (
+                                    <Loader2 className="size-3.5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="size-3.5" />
+                                  )}
+                                </button>
                               </td>
                             </tr>
                           ))
