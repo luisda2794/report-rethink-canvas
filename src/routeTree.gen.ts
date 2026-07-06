@@ -17,6 +17,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as Cd13RouteImport } from './routes/cd13'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -63,6 +64,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Cd13Route = Cd13RouteImport.update({
+  id: '/cd13',
+  path: '/cd13',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BorradoresRoute = BorradoresRouteImport.update({
   id: '/borradores',
   path: '/borradores',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/borradores': typeof BorradoresRoute
+  '/cd13': typeof Cd13Route
   '/dashboard': typeof DashboardRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/borradores': typeof BorradoresRoute
+  '/cd13': typeof Cd13Route
   '/dashboard': typeof DashboardRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/borradores': typeof BorradoresRoute
+  '/cd13': typeof Cd13Route
   '/dashboard': typeof DashboardRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/borradores'
+    | '/cd13'
     | '/dashboard'
     | '/epod'
     | '/facturacion'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/borradores'
+    | '/cd13'
     | '/dashboard'
     | '/epod'
     | '/facturacion'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/borradores'
+    | '/cd13'
     | '/dashboard'
     | '/epod'
     | '/facturacion'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   BorradoresRoute: typeof BorradoresRoute
+  Cd13Route: typeof Cd13Route
   DashboardRoute: typeof DashboardRoute
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
@@ -257,6 +270,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cd13': {
+      id: '/cd13'
+      path: '/cd13'
+      fullPath: '/cd13'
+      preLoaderRoute: typeof Cd13RouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/borradores': {
       id: '/borradores'
       path: '/borradores'
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   BorradoresRoute: BorradoresRoute,
+  Cd13Route: Cd13Route,
   DashboardRoute: DashboardRoute,
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
