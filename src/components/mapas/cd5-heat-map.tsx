@@ -41,6 +41,8 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [layerReady, setLayerReady] = useState(false);
+
 
   // --- Carga inicial del mapa y la geometría ---
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
         }).addTo(map);
         layerRef.current = layer;
         map.fitBounds(layer.getBounds().pad(0.02));
+        setLayerReady(true);
       })
       .catch(() => setError("No se pudo cargar la geometría de códigos postales."));
 
@@ -130,7 +133,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
       lyr.setPopupContent(popupHTML(cp, count));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [counts]);
+  }, [counts, layerReady]);
 
   function popupHTML(cp: string, count: number) {
     const estado = count >= UMBRAL_ROJO_DESDE ? "Crítico" : count >= UMBRAL_NARANJA_DESDE ? "Alerta" : "OK";
