@@ -65,7 +65,7 @@ function MapasAdminPage() {
   const [busyUpload, setBusyUpload] = useState(false);
 
   const [csvText, setCsvText] = useState("");
-  const [csvRows, setCsvRows] = useState<Record<string, string | number>[]>([]);
+  const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
   const [busyImport, setBusyImport] = useState(false);
 
