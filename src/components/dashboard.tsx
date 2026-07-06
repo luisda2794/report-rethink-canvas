@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, CalendarIcon } from "lucide-react";
-import { format, subDays, differenceInCalendarDays, addDays } from "date-fns";
+import { format, subDays, differenceInCalendarDays, addDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import {
