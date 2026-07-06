@@ -1,90 +1,28 @@
-# Plan: Actualizar el mapa mediante CSV y GeoJSON
+## Plan: página /cd13 con el mapa de calor CD13
 
-## Resumen
-Convertimos el mapa de un archivo GeoJSON estático a un sistema versionado: la geometría (polígonos) se actualiza subiendo un nuevo GeoJSON, y los datos operativos por código postal (volumen, DSP, SLA, hub) se actualizan mediante CSV. Admin y manager pueden gestionar las versiones desde una nueva pantalla.
+### Contexto
+El componente `CD13HeatMap.tsx` existe pero está mal ubicado en `public/geo/src/components/` (dentro de `/public`, que solo sirve archivos estáticos y no compila TSX). Además no hay ninguna ruta que lo renderice. La API `/api/public/cd13` ya está lista.
 
-## 1. Modelo de datos
+### Cambios
 
-Crear dos tablas en la base de datos:
+1. **Mover el componente a su sitio**
+   - Mover `public/geo/src/components/CD13HeatMap.tsx` → `src/components/mapas/cd13-heat-map.tsx`.
+   - Eliminar la carpeta huérfana `public/geo/src/`.
+   - Confirmar que el GeoJSON que usa (`/geo/alicante_cp_geometry.json`) exista en `public/geo/`; si no, reutilizar el GeoJSON activo de `mapa_versions` (mismo patrón que `use-mapa-dsp.ts`).
 
-### `public.mapa_versions`
-Guarda cada versión del mapa subida.
+2. **Crear la ruta `/cd13`** (`src/routes/cd13.tsx`)
+   - Protegida con `RequireAuth path="/cd13"` (acceso admin y manager, igual que `/mapas-provincia`).
+   - `head()` propio: título "Mapa de calor CD13" y meta description.
+   - Renderiza `<CD13HeatMap fetchCD13Snapshot={...} />` pasándole una función que hace `fetch('/api/public/cd13')` y devuelve las filas.
+   - Envuelto en `AppShell` para mantener la topbar/sidebar del resto de páginas internas.
 
-- `id` uuid
-- `nombre` text (ej. "Abril 2025")
-- `geojson_path` text (ruta en el bucket `mapas`, ej. `v2/alicante.geojson`)
-- `activa` boolean
-- `creado_por` uuid (referencia a auth.users)
-- `created_at`, `updated_at`
+3. **Registrar la ruta en el sidebar y roles**
+   - `src/lib/roles.ts`: añadir `/cd13` a `ROUTE_ACCESS` para admin y manager.
+   - `src/components/app-shared.tsx`: añadir `/cd13` a `ALL_NAV`, `ICONS` (icono de mapa/calor) y `GROUP_OF` (grupo "Operación", junto a "Mapas por provincia").
 
-### `public.mapa_cp_data`
-Guarda los datos operativos por código postal, vinculados a una versión.
+4. **Verificación**
+   - Login como admin en preview con Playwright, navegar a `/cd13`, comprobar que se renderiza el mapa y el panel lateral con los conteos, capturar pantalla.
 
-- `id` uuid
-- `version_id` uuid (referencia a mapa_versions)
-- `cp` text
-- `dsp` text
-- `hub_id` uuid (referencia a hubs, opcional)
-- `sla_teorico` text
-- `sla_fijo` text
-- `volumen` numeric
-- `updated_at`
-
-RLS: solo admin y manager pueden leer, insertar, actualizar y eliminar. Todos los demás roles solo lectura. Incluir GRANTs y triggers de `updated_at`.
-
-## 2. Backend (server functions)
-
-Crear funciones en `src/lib/mapas.functions.ts`:
-
-- `listMapaVersions()`: lista todas las versiones con conteo de CP.
-- `getActiveMapaVersion()`: devuelve la versión activa y sus datos por CP.
-- `createMapaVersion({ nombre, geojsonFile })`: sube el GeoJSON al bucket `mapas` con un nombre único, crea el registro y lo activa (desactivando la anterior).
-- `activateMapaVersion({ version_id })`: cambia la versión activa.
-- `bulkUpsertCpData({ version_id, csvText })`: parsea CSV, valida columnas (cp, dsp, hub, sla_teorico, sla_fijo, volumen), hace upsert en `mapa_cp_data`.
-- `deleteMapaVersion({ version_id })`: elimina versión, datos asociados y archivo de storage.
-
-Todas las funciones de escritura requieren rol admin o manager (`requireSupabaseAuth` + verificación de rol).
-
-## 3. Frontend de administración
-
-Crear nueva ruta `/mapas-admin` accesible para admin y manager (protegida con `RequireAuth path="/mapas-admin"`).
-
-Pantalla con dos tarjetas:
-
-- **Versiones del mapa**: listado con nombre, fecha, activa, cantidad de CP. Botones para activar, subir nueva versión (GeoJSON + nombre) y eliminar.
-- **Datos por CP**: área para pegar CSV o subir archivo `.csv`. Vista previa de filas detectadas. Botón "Importar" para ejecutar el upsert. Muestra total de CP y volumen de la versión activa.
-
-Añadir la ruta a `ALL_NAV`, `ROUTE_ACCESS` para admin y manager, y a `ICONS`/`GROUP_OF` en `app-shared.tsx` para que aparezca en el sidebar.
-
-## 4. Adaptar el mapa actual
-
-Modificar `src/components/mapas/use-mapa-dsp.ts` para que:
-
-- Llame a `getActiveMapaVersion()`.
-- Descargue el GeoJSON de la ruta indicada por la versión activa.
-- Combine geometría del GeoJSON con datos de `mapa_cp_data` por `cp`: si un CP existe en la tabla, sus propiedades prevalecen sobre las del GeoJSON; si no existe, usa las del GeoJSON.
-- Devuelva el mismo objeto de datos que ahora (`geojson + meta`) para no romper `MapaView` ni `MapaSidebar`.
-
-## 5. Flujo de actualización esperado
-
-1. Admin/manager entra en `/mapas-admin`.
-2. Si cambian los polígonos: sube un nuevo GeoJSON, se crea una versión y se activa.
-3. Si cambian los datos: sube/pegue un CSV y se actualiza `mapa_cp_data` de la versión activa.
-4. El mapa `/mapas-provincia` se recarga automáticamente con la nueva combinación.
-
-## 6. Formato CSV esperado
-
-```csv
-cp,dsp,hub,sla_teorico,sla_fijo,volumen
-03001,DKNS Transportes S.L.,Alicante Centro,T+1,T+1,120
-03002,Luan Express SL,Alicante Norte,T+2,T+2,85
-```
-
-Columna `cp` obligatoria. Las demás son opcionales: si faltan, se conservan los valores del GeoJSON o de la importación anterior.
-
-## 7. Detalles técnicos
-
-- Bucket: reutilizar `mapas` (ya existe y es público). Los archivos GeoJSON se guardarán con prefijo de versión para evitar sobreescrituras accidentales.
-- Parser CSV: usar `papaparse` (instalar vía `bun add papaparse` + tipos `@types/papaparse`).
-- Validación: usar Zod en el server function para validar filas y rechazar CSV con errores graves.
-- Transacción: envolver el upsert en una transacción para evitar estados inconsistentes.
+### Notas técnicas
+- No se toca la API `/api/public/cd13` ni la tabla `cd13_snapshots`; ya devuelven el formato que consume el componente.
+- No se cambian estilos globales: el componente ya trae sus estilos inline. Se puede pulir después si se quiere alinear con el resto de la UI.
