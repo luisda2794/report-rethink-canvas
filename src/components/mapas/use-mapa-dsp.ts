@@ -13,19 +13,31 @@ export type MapaDspData = {
   meta: MapaDspMeta;
 };
 
-async function fetchMapaDsp(): Promise<MapaDspData> {
-  const { version, cpData } = await getActiveMapaVersion();
+const FALLBACK_PATH = "alicante.geojson";
 
-  // Download the active GeoJSON from Supabase Storage.
-  const { data, error } = await supabase.storage.from("mapas").download(version.geojson_path);
+async function downloadGeojson(path: string): Promise<CpFeatureCollection> {
+  const { data, error } = await supabase.storage.from("mapas").download(path);
   if (!data || error) {
     throw new Error(
-      `No se pudo descargar el GeoJSON activo (${version.geojson_path}): ${error?.message ?? "archivo no encontrado"}`,
+      `No se pudo descargar el GeoJSON (${path}): ${error?.message ?? "archivo no encontrado"}`,
     );
   }
-
   const text = await data.text();
-  const geojson = JSON.parse(text) as CpFeatureCollection;
+  return JSON.parse(text) as CpFeatureCollection;
+}
+
+async function fetchMapaDsp(): Promise<MapaDspData> {
+  let geojson: CpFeatureCollection;
+  let cpData: Awaited<ReturnType<typeof getActiveMapaVersion>>["cpData"] = [];
+
+  try {
+    const active = await getActiveMapaVersion();
+    geojson = await downloadGeojson(active.version.geojson_path);
+    cpData = active.cpData;
+  } catch {
+    // Fallback: si no hay versión activa, usamos el archivo GeoJSON estático.
+    geojson = await downloadGeojson(FALLBACK_PATH);
+  }
 
   const overrides = new Map<string, Partial<CpProperties>>();
   for (const row of cpData) {
@@ -64,3 +76,4 @@ export function useMapaDsp() {
     staleTime: 5 * 60 * 1000,
   });
 }
+
