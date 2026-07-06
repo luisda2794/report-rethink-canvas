@@ -97,14 +97,13 @@ function MapasAdminPage() {
     Papa.parse(csvText, {
       header: true,
       skipEmptyLines: true,
-      dynamicTyping: true,
       complete: (results) => {
         if (results.errors.length) {
           setCsvError(results.errors[0].message);
         } else {
           setCsvError(null);
         }
-        setCsvRows(results.data as Record<string, string | number>[]);
+        setCsvRows(results.data as Record<string, string>[]);
       },
     });
   }, [csvText]);
