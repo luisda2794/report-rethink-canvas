@@ -174,14 +174,15 @@ function MapasAdminPage() {
     try {
       const rows = csvRows.map((r) => {
         const volRaw = r.volumen?.trim();
-        const volumen = volRaw ? Number(volRaw) : null;
+        const parsedVol = volRaw ? Number(volRaw) : null;
+        const volumen = parsedVol !== null && Number.isFinite(parsedVol) && parsedVol >= 0 ? parsedVol : null;
         return {
           cp: r.cp.trim(),
           dsp: r.dsp?.trim() || null,
           hub: r.hub?.trim() || null,
           sla_teorico: r.sla_teorico?.trim() || null,
           sla_fijo: r.sla_fijo?.trim() || null,
-          volumen: Number.isFinite(volumen) && volumen >= 0 ? volumen : null,
+          volumen,
         };
       });
       await upsertFn({ data: { version_id: activeVersion.id, rows } });
