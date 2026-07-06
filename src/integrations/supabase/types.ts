@@ -416,6 +416,87 @@ export type Database = {
         }
         Relationships: []
       }
+      mapa_cp_data: {
+        Row: {
+          cp: string
+          dsp: string | null
+          hub_id: string | null
+          id: string
+          sla_fijo: string | null
+          sla_teorico: string | null
+          updated_at: string
+          version_id: string
+          volumen: number | null
+        }
+        Insert: {
+          cp: string
+          dsp?: string | null
+          hub_id?: string | null
+          id?: string
+          sla_fijo?: string | null
+          sla_teorico?: string | null
+          updated_at?: string
+          version_id: string
+          volumen?: number | null
+        }
+        Update: {
+          cp?: string
+          dsp?: string | null
+          hub_id?: string | null
+          id?: string
+          sla_fijo?: string | null
+          sla_teorico?: string | null
+          updated_at?: string
+          version_id?: string
+          volumen?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mapa_cp_data_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mapa_cp_data_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "mapa_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mapa_versions: {
+        Row: {
+          activa: boolean
+          creado_por: string
+          created_at: string
+          geojson_path: string
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          creado_por?: string
+          created_at?: string
+          geojson_path: string
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          creado_por?: string
+          created_at?: string
+          geojson_path?: string
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           activo: boolean
