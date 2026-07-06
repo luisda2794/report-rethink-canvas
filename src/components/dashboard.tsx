@@ -141,14 +141,15 @@ function EntregasPorDia({
   from: Date;
   to: Date;
 }) {
+  type DayRow = {
+    fecha: string;
+    entregados: number;
+    incidencias: number;
+    total: number;
+  };
+
   const data = useMemo(() => {
-    type Row = {
-      fecha: string;
-      entregados: number;
-      incidencias: number;
-      total: number;
-    };
-    const buckets = new Map<string, Row>();
+    const buckets = new Map<string, DayRow>();
     const days = differenceInCalendarDays(to, from);
     for (let i = 0; i <= days; i++) {
       const k = toISO(addDays(from, i));
