@@ -1,5 +1,7 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Bar,
   BarChart,
@@ -248,6 +250,26 @@ function TipoEntrega() {
 
 export function Dashboard() {
   const { selectedHub } = useAuth();
+  const queryClient = useQueryClient();
+  const hubId = selectedHub?.id ?? null;
+
+  // Realtime: refresca cuando entran/actualizan filas en entregas para este hub
+  useEffect(() => {
+    if (!hubId) return;
+    const channel = supabase
+      .channel(`entregas-${hubId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "entregas", filter: `hub_id=eq.${hubId}` },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["dash-entregas", hubId] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [hubId, queryClient]);
 
   if (!selectedHub) {
     return (
@@ -259,8 +281,17 @@ export function Dashboard() {
     );
   }
 
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: ["dash-entregas", hubId] });
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
+          <RefreshCw className="h-3.5 w-3.5" />
+          Refrescar
+        </Button>
+      </div>
       <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3")}>
         <Stats />
       </div>
