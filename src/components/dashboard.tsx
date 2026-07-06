@@ -142,20 +142,33 @@ function EntregasPorDia({
   to: Date;
 }) {
   const data = useMemo(() => {
-    const buckets = new Map<string, number>();
+    type Row = { fecha: string; entregados: number; incidencias: number };
+    const buckets = new Map<string, Row>();
     const days = differenceInCalendarDays(to, from);
     for (let i = 0; i <= days; i++) {
-      buckets.set(toISO(addDays(from, i)), 0);
+      const k = toISO(addDays(from, i));
+      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0 });
     }
+    const failStates = new Set([
+      "Cancelar",
+      "Attempt Failure",
+      "Return_to_seller_success",
+      "Return_to_seller_fail",
+      "Driver_received_incidence",
+    ]);
     for (const e of entregas) {
       if (!e.fecha) continue;
-      if (buckets.has(e.fecha)) buckets.set(e.fecha, buckets.get(e.fecha)! + 1);
+      const row = buckets.get(e.fecha);
+      if (!row) continue;
+      if (e.estado === "Entregado") row.entregados += 1;
+      else if (e.estado && failStates.has(e.estado)) row.incidencias += 1;
     }
-    return Array.from(buckets, ([fecha, n]) => ({ fecha, n }));
+    return Array.from(buckets.values());
   }, [entregas, from, to]);
 
   const config = {
-    n: { label: "Entregas", color: "var(--chart-1)" },
+    entregados: { label: "Entregados", color: "var(--chart-2)" },
+    incidencias: { label: "Incidencias", color: "var(--destructive)" },
   } satisfies ChartConfig;
 
   return (
@@ -178,13 +191,36 @@ function EntregasPorDia({
             <ChartTooltip content={<ChartTooltipContent />} />
             <Line
               type="monotone"
-              dataKey="n"
-              stroke="var(--color-n)"
+              dataKey="entregados"
+              stroke="var(--color-entregados)"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
+              dataKey="incidencias"
+              stroke="var(--color-incidencias)"
               strokeWidth={2}
               dot={false}
             />
           </LineChart>
         </ChartContainer>
+        <div className="mt-2 flex flex-wrap gap-3 text-xs">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ background: "var(--chart-2)" }}
+            />
+            <span className="text-muted-foreground">Entregados</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ background: "var(--destructive)" }}
+            />
+            <span className="text-muted-foreground">Incidencias</span>
+          </span>
+        </div>
       </CardContent>
     </Card>
   );
