@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { RefreshCw, CalendarIcon } from "lucide-react";
-import { format, subDays, differenceInCalendarDays, addDays } from "date-fns";
+import { format, subDays, differenceInCalendarDays, addDays, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 import {
@@ -141,13 +141,19 @@ function EntregasPorDia({
   from: Date;
   to: Date;
 }) {
+  type DayRow = {
+    fecha: string;
+    entregados: number;
+    incidencias: number;
+    total: number;
+  };
+
   const data = useMemo(() => {
-    type Row = { fecha: string; entregados: number; incidencias: number };
-    const buckets = new Map<string, Row>();
+    const buckets = new Map<string, DayRow>();
     const days = differenceInCalendarDays(to, from);
     for (let i = 0; i <= days; i++) {
       const k = toISO(addDays(from, i));
-      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0 });
+      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0, total: 0 });
     }
     const failStates = new Set([
       "Cancelar",
@@ -160,6 +166,7 @@ function EntregasPorDia({
       if (!e.fecha) continue;
       const row = buckets.get(e.fecha);
       if (!row) continue;
+      row.total += 1;
       if (e.estado === "Entregado") row.entregados += 1;
       else if (e.estado && failStates.has(e.estado)) row.incidencias += 1;
     }
@@ -170,6 +177,49 @@ function EntregasPorDia({
     entregados: { label: "Entregados", color: "var(--chart-2)" },
     incidencias: { label: "Incidencias", color: "var(--destructive)" },
   } satisfies ChartConfig;
+
+  function EntregasTooltip({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean;
+    payload?: Array<{ name: string; value: number; color: string; dataKey: string; payload?: DayRow }>;
+    label?: string;
+  }) {
+    if (!active || !payload || payload.length === 0) return null;
+    const row = payload[0]?.payload;
+    const total = row?.total ?? 0;
+    return (
+      <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
+        <p className="mb-1 font-medium text-foreground">
+          {format(parseISO(label!), "d MMM yyyy", { locale: es })}
+        </p>
+        <div className="space-y-1">
+          {payload.map((p) => {
+            const pct = total > 0 ? ((p.value as number) / total) * 100 : 0;
+            return (
+              <div key={p.dataKey} className="flex items-center gap-2">
+                <span
+                  className="inline-block size-2 rounded-full"
+                  style={{ background: p.color }}
+                />
+                <span className="flex-1 text-muted-foreground">{p.name}</span>
+                <span className="font-medium tabular-nums">{p.value}</span>
+                <span className="tabular-nums text-muted-foreground">
+                  ({pct.toFixed(1)}%)
+                </span>
+              </div>
+            );
+          })}
+          <div className="mt-1 flex items-center justify-between border-t pt-1 text-xs text-muted-foreground">
+            <span>Total</span>
+            <span className="font-medium tabular-nums">{total}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Card className="shadow-none sm:col-span-2 lg:col-span-2">
@@ -188,7 +238,7 @@ function EntregasPorDia({
               fontSize={11}
             />
             <YAxis tickLine={false} axisLine={false} fontSize={11} width={28} />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartTooltip content={<EntregasTooltip />} />
             <Line
               type="monotone"
               dataKey="entregados"
