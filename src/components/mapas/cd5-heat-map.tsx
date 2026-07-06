@@ -42,6 +42,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layerReady, setLayerReady] = useState(false);
+  const countsRef = useRef<Record<string, number>>({});
 
 
   // --- Carga inicial del mapa y la geometría ---
