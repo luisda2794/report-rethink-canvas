@@ -73,6 +73,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
         }).addTo(map);
         layerRef.current = layer;
         map.fitBounds(layer.getBounds().pad(0.02));
+        setLayerReady(true);
       })
       .catch(() => setError("No se pudo cargar la geometría de códigos postales."));
 
