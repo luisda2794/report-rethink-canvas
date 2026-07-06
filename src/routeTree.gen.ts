@@ -17,12 +17,12 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
 import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as Cd13RouteImport } from './routes/cd13'
+import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
-import { Route as ApiPublicCd13RouteImport } from './routes/api/public/cd13'
+import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
 
 const ReportesRoute = ReportesRouteImport.update({
   id: '/reportes',
@@ -64,9 +64,9 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const Cd13Route = Cd13RouteImport.update({
-  id: '/cd13',
-  path: '/cd13',
+const Cd5Route = Cd5RouteImport.update({
+  id: '/cd5',
+  path: '/cd5',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BorradoresRoute = BorradoresRouteImport.update({
@@ -89,9 +89,9 @@ const RecTokenRoute = RecTokenRouteImport.update({
   path: '/rec/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicCd13Route = ApiPublicCd13RouteImport.update({
-  id: '/api/public/cd13',
-  path: '/api/public/cd13',
+const ApiPublicCd5Route = ApiPublicCd5RouteImport.update({
+  id: '/api/public/cd5',
+  path: '/api/public/cd5',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -99,7 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/borradores': typeof BorradoresRoute
-  '/cd13': typeof Cd13Route
+  '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
@@ -109,13 +109,13 @@ export interface FileRoutesByFullPath {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
-  '/api/public/cd13': typeof ApiPublicCd13Route
+  '/api/public/cd5': typeof ApiPublicCd5Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/borradores': typeof BorradoresRoute
-  '/cd13': typeof Cd13Route
+  '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
@@ -125,14 +125,14 @@ export interface FileRoutesByTo {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
-  '/api/public/cd13': typeof ApiPublicCd13Route
+  '/api/public/cd5': typeof ApiPublicCd5Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/borradores': typeof BorradoresRoute
-  '/cd13': typeof Cd13Route
+  '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
@@ -142,7 +142,7 @@ export interface FileRoutesById {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
-  '/api/public/cd13': typeof ApiPublicCd13Route
+  '/api/public/cd5': typeof ApiPublicCd5Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,7 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/borradores'
-    | '/cd13'
+    | '/cd5'
     | '/dashboard'
     | '/epod'
     | '/facturacion'
@@ -160,13 +160,13 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
-    | '/api/public/cd13'
+    | '/api/public/cd5'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
     | '/borradores'
-    | '/cd13'
+    | '/cd5'
     | '/dashboard'
     | '/epod'
     | '/facturacion'
@@ -176,13 +176,13 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
-    | '/api/public/cd13'
+    | '/api/public/cd5'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/borradores'
-    | '/cd13'
+    | '/cd5'
     | '/dashboard'
     | '/epod'
     | '/facturacion'
@@ -192,14 +192,14 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
-    | '/api/public/cd13'
+    | '/api/public/cd5'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   BorradoresRoute: typeof BorradoresRoute
-  Cd13Route: typeof Cd13Route
+  Cd5Route: typeof Cd5Route
   DashboardRoute: typeof DashboardRoute
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
@@ -209,7 +209,7 @@ export interface RootRouteChildren {
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
-  ApiPublicCd13Route: typeof ApiPublicCd13Route
+  ApiPublicCd5Route: typeof ApiPublicCd5Route
 }
 
 declare module '@tanstack/react-router' {
@@ -270,11 +270,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/cd13': {
-      id: '/cd13'
-      path: '/cd13'
-      fullPath: '/cd13'
-      preLoaderRoute: typeof Cd13RouteImport
+    '/cd5': {
+      id: '/cd5'
+      path: '/cd5'
+      fullPath: '/cd5'
+      preLoaderRoute: typeof Cd5RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/borradores': {
@@ -305,11 +305,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/cd13': {
-      id: '/api/public/cd13'
-      path: '/api/public/cd13'
-      fullPath: '/api/public/cd13'
-      preLoaderRoute: typeof ApiPublicCd13RouteImport
+    '/api/public/cd5': {
+      id: '/api/public/cd5'
+      path: '/api/public/cd5'
+      fullPath: '/api/public/cd5'
+      preLoaderRoute: typeof ApiPublicCd5RouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -319,7 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   BorradoresRoute: BorradoresRoute,
-  Cd13Route: Cd13Route,
+  Cd5Route: Cd5Route,
   DashboardRoute: DashboardRoute,
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
@@ -329,7 +329,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
-  ApiPublicCd13Route: ApiPublicCd13Route,
+  ApiPublicCd5Route: ApiPublicCd5Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
