@@ -184,7 +184,7 @@ function EntregasPorDia({
     label,
   }: {
     active?: boolean;
-    payload?: Array<{ name: string; value: number; color: string; dataKey: string; payload?: Row }>;
+    payload?: Array<{ name: string; value: number; color: string; dataKey: string; payload?: DayRow }>;
     label?: string;
   }) {
     if (!active || !payload || payload.length === 0) return null;
