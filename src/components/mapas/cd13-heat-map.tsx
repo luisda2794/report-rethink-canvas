@@ -59,13 +59,15 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
         const layer = L.geoJSON(geojson, {
           style: () => ({ fillColor: "#9ca3af", weight: 1, color: "#fff", fillOpacity: 0.75 }),
           onEachFeature: (feature, lyr) => {
-            lyr.bindPopup("");
-            lyr.on("mouseover", () => lyr.setStyle({ weight: 2, color: "#111827" }));
-            lyr.on("mouseout", () => {
+            const path = lyr as L.Path;
+            path.bindPopup("");
+            path.on("mouseover", () => path.setStyle({ weight: 2, color: "#111827" }));
+            path.on("mouseout", () => {
               const cp = feature.properties.cp;
-              lyr.setStyle(styleForCp(cp));
+              path.setStyle(styleForCp(cp));
             });
           },
+
         }).addTo(map);
         layerRef.current = layer;
         map.fitBounds(layer.getBounds().pad(0.02));
