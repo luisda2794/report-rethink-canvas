@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Loader2 } from "lucide-react";
@@ -9,7 +9,27 @@ import { Loader2 } from "lucide-react";
 const UMBRAL_NARANJA_DESDE = 1; // >=1 paquete CD5 -> naranja
 const UMBRAL_ROJO_DESDE = 5; // >=5 paquetes CD5 -> rojo
 
-const GEO_URL = "/geo/alicante_cp_geometry.json";
+type ProvinciaKey = "alicante" | "toledo";
+
+const PROVINCIAS: Record<
+  ProvinciaKey,
+  { label: string; geoUrl: string; center: [number, number]; zoom: number; prefix: string }
+> = {
+  alicante: {
+    label: "Alicante",
+    geoUrl: "/geo/alicante_cp_geometry.json",
+    center: [38.45, -0.55],
+    zoom: 9,
+    prefix: "03",
+  },
+  toledo: {
+    label: "Toledo",
+    geoUrl: "/geo/toledo_cp_geometry.json",
+    center: [39.86, -4.02],
+    zoom: 9,
+    prefix: "45",
+  },
+};
 
 function colorFor(count: number): string {
   if (count >= UMBRAL_ROJO_DESDE) return "#dc2626";
@@ -21,6 +41,7 @@ interface CD5Row {
   cp: string;
   count: number;
   updated_at?: string;
+  provincia?: string | null;
 }
 
 interface CD5HeatMapProps {
@@ -33,26 +54,65 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const layerRef = useRef<L.GeoJSON | null>(null);
   const countsRef = useRef<Record<string, number>>({});
 
-  const [counts, setCounts] = useState<Record<string, number>>({});
+  const [provincia, setProvincia] = useState<ProvinciaKey>("alicante");
+  const [allRows, setAllRows] = useState<CD5Row[]>([]);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layerReady, setLayerReady] = useState(false);
 
-  // --- Carga inicial del mapa y la geometría ---
+  // Filtra los rows en cliente según provincia
+  const counts = useMemo(() => {
+    const cfg = PROVINCIAS[provincia];
+    const map: Record<string, number> = {};
+    for (const r of allRows) {
+      const prov = (r.provincia ?? "").trim();
+      const matches = prov
+        ? prov === cfg.prefix
+        : (r.cp ?? "").startsWith(cfg.prefix);
+      if (matches) map[r.cp] = r.count;
+    }
+    return map;
+  }, [allRows, provincia]);
+
+  // --- Inicializa el mapa (una sola vez) ---
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
-
-    const map = L.map(mapContainerRef.current).setView([38.45, -0.55], 9);
+    const cfg = PROVINCIAS[provincia];
+    const map = L.map(mapContainerRef.current).setView(cfg.center, cfg.zoom);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
       maxZoom: 18,
     }).addTo(map);
     mapRef.current = map;
 
-    fetch(GEO_URL)
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      layerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Carga/recarga del GeoJSON al cambiar de provincia ---
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const cfg = PROVINCIAS[provincia];
+
+    setLayerReady(false);
+    if (layerRef.current) {
+      layerRef.current.remove();
+      layerRef.current = null;
+    }
+
+    map.setView(cfg.center, cfg.zoom);
+
+    let cancelled = false;
+    fetch(cfg.geoUrl)
       .then((res) => res.json())
       .then((geojson) => {
+        if (cancelled || !mapRef.current) return;
         const layer = L.geoJSON(geojson, {
           style: () => ({
             fillColor: "#9ca3af",
@@ -71,17 +131,20 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
           },
         }).addTo(map);
         layerRef.current = layer;
-        map.fitBounds(layer.getBounds().pad(0.02));
+        try {
+          map.fitBounds(layer.getBounds().pad(0.02));
+        } catch {
+          /* noop */
+        }
         setLayerReady(true);
       })
       .catch(() => setError("No se pudo cargar la geometría de códigos postales."));
 
     return () => {
-      map.remove();
-      mapRef.current = null;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [provincia]);
 
   function styleForCp(cp: string) {
     const count = countsRef.current[cp] ?? 0;
@@ -93,21 +156,18 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
     };
   }
 
-  // --- Carga / refresco de los datos CD5 ---
+  // --- Carga / refresco de los datos CD5 (una sola vez + intervalo) ---
   async function refresh() {
     try {
       setLoading(true);
       const rows = await fetchCD5Snapshot();
-      const map: Record<string, number> = {};
       let latestUpdate: string | null = null;
       rows.forEach((r) => {
-        map[r.cp] = r.count;
         if (r.updated_at && (!latestUpdate || r.updated_at > latestUpdate)) {
           latestUpdate = r.updated_at;
         }
       });
-      countsRef.current = map;
-      setCounts(map);
+      setAllRows(rows);
       setLastUpdated(latestUpdate);
       setError(null);
     } catch (e) {
@@ -124,7 +184,12 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Repinta el mapa cuando cambian los conteos
+  // Mantén countsRef sincronizado con los counts filtrados
+  useEffect(() => {
+    countsRef.current = counts;
+  }, [counts]);
+
+  // Repinta el mapa cuando cambian los conteos o el layer
   useEffect(() => {
     const layer = layerRef.current;
     if (!layer) return;
@@ -155,7 +220,9 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
 
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const rojos = Object.values(counts).filter((c) => c >= UMBRAL_ROJO_DESDE).length;
-  const naranjas = Object.values(counts).filter((c) => c >= UMBRAL_NARANJA_DESDE && c < UMBRAL_ROJO_DESDE).length;
+  const naranjas = Object.values(counts).filter(
+    (c) => c >= UMBRAL_NARANJA_DESDE && c < UMBRAL_ROJO_DESDE,
+  ).length;
   const verdes = Object.keys(counts).length - rojos - naranjas;
 
   const legend = [
@@ -168,6 +235,27 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
     <div className="relative h-full w-full">
       <div ref={mapContainerRef} className="h-full w-full bg-muted" />
 
+      {/* Selector de provincia */}
+      <div className="absolute top-3 left-3 z-[500] flex gap-1 rounded-md border border-border bg-background/95 p-1 shadow-sm">
+        {(Object.keys(PROVINCIAS) as ProvinciaKey[]).map((key) => {
+          const active = key === provincia;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setProvincia(key)}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors ${
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {PROVINCIAS[key].label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Loading */}
       {loading && total === 0 && (
         <div className="absolute inset-0 z-[500] flex items-center justify-center bg-background/70">
@@ -177,7 +265,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
 
       {/* Error */}
       {error && (
-        <div className="absolute top-3 left-3 z-[500] max-w-[70%] rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="absolute top-16 left-3 z-[500] max-w-[70%] rounded-md border border-destructive bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {error}
         </div>
       )}
@@ -185,7 +273,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
       {/* Compact legend overlay */}
       <div className="absolute bottom-3 right-3 z-[500] rounded-md border border-border bg-background/95 px-3 py-2 shadow-sm">
         <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          CD5 en reparto
+          CD5 en reparto — {PROVINCIAS[provincia].label}
         </div>
         <div className="flex items-center gap-3">
           {legend.map((row) => (
