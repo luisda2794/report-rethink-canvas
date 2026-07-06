@@ -42,6 +42,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [layerReady, setLayerReady] = useState(false);
+  const countsRef = useRef<Record<string, number>>({});
 
 
   // --- Carga inicial del mapa y la geometría ---
@@ -85,7 +86,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   }, []);
 
   function styleForCp(cp: string) {
-    const count = counts[cp] ?? 0;
+    const count = countsRef.current[cp] ?? 0;
     return { fillColor: colorFor(count), weight: 1, color: "#fff", fillOpacity: 0.75 };
   }
 
@@ -102,6 +103,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
           latestUpdate = r.updated_at;
         }
       });
+      countsRef.current = map;
       setCounts(map);
       setLastUpdated(latestUpdate);
       setError(null);
