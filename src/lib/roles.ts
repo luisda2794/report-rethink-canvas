@@ -20,6 +20,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/facturacion", label: "Facturación" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/mapas-provincia", label: "Mapas Provincia" },
+  { to: "/mapas-admin", label: "Admin mapas" },
   { to: "/admin", label: "Admin" },
 ];
 

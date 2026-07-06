@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
 import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
+import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
@@ -34,6 +35,11 @@ const ReclamacionesRoute = ReclamacionesRouteImport.update({
 const MapasProvinciaRoute = MapasProvinciaRouteImport.update({
   id: '/mapas-provincia',
   path: '/mapas-provincia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapasAdminRoute = MapasAdminRouteImport.update({
+  id: '/mapas-admin',
+  path: '/mapas-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
@@ -98,6 +105,7 @@ export interface FileRoutesByTo {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
@@ -112,6 +120,7 @@ export interface FileRoutesById {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
@@ -127,6 +136,7 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapas-admin'
     | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapas-admin'
     | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapas-admin'
     | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
@@ -167,6 +179,7 @@ export interface RootRouteChildren {
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
   LoginRoute: typeof LoginRoute
+  MapasAdminRoute: typeof MapasAdminRoute
   MapasProvinciaRoute: typeof MapasProvinciaRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
@@ -194,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/mapas-provincia'
       fullPath: '/mapas-provincia'
       preLoaderRoute: typeof MapasProvinciaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapas-admin': {
+      id: '/mapas-admin'
+      path: '/mapas-admin'
+      fullPath: '/mapas-admin'
+      preLoaderRoute: typeof MapasAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -263,6 +283,7 @@ const rootRouteChildren: RootRouteChildren = {
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
   LoginRoute: LoginRoute,
+  MapasAdminRoute: MapasAdminRoute,
   MapasProvinciaRoute: MapasProvinciaRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
