@@ -111,6 +111,27 @@ export type Database = {
           },
         ]
       }
+      cd13_snapshots: {
+        Row: {
+          count: number
+          cp: string
+          provincia: string
+          updated_at: string
+        }
+        Insert: {
+          count?: number
+          cp: string
+          provincia: string
+          updated_at?: string
+        }
+        Update: {
+          count?: number
+          cp?: string
+          provincia?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       conciliacion: {
         Row: {
           cp: string | null
@@ -654,6 +675,7 @@ export type Database = {
     Functions: {
       get_user_role: { Args: { _user_id: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      refresh_cd13_snapshots: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
