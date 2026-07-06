@@ -103,6 +103,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
           latestUpdate = r.updated_at;
         }
       });
+      countsRef.current = map;
       setCounts(map);
       setLastUpdated(latestUpdate);
       setError(null);
