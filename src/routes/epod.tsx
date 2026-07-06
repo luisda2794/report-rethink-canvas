@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   BarChart3,
   FileText,
+  Trash2,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
