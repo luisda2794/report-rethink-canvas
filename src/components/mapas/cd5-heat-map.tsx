@@ -5,8 +5,8 @@ import "leaflet/dist/leaflet.css";
 // ============================================================
 // CONFIGURACIÓN — ajusta aquí umbrales y origen de datos
 // ============================================================
-const UMBRAL_NARANJA_DESDE = 1; // >=1 paquete CD13 -> naranja
-const UMBRAL_ROJO_DESDE = 5; // >=5 paquetes CD13 -> rojo
+const UMBRAL_NARANJA_DESDE = 1; // >=1 paquete CD5 -> naranja
+const UMBRAL_ROJO_DESDE = 5; // >=5 paquetes CD5 -> rojo
 
 // Ruta del GeoJSON de fronteras (estático, no cambia).
 // Colócalo en /public/geo/alicante_cp_geometry.json
@@ -18,21 +18,21 @@ function colorFor(count: number): string {
   return "#16a34a";
 }
 
-interface CD13Row {
+interface CD5Row {
   cp: string;
   count: number;
   updated_at?: string;
 }
 
-interface CD13HeatMapProps {
+interface CD5HeatMapProps {
   // Inyecta aquí tu cliente Supabase (el de Lovable ya trae uno integrado,
   // normalmente en "@/integrations/supabase/client").
   // Se espera un array de filas { cp, count, updated_at } ya calculado
-  // en la tabla cd13_snapshots (ver prompt de configuración de base de datos).
-  fetchCD13Snapshot: () => Promise<CD13Row[]>;
+  // en la tabla cd5_snapshots (ver prompt de configuración de base de datos).
+  fetchCD5Snapshot: () => Promise<CD5Row[]>;
 }
 
-export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
+export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
@@ -86,11 +86,11 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
     return { fillColor: colorFor(count), weight: 1, color: "#fff", fillOpacity: 0.75 };
   }
 
-  // --- Carga / refresco de los datos CD13 ---
+  // --- Carga / refresco de los datos CD5 ---
   async function refresh() {
     try {
       setLoading(true);
-      const rows = await fetchCD13Snapshot();
+      const rows = await fetchCD5Snapshot();
       const map: Record<string, number> = {};
       let latestUpdate: string | null = null;
       rows.forEach((r) => {
@@ -103,7 +103,7 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
       setLastUpdated(latestUpdate);
       setError(null);
     } catch (e) {
-      setError("No se pudo cargar el snapshot de CD13.");
+      setError("No se pudo cargar el snapshot de CD5.");
     } finally {
       setLoading(false);
     }
@@ -136,7 +136,7 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
     const estado = count >= UMBRAL_ROJO_DESDE ? "Crítico" : count >= UMBRAL_NARANJA_DESDE ? "Alerta" : "OK";
     return `<div style="font-weight:700;font-size:14px;margin-bottom:6px">${cp}</div>
       <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
-        <span style="color:#6b7280">CD13 en reparto</span><span style="font-weight:600">${count}</span>
+        <span style="color:#6b7280">CD5 en reparto</span><span style="font-weight:600">${count}</span>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0">
         <span style="color:#6b7280">Estado</span><span style="font-weight:600;color:${colorFor(count)}">${estado}</span>
@@ -164,9 +164,9 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
           fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
         }}
       >
-        <h2 style={{ fontSize: 17, margin: "0 0 2px 0" }}>🔥 Mapa de calor CD13</h2>
+        <h2 style={{ fontSize: 17, margin: "0 0 2px 0" }}>🔥 Mapa de calor CD5</h2>
         <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 16 }}>
-          Alicante · paquetes &gt;13 días en almacén, en reparto
+          Alicante · paquetes &gt;5 días en almacén, en reparto
         </div>
 
         {error && (
@@ -178,7 +178,7 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
           <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{loading ? "–" : total}</div>
-            <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>CD13 en reparto</div>
+            <div style={{ fontSize: 11, color: "#6b7280", textTransform: "uppercase" }}>CD5 en reparto</div>
           </div>
           <div style={{ background: "white", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10 }}>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{loading ? "–" : rojos}</div>
@@ -202,7 +202,7 @@ export default function CD13HeatMap({ fetchCD13Snapshot }: CD13HeatMapProps) {
         ))}
 
         <div style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1, color: "#9ca3af", fontWeight: 600, margin: "16px 0 8px" }}>
-          CPs con más CD13
+          CPs con más CD5
         </div>
         {ranking.map(([cp, count]) => (
           <div key={cp} style={{ display: "flex", justifyContent: "space-between", padding: "6px 4px", borderBottom: "1px solid #f3f4f6", fontSize: 12 }}>
