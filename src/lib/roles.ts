@@ -20,6 +20,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/facturacion", label: "Facturación" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/mapas-provincia", label: "Mapas Provincia" },
+  { to: "/cd13", label: "Mapa CD13" },
   { to: "/mapas-admin", label: "Admin mapas" },
   { to: "/admin", label: "Admin" },
 ];
@@ -33,14 +34,16 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/facturacion",
     "/reclamaciones",
     "/mapas-provincia",
+    "/cd13",
     "/mapas-admin",
     "/admin",
   ],
-  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia", "/mapas-admin"],
+  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia", "/cd13", "/mapas-admin"],
   jefe_flota: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia"],
   contable: ["/borradores", "/facturacion"],
   customer: ["/reclamaciones"],
 };
+
 
 export function navForRole(role: Role | null | undefined): NavItem[] {
   if (!role) return [];

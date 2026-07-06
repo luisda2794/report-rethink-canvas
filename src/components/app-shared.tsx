@@ -7,6 +7,7 @@ import {
   ReceiptIcon,
   AlertOctagonIcon,
   MapIcon,
+  FlameIcon,
   SettingsIcon,
   ShieldIcon,
   HelpCircleIcon,
@@ -35,6 +36,7 @@ const ICONS: Record<string, ReactNode> = {
   "/facturacion": <ReceiptIcon />,
   "/reclamaciones": <AlertOctagonIcon />,
   "/mapas-provincia": <MapIcon />,
+  "/cd13": <FlameIcon />,
   "/mapas-admin": <SettingsIcon />,
   "/admin": <ShieldIcon />,
 };
@@ -47,9 +49,11 @@ const GROUP_OF: Record<string, string> = {
   "/facturacion": "Facturación",
   "/reclamaciones": "Soporte",
   "/mapas-provincia": "Operación",
+  "/cd13": "Operación",
   "/mapas-admin": "Operación",
   "/admin": "Administración",
 };
+
 
 export function buildNavGroups(
   role: Role | null | undefined,
