@@ -111,7 +111,7 @@ export type Database = {
           },
         ]
       }
-      cd13_snapshots: {
+      cd5_snapshots: {
         Row: {
           count: number
           cp: string
@@ -675,7 +675,7 @@ export type Database = {
     Functions: {
       get_user_role: { Args: { _user_id: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
-      refresh_cd13_snapshots: { Args: never; Returns: undefined }
+      refresh_cd5_snapshots: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never

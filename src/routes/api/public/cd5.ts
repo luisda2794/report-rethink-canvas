@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 
-export const Route = createFileRoute('/api/public/cd13')({
+export const Route = createFileRoute('/api/public/cd5')({
   server: {
     handlers: {
       GET: async () => {
         const { supabaseAdmin } = await import('@/integrations/supabase/client.server')
         const { data, error } = await supabaseAdmin
-          .from('cd13_snapshots')
+          .from('cd5_snapshots')
           .select('cp, provincia, count, updated_at')
           .order('count', { ascending: false })
 
