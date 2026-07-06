@@ -33,10 +33,11 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/facturacion",
     "/reclamaciones",
     "/mapas-provincia",
+    "/mapas-admin",
     "/admin",
   ],
-  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia"],
-  jefe_flota: ["/epod", "/dashboard", "/reportes", "/reclamaciones"],
+  manager: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia", "/mapas-admin"],
+  jefe_flota: ["/epod", "/dashboard", "/reportes", "/reclamaciones", "/mapas-provincia"],
   contable: ["/borradores", "/facturacion"],
   customer: ["/reclamaciones"],
 };
