@@ -133,7 +133,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
       lyr.setPopupContent(popupHTML(cp, count));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [counts]);
+  }, [counts, layerReady]);
 
   function popupHTML(cp: string, count: number) {
     const estado = count >= UMBRAL_ROJO_DESDE ? "Crítico" : count >= UMBRAL_NARANJA_DESDE ? "Alerta" : "OK";
