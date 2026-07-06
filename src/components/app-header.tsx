@@ -6,6 +6,7 @@ import { AppBreadcrumbs } from "@/components/app-breadcrumbs";
 import { buildNavGroups, findActive } from "@/components/app-shared";
 import { CustomSidebarTrigger } from "@/components/custom-sidebar-trigger";
 import { NavUser } from "@/components/nav-user";
+import { HubSwitcher } from "@/components/hub-switcher";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function AppHeader() {
@@ -30,6 +31,7 @@ export function AppHeader() {
         <AppBreadcrumbs page={active} />
       </div>
       <div className="flex items-center gap-3">
+        <HubSwitcher />
         <NavUser />
       </div>
     </header>
