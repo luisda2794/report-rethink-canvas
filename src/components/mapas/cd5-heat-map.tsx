@@ -41,6 +41,8 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [layerReady, setLayerReady] = useState(false);
+
 
   // --- Carga inicial del mapa y la geometría ---
   useEffect(() => {
