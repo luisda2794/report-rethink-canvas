@@ -1,12 +1,12 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { RefreshCw, CalendarIcon } from "lucide-react";
+import { format, subDays, differenceInCalendarDays, addDays } from "date-fns";
+import { es } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 import {
-  Bar,
-  BarChart,
-  CartesianGrid,
   Cell,
+  CartesianGrid,
   Line,
   LineChart,
   Pie,
@@ -21,15 +21,16 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Delta, DeltaIcon, DeltaValue } from "@/components/delta";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
-function daysAgo(n: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+function toISO(d: Date) {
+  return format(d, "yyyy-MM-dd");
 }
 
 type Entrega = {
@@ -40,15 +41,9 @@ type Entrega = {
   estado: string | null;
 };
 
-function useDashboardData() {
-  const { selectedHub } = useAuth();
-  const hubId = selectedHub?.id ?? null;
-
-  const since30 = daysAgo(30);
-  const since60 = daysAgo(60);
-
-  const entregasQ = useQuery({
-    queryKey: ["dash-entregas", hubId, since60],
+function useEntregas(hubId: string | null, fromISO: string, toISO: string) {
+  return useQuery({
+    queryKey: ["dash-entregas", hubId, fromISO, toISO],
     enabled: !!hubId,
     queryFn: async (): Promise<Entrega[]> => {
       const pageSize = 1000;
@@ -58,7 +53,8 @@ function useDashboardData() {
           .from("entregas")
           .select("fecha, tipo_norm, tipo, es_aa, estado")
           .eq("hub_id", hubId!)
-          .gte("fecha", since60)
+          .gte("fecha", fromISO)
+          .lte("fecha", toISO)
           .order("fecha", { ascending: true })
           .range(from, from + pageSize - 1);
         if (error) throw error;
@@ -69,39 +65,40 @@ function useDashboardData() {
       return all;
     },
   });
-
-  return { entregasQ, since30 };
 }
 
 /* ---------------- KPIs ---------------- */
 
-function Stats() {
-  const { entregasQ, since30 } = useDashboardData();
-  const entregas = entregasQ.data ?? [];
-
-  const last30 = entregas.filter((e) => (e.fecha ?? "") >= since30);
-  const prev30 = entregas.filter((e) => (e.fecha ?? "") < since30);
-
-  const total30 = last30.length;
-  const totalPrev = prev30.length;
+function Stats({
+  current,
+  previous,
+  days,
+}: {
+  current: Entrega[];
+  previous: Entrega[];
+  days: number;
+}) {
+  const total = current.length;
+  const totalPrev = previous.length;
   const deltaEntregas =
-    totalPrev > 0 ? ((total30 - totalPrev) / totalPrev) * 100 : 0;
+    totalPrev > 0 ? ((total - totalPrev) / totalPrev) * 100 : 0;
 
-  const aa30 = last30.filter((e) => e.es_aa).length;
-  const aaPct = total30 ? (aa30 / total30) * 100 : 0;
+  const aa = current.filter((e) => e.es_aa).length;
+  const aaPct = total ? (aa / total) * 100 : 0;
 
+  const label = `${days}d`;
   const stats = [
     {
-      label: "Entregas (30d)",
-      value: total30.toLocaleString("es-ES"),
+      label: `Entregas (${label})`,
+      value: total.toLocaleString("es-ES"),
       delta: deltaEntregas,
-      footnote: "vs 30d previos",
+      footnote: `vs ${label} previos`,
     },
     {
-      label: "% AA (30d)",
+      label: `% AA (${label})`,
       value: `${aaPct.toFixed(1)}%`,
       delta: 0,
-      footnote: `${aa30} entregas AA`,
+      footnote: `${aa} entregas AA`,
       hideDelta: true,
     },
   ];
@@ -135,21 +132,27 @@ function Stats() {
 
 /* ---------------- Entregas por día ---------------- */
 
-function EntregasPorDia() {
-  const { entregasQ, since30 } = useDashboardData();
+function EntregasPorDia({
+  entregas,
+  from,
+  to,
+}: {
+  entregas: Entrega[];
+  from: Date;
+  to: Date;
+}) {
   const data = useMemo(() => {
     const buckets = new Map<string, number>();
-    for (let i = 29; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      buckets.set(d.toISOString().slice(0, 10), 0);
+    const days = differenceInCalendarDays(to, from);
+    for (let i = 0; i <= days; i++) {
+      buckets.set(toISO(addDays(from, i)), 0);
     }
-    for (const e of entregasQ.data ?? []) {
-      if (!e.fecha || e.fecha < since30) continue;
+    for (const e of entregas) {
+      if (!e.fecha) continue;
       if (buckets.has(e.fecha)) buckets.set(e.fecha, buckets.get(e.fecha)! + 1);
     }
     return Array.from(buckets, ([fecha, n]) => ({ fecha, n }));
-  }, [entregasQ.data, since30]);
+  }, [entregas, from, to]);
 
   const config = {
     n: { label: "Entregas", color: "var(--chart-1)" },
@@ -158,7 +161,7 @@ function EntregasPorDia() {
   return (
     <Card className="shadow-none sm:col-span-2 lg:col-span-2">
       <CardHeader>
-        <CardTitle>Entregas por día (30d)</CardTitle>
+        <CardTitle>Entregas por día</CardTitle>
       </CardHeader>
       <CardContent>
         <ChartContainer className="h-[220px] w-full" config={config}>
@@ -197,12 +200,10 @@ const TIPO_COLORS = [
   "var(--chart-5)",
 ];
 
-function TipoEntrega() {
-  const { entregasQ, since30 } = useDashboardData();
+function TipoEntrega({ entregas }: { entregas: Entrega[] }) {
   const data = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const e of entregasQ.data ?? []) {
-      if (!e.fecha || e.fecha < since30) continue;
+    for (const e of entregas) {
       const key = (e.tipo_norm || e.tipo || "OTRO").toUpperCase();
       counts.set(key, (counts.get(key) ?? 0) + 1);
     }
@@ -211,12 +212,12 @@ function TipoEntrega() {
       n,
       fill: TIPO_COLORS[i % TIPO_COLORS.length],
     }));
-  }, [entregasQ.data, since30]);
+  }, [entregas]);
 
   return (
     <Card className="shadow-none">
       <CardHeader>
-        <CardTitle>Tipo de entrega (30d)</CardTitle>
+        <CardTitle>Tipo de entrega</CardTitle>
       </CardHeader>
       <CardContent>
         <ChartContainer className="h-[220px] w-full" config={{}}>
@@ -248,10 +249,30 @@ function TipoEntrega() {
 
 /* ---------------- Dashboard ---------------- */
 
+const PRESETS: { label: string; days: number }[] = [
+  { label: "7d", days: 7 },
+  { label: "30d", days: 30 },
+  { label: "90d", days: 90 },
+];
+
 export function Dashboard() {
   const { selectedHub } = useAuth();
   const queryClient = useQueryClient();
   const hubId = selectedHub?.id ?? null;
+
+  const [range, setRange] = useState<DateRange | undefined>(() => {
+    const today = new Date();
+    return { from: subDays(today, 29), to: today };
+  });
+
+  const from = range?.from ?? subDays(new Date(), 29);
+  const to = range?.to ?? from;
+  const days = differenceInCalendarDays(to, from) + 1;
+  const prevFrom = subDays(from, days);
+  const prevTo = subDays(from, 1);
+
+  const currentQ = useEntregas(hubId, toISO(from), toISO(to));
+  const prevQ = useEntregas(hubId, toISO(prevFrom), toISO(prevTo));
 
   // Realtime: refresca cuando entran/actualizan filas en entregas para este hub
   useEffect(() => {
@@ -284,20 +305,65 @@ export function Dashboard() {
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["dash-entregas", hubId] });
 
+  const applyPreset = (d: number) => {
+    const today = new Date();
+    setRange({ from: subDays(today, d - 1), to: today });
+  };
+
+  const rangeLabel =
+    range?.from && range.to
+      ? `${format(range.from, "d MMM", { locale: es })} – ${format(range.to, "d MMM yyyy", { locale: es })}`
+      : "Selecciona fechas";
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex items-center gap-1">
+          {PRESETS.map((p) => (
+            <Button
+              key={p.days}
+              variant={days === p.days ? "default" : "outline"}
+              size="sm"
+              onClick={() => applyPreset(p.days)}
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <CalendarIcon className="h-3.5 w-3.5" />
+              {rangeLabel}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="range"
+              numberOfMonths={2}
+              selected={range}
+              onSelect={setRange}
+              locale={es}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
         <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
           <RefreshCw className="h-3.5 w-3.5" />
           Refrescar
         </Button>
       </div>
       <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3")}>
-        <Stats />
+        <Stats
+          current={currentQ.data ?? []}
+          previous={prevQ.data ?? []}
+          days={days}
+        />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <EntregasPorDia />
-        <TipoEntrega />
+        <EntregasPorDia entregas={currentQ.data ?? []} from={from} to={to} />
+        <TipoEntrega entregas={currentQ.data ?? []} />
       </div>
     </div>
   );
