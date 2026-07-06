@@ -7,6 +7,7 @@ import {
   ReceiptIcon,
   AlertOctagonIcon,
   MapIcon,
+  SettingsIcon,
   ShieldIcon,
   HelpCircleIcon,
   BookOpenIcon,
