@@ -86,7 +86,7 @@ export default function CD5HeatMap({ fetchCD5Snapshot }: CD5HeatMapProps) {
   }, []);
 
   function styleForCp(cp: string) {
-    const count = counts[cp] ?? 0;
+    const count = countsRef.current[cp] ?? 0;
     return { fillColor: colorFor(count), weight: 1, color: "#fff", fillOpacity: 0.75 };
   }
 
