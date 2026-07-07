@@ -42,7 +42,7 @@ export const Route = createFileRoute("/reportes")({
   }),
 });
 
-const API_BASE = "https://menssajero-api-production.up.railway.app";
+const API_BASE = "/api/reportes";
 
 type ReportState =
   | { kind: "idle" }
