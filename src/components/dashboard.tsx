@@ -95,6 +95,13 @@ function Stats({
       footnote: `vs ${label} previos`,
     },
     {
+      label: `En reparto hoy`,
+      value: current.en_reparto_hoy.toLocaleString("es-ES"),
+      delta: 0,
+      footnote: `Driver_received + Assigned`,
+      hideDelta: true,
+    },
+    {
       label: `% AA (${label})`,
       value: `${aaPct.toFixed(1)}%`,
       delta: 0,
