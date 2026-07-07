@@ -33,36 +33,34 @@ function toISO(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
-type Entrega = {
-  fecha: string | null;
-  tipo_norm: string | null;
-  tipo: string | null;
-  es_aa: boolean | null;
-  estado: string | null;
+type DayAgg = { fecha: string; total: number; entregados: number; incidencias: number };
+type TipoAgg = { tipo: string; n: number };
+type DashStats = {
+  total: number;
+  aa: number;
+  by_day: DayAgg[];
+  by_tipo: TipoAgg[];
 };
 
-function useEntregas(hubIds: string[], fromISO: string, toISO: string) {
+function useDashStats(hubIds: string[], fromISO: string, toISO: string) {
   return useQuery({
-    queryKey: ["dash-entregas", hubIds.slice().sort().join(","), fromISO, toISO],
+    queryKey: ["dash-stats", hubIds.slice().sort().join(","), fromISO, toISO],
     enabled: hubIds.length > 0,
-    queryFn: async (): Promise<Entrega[]> => {
-      const pageSize = 1000;
-      const all: Entrega[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("entregas")
-          .select("fecha, tipo_norm, tipo, es_aa, estado")
-          .in("hub_id", hubIds)
-          .gte("fecha", fromISO)
-          .lte("fecha", toISO)
-          .order("fecha", { ascending: true })
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        const rows = (data ?? []) as Entrega[];
-        all.push(...rows);
-        if (rows.length < pageSize) break;
-      }
-      return all;
+    staleTime: 60_000,
+    queryFn: async (): Promise<DashStats> => {
+      const { data, error } = await supabase.rpc("dashboard_stats", {
+        _hub_ids: hubIds,
+        _from: fromISO,
+        _to: toISO,
+      });
+      if (error) throw error;
+      const d = (data ?? {}) as Partial<DashStats>;
+      return {
+        total: d.total ?? 0,
+        aa: d.aa ?? 0,
+        by_day: d.by_day ?? [],
+        by_tipo: d.by_tipo ?? [],
+      };
     },
   });
 }
@@ -74,16 +72,16 @@ function Stats({
   previous,
   days,
 }: {
-  current: Entrega[];
-  previous: Entrega[];
+  current: DashStats;
+  previous: DashStats;
   days: number;
 }) {
-  const total = current.length;
-  const totalPrev = previous.length;
+  const total = current.total;
+  const totalPrev = previous.total;
   const deltaEntregas =
     totalPrev > 0 ? ((total - totalPrev) / totalPrev) * 100 : 0;
 
-  const aa = current.filter((e) => e.es_aa).length;
+  const aa = current.aa;
   const aaPct = total ? (aa / total) * 100 : 0;
 
   const label = `${days}d`;
@@ -133,45 +131,26 @@ function Stats({
 /* ---------------- Entregas por día ---------------- */
 
 function EntregasPorDia({
-  entregas,
+  byDay,
   from,
   to,
 }: {
-  entregas: Entrega[];
+  byDay: DayAgg[];
   from: Date;
   to: Date;
 }) {
-  type DayRow = {
-    fecha: string;
-    entregados: number;
-    incidencias: number;
-    total: number;
-  };
-
   const data = useMemo(() => {
-    const buckets = new Map<string, DayRow>();
+    const buckets = new Map<string, DayAgg>();
     const days = differenceInCalendarDays(to, from);
     for (let i = 0; i <= days; i++) {
       const k = toISO(addDays(from, i));
       buckets.set(k, { fecha: k, entregados: 0, incidencias: 0, total: 0 });
     }
-    const failStates = new Set([
-      "Cancelar",
-      "Attempt Failure",
-      "Return_to_seller_success",
-      "Return_to_seller_fail",
-      "Driver_received_incidence",
-    ]);
-    for (const e of entregas) {
-      if (!e.fecha) continue;
-      const row = buckets.get(e.fecha);
-      if (!row) continue;
-      row.total += 1;
-      if (e.estado === "Entregado") row.entregados += 1;
-      else if (e.estado && failStates.has(e.estado)) row.incidencias += 1;
+    for (const r of byDay) {
+      if (buckets.has(r.fecha)) buckets.set(r.fecha, r);
     }
     return Array.from(buckets.values());
-  }, [entregas, from, to]);
+  }, [byDay, from, to]);
 
   const config = {
     entregados: { label: "Entregados", color: "var(--chart-2)" },
@@ -184,7 +163,7 @@ function EntregasPorDia({
     label,
   }: {
     active?: boolean;
-    payload?: Array<{ name: string; value: number; color: string; dataKey: string; payload?: DayRow }>;
+    payload?: Array<{ name: string; value: number; color: string; dataKey: string; payload?: DayAgg }>;
     label?: string;
   }) {
     if (!active || !payload || payload.length === 0) return null;
@@ -286,19 +265,16 @@ const TIPO_COLORS = [
   "var(--chart-5)",
 ];
 
-function TipoEntrega({ entregas }: { entregas: Entrega[] }) {
-  const data = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const e of entregas) {
-      const key = (e.tipo_norm || e.tipo || "OTRO").toUpperCase();
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    return Array.from(counts, ([tipo, n], i) => ({
-      tipo,
-      n,
-      fill: TIPO_COLORS[i % TIPO_COLORS.length],
-    }));
-  }, [entregas]);
+function TipoEntrega({ byTipo }: { byTipo: TipoAgg[] }) {
+  const data = useMemo(
+    () =>
+      byTipo.map((d, i) => ({
+        tipo: d.tipo,
+        n: d.n,
+        fill: TIPO_COLORS[i % TIPO_COLORS.length],
+      })),
+    [byTipo],
+  );
 
   return (
     <Card className="shadow-none">
@@ -341,11 +317,13 @@ const PRESETS: { label: string; days: number }[] = [
   { label: "90d", days: 90 },
 ];
 
+const EMPTY_STATS: DashStats = { total: 0, aa: 0, by_day: [], by_tipo: [] };
+
 export function Dashboard() {
   const { hubs } = useAuth();
   const queryClient = useQueryClient();
 
-  const [hubFilter, setHubFilter] = useState<string>("all"); // "all" | hub.id
+  const [hubFilter, setHubFilter] = useState<string>("all");
   const [range, setRange] = useState<DateRange | undefined>(() => {
     const today = new Date();
     return { from: subDays(today, 29), to: today };
@@ -360,10 +338,9 @@ export function Dashboard() {
   const prevFrom = subDays(from, days);
   const prevTo = subDays(from, 1);
 
-  const currentQ = useEntregas(activeHubIds, toISO(from), toISO(to));
-  const prevQ = useEntregas(activeHubIds, toISO(prevFrom), toISO(prevTo));
+  const currentQ = useDashStats(activeHubIds, toISO(from), toISO(to));
+  const prevQ = useDashStats(activeHubIds, toISO(prevFrom), toISO(prevTo));
 
-  // Realtime: refresca cuando entran/actualizan filas en entregas para los hubs del usuario
   useEffect(() => {
     if (allHubIds.length === 0) return;
     const channel = supabase
@@ -374,7 +351,7 @@ export function Dashboard() {
         (payload) => {
           const row = (payload.new ?? payload.old) as { hub_id?: string } | null;
           if (row?.hub_id && allHubIds.includes(row.hub_id)) {
-            queryClient.invalidateQueries({ queryKey: ["dash-entregas"] });
+            queryClient.invalidateQueries({ queryKey: ["dash-stats"] });
           }
         },
       )
@@ -395,7 +372,7 @@ export function Dashboard() {
   }
 
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["dash-entregas"] });
+    queryClient.invalidateQueries({ queryKey: ["dash-stats"] });
 
   const applyPreset = (d: number) => {
     const today = new Date();
@@ -414,6 +391,10 @@ export function Dashboard() {
           const h = hubs.find((x) => x.id === hubFilter);
           return h ? `${h.marca} · ${h.nombre}` : "Hub";
         })();
+
+  const current = currentQ.data ?? EMPTY_STATS;
+  const previous = prevQ.data ?? EMPTY_STATS;
+  const loading = currentQ.isLoading || currentQ.isFetching;
 
   return (
     <div className="flex flex-col gap-4">
@@ -488,21 +469,17 @@ export function Dashboard() {
             />
           </PopoverContent>
         </Popover>
-        <Button variant="outline" size="sm" onClick={refresh} className="gap-2">
-          <RefreshCw className="h-3.5 w-3.5" />
+        <Button variant="outline" size="sm" onClick={refresh} className="gap-2" disabled={loading}>
+          <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
           Refrescar
         </Button>
       </div>
       <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3")}>
-        <Stats
-          current={currentQ.data ?? []}
-          previous={prevQ.data ?? []}
-          days={days}
-        />
+        <Stats current={current} previous={previous} days={days} />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <EntregasPorDia entregas={currentQ.data ?? []} from={from} to={to} />
-        <TipoEntrega entregas={currentQ.data ?? []} />
+        <EntregasPorDia byDay={current.by_day} from={from} to={to} />
+        <TipoEntrega byTipo={current.by_tipo} />
       </div>
     </div>
   );
