@@ -8,10 +8,14 @@ import {
   Upload,
   FileSpreadsheet,
   X,
+  Database,
 } from "lucide-react";
+import * as XLSX from "xlsx";
+import { format, subDays } from "date-fns";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
