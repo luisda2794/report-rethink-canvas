@@ -33,11 +33,12 @@ function toISO(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
-type DayAgg = { fecha: string; total: number; entregados: number; incidencias: number };
+type DayAgg = { fecha: string; total: number; entregados: number; incidencias: number; en_reparto: number };
 type TipoAgg = { tipo: string; n: number };
 type DashStats = {
   total: number;
   aa: number;
+  en_reparto_hoy: number;
   by_day: DayAgg[];
   by_tipo: TipoAgg[];
 };
@@ -58,6 +59,7 @@ function useDashStats(hubIds: string[], fromISO: string, toISO: string) {
       return {
         total: d.total ?? 0,
         aa: d.aa ?? 0,
+        en_reparto_hoy: d.en_reparto_hoy ?? 0,
         by_day: d.by_day ?? [],
         by_tipo: d.by_tipo ?? [],
       };
