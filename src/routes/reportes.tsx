@@ -216,7 +216,54 @@ function ReportesPage() {
               </p>
             </header>
 
-            {/* FILE PICKER */}
+            {/* GENERAR DESDE BASE */}
+            <section className="mb-4 animate-fade-up" style={{ animationDelay: "20ms" }}>
+              <div className="p-4 bg-surface border border-hairline rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <Database className="size-5 text-electric shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-ink">Usar datos guardados</div>
+                    <div className="text-[11px] font-mono text-muted-text">Genera el Excel desde las entregas ya cargadas en la base</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col text-[11px] font-mono text-muted-text">
+                    Desde
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="mt-1 px-2 py-1.5 text-sm bg-background border border-hairline rounded text-ink"
+                    />
+                  </label>
+                  <label className="flex flex-col text-[11px] font-mono text-muted-text">
+                    Hasta
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="mt-1 px-2 py-1.5 text-sm bg-background border border-hairline rounded text-ink"
+                    />
+                  </label>
+                  <button
+                    onClick={generarDesdeBase}
+                    disabled={!selectedHub || genLoading}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold font-syne tracking-tight rounded-md bg-ink text-white hover:bg-ink/90 disabled:bg-surface-2 disabled:text-muted-text disabled:cursor-not-allowed disabled:border disabled:border-hairline"
+                  >
+                    {genLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}
+                    {genLoading ? "Generando" : "Usar datos guardados"}
+                  </button>
+                </div>
+                {genError && (
+                  <p className="mt-2 text-danger text-[12px] font-mono flex items-start gap-1.5">
+                    <AlertCircle className="size-3 mt-0.5 shrink-0" />
+                    <span>{genError}</span>
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* FILE PICKER (fallback) */}
             <section className="mb-6 animate-fade-up" style={{ animationDelay: "40ms" }}>
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -259,13 +306,14 @@ function ReportesPage() {
                   <div className="flex items-center gap-3 text-muted-text">
                     <Upload className="size-6 text-electric" />
                     <div>
-                      <div className="text-sm font-semibold text-ink">Sube el archivo de Cainiao</div>
+                      <div className="text-sm font-semibold text-ink">O sube el archivo de Cainiao</div>
                       <div className="text-[11px] font-mono">Arrastra aquí o haz clic · .xlsx, .xls, .csv</div>
                     </div>
                   </div>
                 )}
               </div>
             </section>
+
 
             {/* TABS */}
             <section className="animate-fade-up" style={{ animationDelay: "120ms" }}>
