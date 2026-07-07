@@ -167,7 +167,7 @@ function ReportesPage() {
     try {
       const fd = new FormData();
       fd.append("file", file, file.name);
-      const res = await fetch(`${API_BASE}/reporte/${r.id}`, {
+      const res = await fetch(`${API_BASE}/${r.id}`, {
         method: "POST",
         body: fd,
       });
