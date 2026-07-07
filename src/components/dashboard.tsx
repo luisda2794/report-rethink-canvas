@@ -41,10 +41,10 @@ type Entrega = {
   estado: string | null;
 };
 
-function useEntregas(hubId: string | null, fromISO: string, toISO: string) {
+function useEntregas(hubIds: string[], fromISO: string, toISO: string) {
   return useQuery({
-    queryKey: ["dash-entregas", hubId, fromISO, toISO],
-    enabled: !!hubId,
+    queryKey: ["dash-entregas", hubIds.slice().sort().join(","), fromISO, toISO],
+    enabled: hubIds.length > 0,
     queryFn: async (): Promise<Entrega[]> => {
       const pageSize = 1000;
       const all: Entrega[] = [];
@@ -52,7 +52,7 @@ function useEntregas(hubId: string | null, fromISO: string, toISO: string) {
         const { data, error } = await supabase
           .from("entregas")
           .select("fecha, tipo_norm, tipo, es_aa, estado")
-          .eq("hub_id", hubId!)
+          .in("hub_id", hubIds)
           .gte("fecha", fromISO)
           .lte("fecha", toISO)
           .order("fecha", { ascending: true })
