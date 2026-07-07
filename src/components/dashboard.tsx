@@ -146,7 +146,7 @@ function EntregasPorDia({
     const days = differenceInCalendarDays(to, from);
     for (let i = 0; i <= days; i++) {
       const k = toISO(addDays(from, i));
-      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0, total: 0 });
+      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0, en_reparto: 0, total: 0 });
     }
     for (const r of byDay) {
       if (buckets.has(r.fecha)) buckets.set(r.fecha, r);
