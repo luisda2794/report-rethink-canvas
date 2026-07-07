@@ -110,12 +110,35 @@ function ReportesPage() {
     setGenLoading(true);
     setGenError(null);
     try {
+      const CAINIAO_HEADERS = [
+        "Número de Waybill","LP No.","Fecha de la tarea","Sitiocode","Plan de envíocode",
+        "Estado de la Tarea","Tipo de pedido","Tipo de Entrega","Nombre del Repartidor","Nombre de DSP",
+        "Orden de grupo de tareas","La primera clasificación del número de la bolsa grande","País receptor",
+        "Área de destino","La ciudad de destino","Código postal","Dirección detallada",
+        "Receptor a  latitud","Receptor a  longitud","Entrega real  latitud","Entrega real  longitud",
+        "Distancia de brecha de entrega","Contacto","Teléfono de contacto","Teléfono de contacto",
+        "Correo","Tiempo de creación","Tiempo de recepción","Tiempo de salida","Comience el tiempo de entrega",
+        "Tiempo de Entrega","Método de inicio de sesión","Detalles firmados","Firma","Fotos firmadas",
+        "Nombre del firmante","Signo POD","Tiempo del Fracaso de la Entrega","Tipo de Excepción",
+        "Detalles de la Excepción","Número de contactos","Última hora de contacto","Advertencia de envío falso",
+        "popStationId","ID de tarea","Nombre del esquema","Tipo de paquete","dspActionTime","dspAction",
+        "dspOperatorName","hasNewTaskForNextDayDelivery","ocrFailTimes","Motivo de error de programación",
+        "returnRemark","badCustomerTag","badZipCodeTag","Punto de conexión","deliveryMode","PUDO address",
+        "PUDO Validation Fail","SDSA Failure Reason (PUDO)","Peso (g)","Amplio","Anchura","Alto",
+        "eligibleMailbox","Tipo de envío falso","Duración de la llamada de número virtual",
+        "Causa de falla de llamada","Tipo de llamada","ocrFailType","Nombre del vendedor","pointBizCode",
+        "Nombre del mercado","stationWaveCode","pinCode","hasPinCode","sellerInterception",
+        "sellerInterceptionStatus","Vendedor Nombre","Zona","originalPlanTaskDate",
+        "Llegando al hub equivocado","Nombre de Hub incorrecto","hasCommercialAreaTag",
+        "podCheckManualResult","podCheckManualReason","podCheckTimeManual","podCheckInspector",
+      ] as const;
+
       const pageSize = 1000;
-      const rows: Record<string, unknown>[] = [];
+      const dataRows: Array<Record<string, string>> = [];
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await supabase
           .from("entregas")
-          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, tipo_norm, estado, pop_station_id")
+          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, estado, pop_station_id")
           .eq("hub_id", selectedHub.id)
           .gte("fecha", fromDate)
           .lte("fecha", toDate)
@@ -124,30 +147,32 @@ function ReportesPage() {
         if (error) throw error;
         const page = data ?? [];
         for (const r of page) {
-          rows.push({
-            "LP number": r.lp_no ?? "",
-            "Waybill number": r.waybill ?? "",
-            "Driver": r.driver ?? "",
-            "Date": r.fecha ?? "",
-            "Inbound Date": r.fecha_inbound ?? "",
-            "CP": r.cp ?? "",
-            "Address": r.direccion ?? "",
-            "Contact": r.contacto ?? "",
-            "Type": r.tipo_norm ?? r.tipo ?? "",
-            "Status": r.estado ?? "",
-            "POP Station": r.pop_station_id ?? "",
-          });
+          const row: Record<string, string> = {};
+          for (const h of CAINIAO_HEADERS) row[h] = "";
+          row["Número de Waybill"] = r.waybill ?? "";
+          row["LP No."] = r.lp_no ?? "";
+          row["Fecha de la tarea"] = r.fecha ?? "";
+          row["Estado de la Tarea"] = r.estado ?? "";
+          row["Tipo de Entrega"] = r.tipo ?? "";
+          row["Nombre del Repartidor"] = r.driver ?? "";
+          row["Código postal"] = r.cp ?? "";
+          row["Dirección detallada"] = r.direccion ?? "";
+          row["Contacto"] = r.contacto ?? "";
+          row["Tiempo de recepción"] = r.fecha_inbound ?? "";
+          row["Tiempo de Entrega"] = r.estado === "Entregado" ? (r.fecha ?? "") : "";
+          row["popStationId"] = r.pop_station_id ?? "";
+          dataRows.push(row);
         }
         if (page.length < pageSize) break;
       }
-      if (rows.length === 0) {
+      if (dataRows.length === 0) {
         setGenError("No hay entregas en ese rango para este hub.");
         setGenLoading(false);
         return;
       }
-      const ws = XLSX.utils.json_to_sheet(rows);
+      const ws = XLSX.utils.json_to_sheet(dataRows, { header: [...CAINIAO_HEADERS] });
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
       const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
       const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const filename = `entregas_${selectedHub.marca}_${fromDate}_${toDate}.xlsx`;
@@ -160,6 +185,7 @@ function ReportesPage() {
       setGenLoading(false);
     }
   };
+
 
   const descargar = async (r: Reporte) => {
     if (!file) return;
