@@ -673,6 +673,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dashboard_stats: {
+        Args: { _from: string; _hub_ids: string[]; _to: string }
+        Returns: Json
+      }
       get_user_role: { Args: { _user_id: string }; Returns: string }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       refresh_cd5_snapshots: { Args: never; Returns: undefined }
