@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   Check,
@@ -104,6 +104,14 @@ function ReportesPage() {
     setStates({});
     setGenError(null);
   };
+
+  // Al cambiar de hub, limpiar el archivo cargado/generado para forzar
+  // regenerar con los datos del hub actualmente seleccionado.
+  useEffect(() => {
+    setFile(null);
+    setStates({});
+    setGenError(null);
+  }, [selectedHub?.id]);
 
   const generarDesdeBase = async () => {
     if (!selectedHub) return;
