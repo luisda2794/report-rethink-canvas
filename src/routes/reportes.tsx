@@ -149,17 +149,25 @@ function ReportesPage() {
         for (const r of page) {
           const row: Record<string, string> = {};
           for (const h of CAINIAO_HEADERS) row[h] = "";
+          const fechaTs = r.fecha ? `${r.fecha} 08:00:00` : "";
+          const inboundTs = r.fecha_inbound ? `${r.fecha_inbound} 08:00:00` : fechaTs;
           row["Número de Waybill"] = r.waybill ?? "";
           row["LP No."] = r.lp_no ?? "";
           row["Fecha de la tarea"] = r.fecha ?? "";
           row["Estado de la Tarea"] = r.estado ?? "";
+          row["Tipo de pedido"] = "Entrega";
           row["Tipo de Entrega"] = r.tipo ?? "";
           row["Nombre del Repartidor"] = r.driver ?? "";
+          row["Nombre de DSP"] = selectedHub.marca ?? "";
+          row["País receptor"] = "ES";
           row["Código postal"] = r.cp ?? "";
           row["Dirección detallada"] = r.direccion ?? "";
           row["Contacto"] = r.contacto ?? "";
-          row["Tiempo de recepción"] = r.fecha_inbound ?? "";
-          row["Tiempo de Entrega"] = r.estado === "Entregado" ? (r.fecha ?? "") : "";
+          row["Tiempo de creación"] = inboundTs;
+          row["Tiempo de recepción"] = inboundTs;
+          row["Tiempo de salida"] = fechaTs;
+          row["Comience el tiempo de entrega"] = fechaTs;
+          row["Tiempo de Entrega"] = r.estado === "Entregado" ? fechaTs : "";
           row["popStationId"] = r.pop_station_id ?? "";
           dataRows.push(row);
         }
