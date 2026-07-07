@@ -163,6 +163,7 @@ function EntregasPorDia({
 
   const config = {
     entregados: { label: "Entregados", color: "var(--chart-2)" },
+    en_reparto: { label: "En reparto", color: "var(--chart-1)" },
     incidencias: { label: "Incidencias", color: "var(--destructive)" },
   } satisfies ChartConfig;
 
