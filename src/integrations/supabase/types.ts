@@ -310,6 +310,84 @@ export type Database = {
           },
         ]
       }
+      epod_lineas: {
+        Row: {
+          contacto: string | null
+          cp: string | null
+          created_at: string
+          direccion: string | null
+          driver: string | null
+          epod_upload_id: string | null
+          estado: string
+          fecha: string | null
+          fecha_inbound: string | null
+          hub_id: string
+          id: string
+          lp_no: string
+          pop_station_id: string | null
+          row_index: number
+          source: string | null
+          tipo: string | null
+          tipo_norm: string | null
+          waybill: string | null
+        }
+        Insert: {
+          contacto?: string | null
+          cp?: string | null
+          created_at?: string
+          direccion?: string | null
+          driver?: string | null
+          epod_upload_id?: string | null
+          estado?: string
+          fecha?: string | null
+          fecha_inbound?: string | null
+          hub_id: string
+          id?: string
+          lp_no: string
+          pop_station_id?: string | null
+          row_index: number
+          source?: string | null
+          tipo?: string | null
+          tipo_norm?: string | null
+          waybill?: string | null
+        }
+        Update: {
+          contacto?: string | null
+          cp?: string | null
+          created_at?: string
+          direccion?: string | null
+          driver?: string | null
+          epod_upload_id?: string | null
+          estado?: string
+          fecha?: string | null
+          fecha_inbound?: string | null
+          hub_id?: string
+          id?: string
+          lp_no?: string
+          pop_station_id?: string | null
+          row_index?: number
+          source?: string | null
+          tipo?: string | null
+          tipo_norm?: string | null
+          waybill?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "epod_lineas_epod_upload_id_fkey"
+            columns: ["epod_upload_id"]
+            isOneToOne: false
+            referencedRelation: "epod_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "epod_lineas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       epod_uploads: {
         Row: {
           created_at: string

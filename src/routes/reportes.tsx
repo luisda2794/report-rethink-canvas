@@ -141,19 +141,21 @@ function ReportesPage() {
         "podCheckManualResult","podCheckManualReason","podCheckTimeManual","podCheckInspector",
       ] as const;
 
-      const pageSize = 1000;
-      const dataRows: Array<Record<string, string>> = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("entregas")
-          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, estado, pop_station_id")
-          .eq("hub_id", selectedHub.id)
-          .gte("fecha", fromDate)
-          .lte("fecha", toDate)
-          .order("fecha", { ascending: true })
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        const page = data ?? [];
+      type CainiaoSourceRow = {
+        lp_no: string;
+        waybill: string | null;
+        driver: string | null;
+        fecha: string | null;
+        fecha_inbound: string | null;
+        cp: string | null;
+        direccion: string | null;
+        contacto: string | null;
+        tipo: string | null;
+        estado: string | null;
+        pop_station_id: string | null;
+      };
+
+      const appendRows = (page: CainiaoSourceRow[]) => {
         for (const r of page) {
           const row: Record<string, string> = {};
           for (const h of CAINIAO_HEADERS) row[h] = "";
@@ -176,11 +178,51 @@ function ReportesPage() {
           row["Tiempo de salida"] = fechaTs;
           row["Comience el tiempo de entrega"] = fechaTs;
           row["Tiempo de Entrega"] = r.estado === "Entregado" ? fechaTs : "";
+          row["Tiempo del Fracaso de la Entrega"] = r.estado && r.estado !== "Entregado" ? fechaTs : "";
+          row["Tipo de Excepción"] = r.estado && !["Entregado", "Driver_received", "Assigned"].includes(r.estado) ? r.estado : "";
           row["popStationId"] = r.pop_station_id ?? "";
           dataRows.push(row);
         }
+      };
+
+      const pageSize = 1000;
+      const dataRows: Array<Record<string, string>> = [];
+      let hasRawEpodLines = false;
+
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("epod_lineas")
+          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, estado, pop_station_id")
+          .eq("hub_id", selectedHub.id)
+          .gte("fecha", fromDate)
+          .lte("fecha", toDate)
+          .order("fecha", { ascending: true })
+          .order("row_index", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = data ?? [];
+        if (page.length > 0) hasRawEpodLines = true;
+        appendRows(page);
         if (page.length < pageSize) break;
       }
+
+      if (!hasRawEpodLines) {
+        for (let from = 0; ; from += pageSize) {
+          const { data, error } = await supabase
+            .from("entregas")
+            .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, estado, pop_station_id")
+            .eq("hub_id", selectedHub.id)
+            .gte("fecha", fromDate)
+            .lte("fecha", toDate)
+            .order("fecha", { ascending: true })
+            .range(from, from + pageSize - 1);
+          if (error) throw error;
+          const page = data ?? [];
+          appendRows(page);
+          if (page.length < pageSize) break;
+        }
+      }
+
       if (dataRows.length === 0) {
         setGenError("No hay entregas en ese rango para este hub.");
         setGenLoading(false);

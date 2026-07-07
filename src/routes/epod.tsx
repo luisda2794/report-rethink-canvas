@@ -349,9 +349,35 @@ function EpodPage() {
         source: "epod",
       }));
 
+      const linePayload = parsed.map((r, index) => ({
+        hub_id: selectedHub.id,
+        epod_upload_id: upload.id,
+        row_index: index + 2,
+        lp_no: r.lp_no,
+        waybill: r.waybill,
+        fecha: r.fecha,
+        fecha_inbound: r.fecha_inbound,
+        estado: r.estado,
+        tipo: r.tipo_entrega,
+        tipo_norm: r.tipo_norm,
+        driver: r.driver,
+        cp: r.codigo_postal,
+        direccion: r.direccion,
+        contacto: r.contacto,
+        pop_station_id: r.pop_station_id,
+        source: "epod",
+      }));
+
       // Upsert in parallel batches; ignore-duplicates returns only inserted rows
       const chunk = 1000;
       const concurrency = 4;
+      for (let i = 0; i < linePayload.length; i += chunk) {
+        const { error: lineErr } = await supabase
+          .from("epod_lineas")
+          .insert(linePayload.slice(i, i + chunk));
+        if (lineErr) throw lineErr;
+      }
+
       const chunks: typeof payload[] = [];
       for (let i = 0; i < payload.length; i += chunk) {
         chunks.push(payload.slice(i, i + chunk));
