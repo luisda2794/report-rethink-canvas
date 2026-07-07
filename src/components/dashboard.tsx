@@ -33,11 +33,12 @@ function toISO(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
-type DayAgg = { fecha: string; total: number; entregados: number; incidencias: number };
+type DayAgg = { fecha: string; total: number; entregados: number; incidencias: number; en_reparto: number };
 type TipoAgg = { tipo: string; n: number };
 type DashStats = {
   total: number;
   aa: number;
+  en_reparto_hoy: number;
   by_day: DayAgg[];
   by_tipo: TipoAgg[];
 };
@@ -58,6 +59,7 @@ function useDashStats(hubIds: string[], fromISO: string, toISO: string) {
       return {
         total: d.total ?? 0,
         aa: d.aa ?? 0,
+        en_reparto_hoy: d.en_reparto_hoy ?? 0,
         by_day: d.by_day ?? [],
         by_tipo: d.by_tipo ?? [],
       };
@@ -91,6 +93,13 @@ function Stats({
       value: total.toLocaleString("es-ES"),
       delta: deltaEntregas,
       footnote: `vs ${label} previos`,
+    },
+    {
+      label: `En reparto hoy`,
+      value: current.en_reparto_hoy.toLocaleString("es-ES"),
+      delta: 0,
+      footnote: `Driver_received + Assigned`,
+      hideDelta: true,
     },
     {
       label: `% AA (${label})`,
@@ -144,7 +153,7 @@ function EntregasPorDia({
     const days = differenceInCalendarDays(to, from);
     for (let i = 0; i <= days; i++) {
       const k = toISO(addDays(from, i));
-      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0, total: 0 });
+      buckets.set(k, { fecha: k, entregados: 0, incidencias: 0, en_reparto: 0, total: 0 });
     }
     for (const r of byDay) {
       if (buckets.has(r.fecha)) buckets.set(r.fecha, r);
@@ -154,6 +163,7 @@ function EntregasPorDia({
 
   const config = {
     entregados: { label: "Entregados", color: "var(--chart-2)" },
+    en_reparto: { label: "En reparto", color: "var(--chart-1)" },
     incidencias: { label: "Incidencias", color: "var(--destructive)" },
   } satisfies ChartConfig;
 
@@ -227,6 +237,13 @@ function EntregasPorDia({
             />
             <Line
               type="monotone"
+              dataKey="en_reparto"
+              stroke="var(--color-en_reparto)"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
               dataKey="incidencias"
               stroke="var(--color-incidencias)"
               strokeWidth={2}
@@ -241,6 +258,13 @@ function EntregasPorDia({
               style={{ background: "var(--chart-2)" }}
             />
             <span className="text-muted-foreground">Entregados</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ background: "var(--chart-1)" }}
+            />
+            <span className="text-muted-foreground">En reparto</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span
@@ -335,7 +359,7 @@ const PRESETS: { label: string; days: number }[] = [
   { label: "90d", days: 90 },
 ];
 
-const EMPTY_STATS: DashStats = { total: 0, aa: 0, by_day: [], by_tipo: [] };
+const EMPTY_STATS: DashStats = { total: 0, aa: 0, en_reparto_hoy: 0, by_day: [], by_tipo: [] };
 
 export function Dashboard() {
   const { hubs } = useAuth();
