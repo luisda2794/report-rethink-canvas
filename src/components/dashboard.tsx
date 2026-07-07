@@ -266,15 +266,22 @@ const TIPO_COLORS = [
 ];
 
 function TipoEntrega({ byTipo }: { byTipo: TipoAgg[] }) {
+  const total = useMemo(() => byTipo.reduce((s, d) => s + d.n, 0), [byTipo]);
   const data = useMemo(
     () =>
       byTipo.map((d, i) => ({
         tipo: d.tipo,
         n: d.n,
+        pct: total > 0 ? (d.n / total) * 100 : 0,
         fill: TIPO_COLORS[i % TIPO_COLORS.length],
       })),
-    [byTipo],
+    [byTipo, total],
   );
+
+  const pctFor = (key: string) =>
+    data.find((d) => d.tipo === key)?.pct ?? 0;
+  const toDoorPct = pctFor("TO_DOOR");
+  const pudoPct = pctFor("PUDO");
 
   return (
     <Card className="shadow-none">
@@ -292,6 +299,16 @@ function TipoEntrega({ byTipo }: { byTipo: TipoAgg[] }) {
             </Pie>
           </PieChart>
         </ChartContainer>
+        <div className="mt-2 grid grid-cols-2 gap-2 border-t pt-2">
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase text-muted-foreground">% TO_DOOR</span>
+            <span className="font-semibold text-lg tabular-nums">{toDoorPct.toFixed(1)}%</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase text-muted-foreground">% PUDO</span>
+            <span className="font-semibold text-lg tabular-nums">{pudoPct.toFixed(1)}%</span>
+          </div>
+        </div>
         <div className="mt-2 flex flex-wrap gap-2 text-xs">
           {data.map((d) => (
             <span key={d.tipo} className="flex items-center gap-1.5">
@@ -301,6 +318,7 @@ function TipoEntrega({ byTipo }: { byTipo: TipoAgg[] }) {
               />
               <span className="text-muted-foreground">{d.tipo}</span>
               <span className="font-medium tabular-nums">{d.n}</span>
+              <span className="text-muted-foreground tabular-nums">({d.pct.toFixed(1)}%)</span>
             </span>
           ))}
         </div>
