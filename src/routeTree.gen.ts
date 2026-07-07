@@ -22,6 +22,7 @@ import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
+import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
 import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
 
 const ReportesRoute = ReportesRouteImport.update({
@@ -89,6 +90,11 @@ const RecTokenRoute = RecTokenRouteImport.update({
   path: '/rec/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReportesIdRoute = ApiReportesIdRouteImport.update({
+  id: '/api/reportes/$id',
+  path: '/api/reportes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicCd5Route = ApiPublicCd5RouteImport.update({
   id: '/api/public/cd5',
   path: '/api/public/cd5',
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
+  '/api/reportes/$id': typeof ApiReportesIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
+  '/api/reportes/$id': typeof ApiReportesIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
+  '/api/reportes/$id': typeof ApiReportesIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/reportes'
     | '/rec/$token'
     | '/api/public/cd5'
+    | '/api/reportes/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/reportes'
     | '/rec/$token'
     | '/api/public/cd5'
+    | '/api/reportes/$id'
   id:
     | '__root__'
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/reportes'
     | '/rec/$token'
     | '/api/public/cd5'
+    | '/api/reportes/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
+  ApiReportesIdRoute: typeof ApiReportesIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RecTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/reportes/$id': {
+      id: '/api/reportes/$id'
+      path: '/api/reportes/$id'
+      fullPath: '/api/reportes/$id'
+      preLoaderRoute: typeof ApiReportesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/cd5': {
       id: '/api/public/cd5'
       path: '/api/public/cd5'
@@ -330,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,
+  ApiReportesIdRoute: ApiReportesIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
