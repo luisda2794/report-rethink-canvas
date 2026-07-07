@@ -237,6 +237,13 @@ function EntregasPorDia({
             />
             <Line
               type="monotone"
+              dataKey="en_reparto"
+              stroke="var(--color-en_reparto)"
+              strokeWidth={2}
+              dot={false}
+            />
+            <Line
+              type="monotone"
               dataKey="incidencias"
               stroke="var(--color-incidencias)"
               strokeWidth={2}
@@ -251,6 +258,13 @@ function EntregasPorDia({
               style={{ background: "var(--chart-2)" }}
             />
             <span className="text-muted-foreground">Entregados</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="inline-block size-2 rounded-full"
+              style={{ background: "var(--chart-1)" }}
+            />
+            <span className="text-muted-foreground">En reparto</span>
           </span>
           <span className="flex items-center gap-1.5">
             <span
