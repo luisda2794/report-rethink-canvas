@@ -94,10 +94,71 @@ function ReportesPage() {
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [fromDate, setFromDate] = useState(() => format(subDays(new Date(), 6), "yyyy-MM-dd"));
+  const [toDate, setToDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
   const onPickFile = (f: File | null) => {
     setFile(f);
     setStates({});
+    setGenError(null);
+  };
+
+  const generarDesdeBase = async () => {
+    if (!selectedHub) return;
+    setGenLoading(true);
+    setGenError(null);
+    try {
+      const pageSize = 1000;
+      const rows: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("entregas")
+          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, tipo_norm, estado, pop_station_id")
+          .eq("hub_id", selectedHub.id)
+          .gte("fecha", fromDate)
+          .lte("fecha", toDate)
+          .order("fecha", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = data ?? [];
+        for (const r of page) {
+          rows.push({
+            "LP number": r.lp_no ?? "",
+            "Waybill number": r.waybill ?? "",
+            "Driver": r.driver ?? "",
+            "Date": r.fecha ?? "",
+            "Inbound Date": r.fecha_inbound ?? "",
+            "CP": r.cp ?? "",
+            "Address": r.direccion ?? "",
+            "Contact": r.contacto ?? "",
+            "Type": r.tipo_norm ?? r.tipo ?? "",
+            "Status": r.estado ?? "",
+            "POP Station": r.pop_station_id ?? "",
+          });
+        }
+        if (page.length < pageSize) break;
+      }
+      if (rows.length === 0) {
+        setGenError("No hay entregas en ese rango para este hub.");
+        setGenLoading(false);
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const filename = `entregas_${selectedHub.marca}_${fromDate}_${toDate}.xlsx`;
+      const generated = new File([blob], filename, { type: blob.type });
+      onPickFile(generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al generar";
+      setGenError(msg);
+    } finally {
+      setGenLoading(false);
+    }
   };
 
   const descargar = async (r: Reporte) => {
