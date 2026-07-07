@@ -228,13 +228,6 @@ function ReportesPage() {
         setGenLoading(false);
         return;
       }
-        if (page.length < pageSize) break;
-      }
-      if (dataRows.length === 0) {
-        setGenError("No hay entregas en ese rango para este hub.");
-        setGenLoading(false);
-        return;
-      }
       const ws = XLSX.utils.json_to_sheet(dataRows, { header: [...CAINIAO_HEADERS] });
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
