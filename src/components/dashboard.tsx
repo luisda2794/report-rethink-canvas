@@ -337,7 +337,7 @@ const PRESETS: { label: string; days: number }[] = [
   { label: "90d", days: 90 },
 ];
 
-const EMPTY_STATS: DashStats = { total: 0, aa: 0, by_day: [], by_tipo: [] };
+const EMPTY_STATS: DashStats = { total: 0, aa: 0, en_reparto_hoy: 0, by_day: [], by_tipo: [] };
 
 export function Dashboard() {
   const { hubs } = useAuth();
