@@ -8,10 +8,14 @@ import {
   Upload,
   FileSpreadsheet,
   X,
+  Database,
 } from "lucide-react";
+import * as XLSX from "xlsx";
+import { format, subDays } from "date-fns";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
@@ -90,10 +94,71 @@ function ReportesPage() {
   const [file, setFile] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [genLoading, setGenLoading] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
+  const [fromDate, setFromDate] = useState(() => format(subDays(new Date(), 6), "yyyy-MM-dd"));
+  const [toDate, setToDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
 
   const onPickFile = (f: File | null) => {
     setFile(f);
     setStates({});
+    setGenError(null);
+  };
+
+  const generarDesdeBase = async () => {
+    if (!selectedHub) return;
+    setGenLoading(true);
+    setGenError(null);
+    try {
+      const pageSize = 1000;
+      const rows: Record<string, unknown>[] = [];
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from("entregas")
+          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, tipo_norm, estado, pop_station_id")
+          .eq("hub_id", selectedHub.id)
+          .gte("fecha", fromDate)
+          .lte("fecha", toDate)
+          .order("fecha", { ascending: true })
+          .range(from, from + pageSize - 1);
+        if (error) throw error;
+        const page = data ?? [];
+        for (const r of page) {
+          rows.push({
+            "LP number": r.lp_no ?? "",
+            "Waybill number": r.waybill ?? "",
+            "Driver": r.driver ?? "",
+            "Date": r.fecha ?? "",
+            "Inbound Date": r.fecha_inbound ?? "",
+            "CP": r.cp ?? "",
+            "Address": r.direccion ?? "",
+            "Contact": r.contacto ?? "",
+            "Type": r.tipo_norm ?? r.tipo ?? "",
+            "Status": r.estado ?? "",
+            "POP Station": r.pop_station_id ?? "",
+          });
+        }
+        if (page.length < pageSize) break;
+      }
+      if (rows.length === 0) {
+        setGenError("No hay entregas en ese rango para este hub.");
+        setGenLoading(false);
+        return;
+      }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Entregas");
+      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const filename = `entregas_${selectedHub.marca}_${fromDate}_${toDate}.xlsx`;
+      const generated = new File([blob], filename, { type: blob.type });
+      onPickFile(generated);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Error al generar";
+      setGenError(msg);
+    } finally {
+      setGenLoading(false);
+    }
   };
 
   const descargar = async (r: Reporte) => {
@@ -151,7 +216,54 @@ function ReportesPage() {
               </p>
             </header>
 
-            {/* FILE PICKER */}
+            {/* GENERAR DESDE BASE */}
+            <section className="mb-4 animate-fade-up" style={{ animationDelay: "20ms" }}>
+              <div className="p-4 bg-surface border border-hairline rounded-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <Database className="size-5 text-electric shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-ink">Usar datos guardados</div>
+                    <div className="text-[11px] font-mono text-muted-text">Genera el Excel desde las entregas ya cargadas en la base</div>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="flex flex-col text-[11px] font-mono text-muted-text">
+                    Desde
+                    <input
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="mt-1 px-2 py-1.5 text-sm bg-background border border-hairline rounded text-ink"
+                    />
+                  </label>
+                  <label className="flex flex-col text-[11px] font-mono text-muted-text">
+                    Hasta
+                    <input
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="mt-1 px-2 py-1.5 text-sm bg-background border border-hairline rounded text-ink"
+                    />
+                  </label>
+                  <button
+                    onClick={generarDesdeBase}
+                    disabled={!selectedHub || genLoading}
+                    className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold font-syne tracking-tight rounded-md bg-ink text-white hover:bg-ink/90 disabled:bg-surface-2 disabled:text-muted-text disabled:cursor-not-allowed disabled:border disabled:border-hairline"
+                  >
+                    {genLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}
+                    {genLoading ? "Generando" : "Usar datos guardados"}
+                  </button>
+                </div>
+                {genError && (
+                  <p className="mt-2 text-danger text-[12px] font-mono flex items-start gap-1.5">
+                    <AlertCircle className="size-3 mt-0.5 shrink-0" />
+                    <span>{genError}</span>
+                  </p>
+                )}
+              </div>
+            </section>
+
+            {/* FILE PICKER (fallback) */}
             <section className="mb-6 animate-fade-up" style={{ animationDelay: "40ms" }}>
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -194,13 +306,14 @@ function ReportesPage() {
                   <div className="flex items-center gap-3 text-muted-text">
                     <Upload className="size-6 text-electric" />
                     <div>
-                      <div className="text-sm font-semibold text-ink">Sube el archivo de Cainiao</div>
+                      <div className="text-sm font-semibold text-ink">O sube el archivo de Cainiao</div>
                       <div className="text-[11px] font-mono">Arrastra aquí o haz clic · .xlsx, .xls, .csv</div>
                     </div>
                   </div>
                 )}
               </div>
             </section>
+
 
             {/* TABS */}
             <section className="animate-fade-up" style={{ animationDelay: "120ms" }}>
