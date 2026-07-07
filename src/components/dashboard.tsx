@@ -342,14 +342,17 @@ const PRESETS: { label: string; days: number }[] = [
 ];
 
 export function Dashboard() {
-  const { selectedHub } = useAuth();
+  const { hubs } = useAuth();
   const queryClient = useQueryClient();
-  const hubId = selectedHub?.id ?? null;
 
+  const [hubFilter, setHubFilter] = useState<string>("all"); // "all" | hub.id
   const [range, setRange] = useState<DateRange | undefined>(() => {
     const today = new Date();
     return { from: subDays(today, 29), to: today };
   });
+
+  const allHubIds = useMemo(() => hubs.map((h) => h.id), [hubs]);
+  const activeHubIds = hubFilter === "all" ? allHubIds : [hubFilter];
 
   const from = range?.from ?? subDays(new Date(), 29);
   const to = range?.to ?? from;
@@ -357,39 +360,42 @@ export function Dashboard() {
   const prevFrom = subDays(from, days);
   const prevTo = subDays(from, 1);
 
-  const currentQ = useEntregas(hubId, toISO(from), toISO(to));
-  const prevQ = useEntregas(hubId, toISO(prevFrom), toISO(prevTo));
+  const currentQ = useEntregas(activeHubIds, toISO(from), toISO(to));
+  const prevQ = useEntregas(activeHubIds, toISO(prevFrom), toISO(prevTo));
 
-  // Realtime: refresca cuando entran/actualizan filas en entregas para este hub
+  // Realtime: refresca cuando entran/actualizan filas en entregas para los hubs del usuario
   useEffect(() => {
-    if (!hubId) return;
+    if (allHubIds.length === 0) return;
     const channel = supabase
-      .channel(`entregas-${hubId}`)
+      .channel(`entregas-dash`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "entregas", filter: `hub_id=eq.${hubId}` },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["dash-entregas", hubId] });
+        { event: "*", schema: "public", table: "entregas" },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as { hub_id?: string } | null;
+          if (row?.hub_id && allHubIds.includes(row.hub_id)) {
+            queryClient.invalidateQueries({ queryKey: ["dash-entregas"] });
+          }
         },
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [hubId, queryClient]);
+  }, [allHubIds, queryClient]);
 
-  if (!selectedHub) {
+  if (hubs.length === 0) {
     return (
       <Card className="shadow-none">
         <CardContent className="p-6 text-sm text-muted-foreground">
-          Selecciona un hub para ver las métricas.
+          No tienes hubs asignados.
         </CardContent>
       </Card>
     );
   }
 
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: ["dash-entregas", hubId] });
+    queryClient.invalidateQueries({ queryKey: ["dash-entregas"] });
 
   const applyPreset = (d: number) => {
     const today = new Date();
@@ -401,9 +407,56 @@ export function Dashboard() {
       ? `${format(range.from, "d MMM", { locale: es })} – ${format(range.to, "d MMM yyyy", { locale: es })}`
       : "Selecciona fechas";
 
+  const selectedHubLabel =
+    hubFilter === "all"
+      ? `Todos los hubs (${hubs.length})`
+      : (() => {
+          const h = hubs.find((x) => x.id === hubFilter);
+          return h ? `${h.marca} · ${h.nombre}` : "Hub";
+        })();
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2 max-w-[240px]">
+              <span className="truncate">{selectedHubLabel}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-1" align="end">
+            <button
+              type="button"
+              onClick={() => setHubFilter("all")}
+              className={cn(
+                "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+                hubFilter === "all" && "bg-accent",
+              )}
+            >
+              <span>Todos los hubs</span>
+              <span className="text-xs text-muted-foreground">{hubs.length}</span>
+            </button>
+            <div className="my-1 h-px bg-border" />
+            <div className="max-h-64 overflow-auto">
+              {hubs.map((h) => (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() => setHubFilter(h.id)}
+                  className={cn(
+                    "flex w-full flex-col items-start rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+                    hubFilter === h.id && "bg-accent",
+                  )}
+                >
+                  <span className="truncate">{h.marca} · {h.nombre}</span>
+                  {h.ciudad && (
+                    <span className="text-[10px] text-muted-foreground">{h.ciudad}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="flex items-center gap-1">
           {PRESETS.map((p) => (
             <Button
