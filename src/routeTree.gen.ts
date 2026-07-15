@@ -16,6 +16,7 @@ import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
+import { Route as DuplicadosRouteImport } from './routes/duplicados'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
@@ -58,6 +59,11 @@ const FacturacionRoute = FacturacionRouteImport.update({
 const EpodRoute = EpodRouteImport.update({
   id: '/epod',
   path: '/epod',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DuplicadosRoute = DuplicadosRouteImport.update({
+  id: '/duplicados',
+  path: '/duplicados',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/borradores': typeof BorradoresRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
+  '/duplicados': typeof DuplicadosRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/borradores': typeof BorradoresRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
+  '/duplicados': typeof DuplicadosRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/borradores': typeof BorradoresRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
+  '/duplicados': typeof DuplicadosRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/borradores'
     | '/cd5'
     | '/dashboard'
+    | '/duplicados'
     | '/epod'
     | '/facturacion'
     | '/login'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/borradores'
     | '/cd5'
     | '/dashboard'
+    | '/duplicados'
     | '/epod'
     | '/facturacion'
     | '/login'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/borradores'
     | '/cd5'
     | '/dashboard'
+    | '/duplicados'
     | '/epod'
     | '/facturacion'
     | '/login'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   BorradoresRoute: typeof BorradoresRoute
   Cd5Route: typeof Cd5Route
   DashboardRoute: typeof DashboardRoute
+  DuplicadosRoute: typeof DuplicadosRoute
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
   LoginRoute: typeof LoginRoute
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       path: '/epod'
       fullPath: '/epod'
       preLoaderRoute: typeof EpodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/duplicados': {
+      id: '/duplicados'
+      path: '/duplicados'
+      fullPath: '/duplicados'
+      preLoaderRoute: typeof DuplicadosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -341,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   BorradoresRoute: BorradoresRoute,
   Cd5Route: Cd5Route,
   DashboardRoute: DashboardRoute,
+  DuplicadosRoute: DuplicadosRoute,
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
   LoginRoute: LoginRoute,
