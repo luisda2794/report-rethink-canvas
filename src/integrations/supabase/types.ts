@@ -251,6 +251,7 @@ export type Database = {
           hub_id: string
           id: string
           lp_no: string
+          motivo: string | null
           pop_station_id: string | null
           source: string | null
           tipo: string | null
@@ -272,6 +273,7 @@ export type Database = {
           hub_id: string
           id?: string
           lp_no: string
+          motivo?: string | null
           pop_station_id?: string | null
           source?: string | null
           tipo?: string | null
@@ -293,6 +295,7 @@ export type Database = {
           hub_id?: string
           id?: string
           lp_no?: string
+          motivo?: string | null
           pop_station_id?: string | null
           source?: string | null
           tipo?: string | null
@@ -324,6 +327,7 @@ export type Database = {
           hub_id: string
           id: string
           lp_no: string
+          motivo: string | null
           pop_station_id: string | null
           row_index: number
           source: string | null
@@ -344,6 +348,7 @@ export type Database = {
           hub_id: string
           id?: string
           lp_no: string
+          motivo?: string | null
           pop_station_id?: string | null
           row_index: number
           source?: string | null
@@ -364,6 +369,7 @@ export type Database = {
           hub_id?: string
           id?: string
           lp_no?: string
+          motivo?: string | null
           pop_station_id?: string | null
           row_index?: number
           source?: string | null
