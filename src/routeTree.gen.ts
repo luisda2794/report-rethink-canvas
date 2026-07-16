@@ -22,6 +22,7 @@ import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
 import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
 import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
@@ -91,6 +92,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportesPaquetesEnRiesgoRoute =
+  ReportesPaquetesEnRiesgoRouteImport.update({
+    id: '/reportes_/paquetes-en-riesgo',
+    path: '/reportes/paquetes-en-riesgo',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const RecTokenRoute = RecTokenRouteImport.update({
   id: '/rec/$token',
   path: '/rec/$token',
@@ -122,6 +129,7 @@ export interface FileRoutesByFullPath {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -140,6 +148,7 @@ export interface FileRoutesByTo {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -159,6 +168,7 @@ export interface FileRoutesById {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes_/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -179,6 +189,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes/paquetes-en-riesgo'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes/paquetes-en-riesgo'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   id:
@@ -215,6 +227,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes_/paquetes-en-riesgo'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   fileRoutesById: FileRoutesById
@@ -234,6 +247,7 @@ export interface RootRouteChildren {
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
+  ReportesPaquetesEnRiesgoRoute: typeof ReportesPaquetesEnRiesgoRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
   ApiReportesIdRoute: typeof ApiReportesIdRoute
 }
@@ -331,6 +345,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reportes_/paquetes-en-riesgo': {
+      id: '/reportes_/paquetes-en-riesgo'
+      path: '/reportes/paquetes-en-riesgo'
+      fullPath: '/reportes/paquetes-en-riesgo'
+      preLoaderRoute: typeof ReportesPaquetesEnRiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rec/$token': {
       id: '/rec/$token'
       path: '/rec/$token'
@@ -370,6 +391,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
+  ReportesPaquetesEnRiesgoRoute: ReportesPaquetesEnRiesgoRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,
   ApiReportesIdRoute: ApiReportesIdRoute,
 }

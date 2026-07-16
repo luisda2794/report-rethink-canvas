@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
+  ArrowRight,
+  AlertTriangle,
   Check,
   Loader2,
   AlertCircle,
@@ -16,6 +18,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
@@ -300,7 +303,34 @@ function ReportesPage() {
               </p>
             </header>
 
+            {/* REPORTE PRINCIPAL — PAQUETES EN RIESGO */}
+            <section className="mb-6 animate-fade-up" style={{ animationDelay: "10ms" }}>
+              <Link
+                to="/reportes/paquetes-en-riesgo"
+                className="group flex items-center gap-4 p-5 bg-[#F5E100] border-2 border-ink rounded-lg hover:brightness-95 transition-all"
+              >
+                <div className="shrink-0 size-11 rounded-md bg-ink text-[#F5E100] flex items-center justify-center">
+                  <AlertTriangle className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="font-syne font-bold text-ink text-base tracking-tight">
+                      PAQUETES EN RIESGO
+                    </h2>
+                    <span className="px-1.5 py-0.5 text-[9px] font-mono tracking-widest border border-ink/30 rounded text-ink">
+                      PRINCIPAL
+                    </span>
+                  </div>
+                  <p className="text-ink/80 text-[13px]">
+                    Paquetes en reparto que rompen <span className="italic font-serif">CD5</span> (5+ días desde inbound).
+                  </p>
+                </div>
+                <ArrowRight className="size-5 text-ink shrink-0 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </section>
+
             {/* GENERAR DESDE BASE */}
+
             <section className="mb-4 animate-fade-up" style={{ animationDelay: "20ms" }}>
               <div className="p-4 bg-surface border border-hairline rounded-lg">
                 <div className="flex items-center gap-3 mb-3">
