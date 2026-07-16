@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
+  ArrowRight,
+  AlertTriangle,
   Check,
   Loader2,
   AlertCircle,
@@ -16,6 +18,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
