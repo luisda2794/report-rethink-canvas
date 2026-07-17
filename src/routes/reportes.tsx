@@ -329,6 +329,32 @@ function ReportesPage() {
               </Link>
             </section>
 
+            {/* FLOW MEETING */}
+            <section className="mb-6 animate-fade-up" style={{ animationDelay: "15ms" }}>
+              <Link
+                to="/reportes/flow-meeting"
+                className="group flex items-center gap-4 p-5 bg-ink border-2 border-ink rounded-lg hover:brightness-110 transition-all"
+              >
+                <div className="shrink-0 size-11 rounded-md bg-[#F5E100] text-ink flex items-center justify-center">
+                  <AlertTriangle className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="font-syne font-bold text-white text-base tracking-tight">
+                      FLOW MEETING
+                    </h2>
+                    <span className="px-1.5 py-0.5 text-[9px] font-mono tracking-widest border border-white/40 rounded text-white/80">
+                      DIARIO
+                    </span>
+                  </div>
+                  <p className="text-white/80 text-[13px]">
+                    Dashboard de la <span className="italic font-serif">reunión de flujo</span>: KPIs, drivers, CPs e incidencias del día.
+                  </p>
+                </div>
+                <ArrowRight className="size-5 text-white shrink-0 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </section>
+
             {/* GENERAR DESDE BASE */}
 
             <section className="mb-4 animate-fade-up" style={{ animationDelay: "20ms" }}>

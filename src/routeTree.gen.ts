@@ -23,6 +23,7 @@ import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
+import { Route as ReportesFlowMeetingRouteImport } from './routes/reportes_.flow-meeting'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
 import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
 import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
@@ -98,6 +99,11 @@ const ReportesPaquetesEnRiesgoRoute =
     path: '/reportes/paquetes-en-riesgo',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ReportesFlowMeetingRoute = ReportesFlowMeetingRouteImport.update({
+  id: '/reportes_/flow-meeting',
+  path: '/reportes/flow-meeting',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RecTokenRoute = RecTokenRouteImport.update({
   id: '/rec/$token',
   path: '/rec/$token',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
@@ -168,6 +176,7 @@ export interface FileRoutesById {
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes_/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes_/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
@@ -189,6 +198,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/api/public/cd5'
     | '/api/reportes/$id'
@@ -208,6 +218,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/api/public/cd5'
     | '/api/reportes/$id'
@@ -227,6 +238,7 @@ export interface FileRouteTypes {
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes_/flow-meeting'
     | '/reportes_/paquetes-en-riesgo'
     | '/api/public/cd5'
     | '/api/reportes/$id'
@@ -247,6 +259,7 @@ export interface RootRouteChildren {
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
+  ReportesFlowMeetingRoute: typeof ReportesFlowMeetingRoute
   ReportesPaquetesEnRiesgoRoute: typeof ReportesPaquetesEnRiesgoRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
   ApiReportesIdRoute: typeof ApiReportesIdRoute
@@ -352,6 +365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportesPaquetesEnRiesgoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reportes_/flow-meeting': {
+      id: '/reportes_/flow-meeting'
+      path: '/reportes/flow-meeting'
+      fullPath: '/reportes/flow-meeting'
+      preLoaderRoute: typeof ReportesFlowMeetingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rec/$token': {
       id: '/rec/$token'
       path: '/rec/$token'
@@ -391,6 +411,7 @@ const rootRouteChildren: RootRouteChildren = {
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
+  ReportesFlowMeetingRoute: ReportesFlowMeetingRoute,
   ReportesPaquetesEnRiesgoRoute: ReportesPaquetesEnRiesgoRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,
   ApiReportesIdRoute: ApiReportesIdRoute,
@@ -398,13 +419,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
