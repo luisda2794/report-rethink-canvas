@@ -42,15 +42,34 @@ const HUBS = [
 ] as const;
 type HubKey = (typeof HUBS)[number];
 
-const REQUIRED_COLS = [
-  "Número de Waybill",
-  "Fecha de la tarea",
-  "Estado de la Tarea",
-  "Detalles de la Excepción",
-  "Código postal",
-  "Nombre del Repartidor",
-  "Tipo de Entrega",
-] as const;
+const COLUMN_ALIASES = {
+  waybill: ["Número de Waybill", "Waybill Number"],
+  fecha: ["Fecha de la tarea", "Task Date"],
+  estado: ["Estado de la Tarea", "Task Status"],
+  incidencia: ["Detalles de la Excepción", "Exception Detail"],
+  cp: ["Código postal", "Zip Code"],
+  driver: ["Nombre del Repartidor", "Courier Name"],
+  tipoEntrega: ["Tipo de Entrega", "Delivery Type"],
+} as const;
+
+type ColumnField = keyof typeof COLUMN_ALIASES;
+
+function resolveColumns(
+  headers: string[],
+): { cols: Record<ColumnField, string>; missing?: never } | { cols?: never; missing: string[] } {
+  const cols = {} as Record<ColumnField, string>;
+  const missing: string[] = [];
+  for (const field of Object.keys(COLUMN_ALIASES) as ColumnField[]) {
+    const aliases = COLUMN_ALIASES[field];
+    const found = aliases.find((a) => headers.includes(a));
+    if (found) {
+      cols[field] = found;
+    } else {
+      missing.push(aliases.join(" / "));
+    }
+  }
+  return missing.length > 0 ? { missing } : { cols };
+}
 
 type Categoria = "COMPLETADO" | "DEVOLUCION" | "EN_REPARTO" | "FALLO" | "OTRO";
 
@@ -304,23 +323,24 @@ function FlowMeetingPage() {
       });
       if (json.length === 0) throw new Error("El archivo está vacío.");
       const headers = Object.keys(json[0]);
-      const missing = REQUIRED_COLS.filter((c) => !headers.includes(c));
-      if (missing.length > 0) {
+      const resolved = resolveColumns(headers);
+      if (resolved.missing) {
         throw new Error(
-          `Faltan columnas: ${missing.join(", ")}. Verifica el formato del archivo.`,
+          `Faltan columnas: ${resolved.missing.join(", ")}. Verifica el formato del archivo (se aceptan EPOD en español o en inglés).`,
         );
       }
+      const cols = resolved.cols;
       const parsed: RawRow[] = json.map((r, i) => {
-        const estado = String(r["Estado de la Tarea"] ?? "").trim();
+        const estado = String(r[cols.estado] ?? "").trim();
         return {
-          waybill: String(r["Número de Waybill"] ?? "").trim(),
-          fecha: parseFecha(r["Fecha de la tarea"]),
+          waybill: String(r[cols.waybill] ?? "").trim(),
+          fecha: parseFecha(r[cols.fecha]),
           estado,
           categoria: categorizar(estado),
-          incidencia: String(r["Detalles de la Excepción"] ?? "").trim(),
-          cp: String(r["Código postal"] ?? "").trim(),
-          driver: String(r["Nombre del Repartidor"] ?? "").trim(),
-          tipoEntrega: String(r["Tipo de Entrega"] ?? "").trim(),
+          incidencia: String(r[cols.incidencia] ?? "").trim(),
+          cp: String(r[cols.cp] ?? "").trim(),
+          driver: String(r[cols.driver] ?? "").trim(),
+          tipoEntrega: String(r[cols.tipoEntrega] ?? "").trim(),
           rowIndex: i,
         };
       });
