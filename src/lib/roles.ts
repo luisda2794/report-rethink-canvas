@@ -12,14 +12,15 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export type NavItem = { to: string; label: string };
 
+// Nota: "/duplicados" y "/mapas-provincia" se acceden ahora desde tarjetas
+// dentro de /reportes (no del nav lateral), y "/mapas-admin" está oculto del
+// nav por no usarse. Los tres siguen siendo rutas válidas — ver ROUTE_ACCESS,
+// que no cambia — así que el acceso directo por URL sigue funcionando.
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/reportes", label: "Reportes" },
-  { to: "/duplicados", label: "Duplicados" },
   { to: "/reclamaciones", label: "Reclamaciones" },
-  { to: "/mapas-provincia", label: "Mapas Provincia" },
-  { to: "/mapas-admin", label: "Admin mapas" },
   { to: "/admin", label: "Admin" },
 ];
 
