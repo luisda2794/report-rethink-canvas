@@ -22,6 +22,7 @@ import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReportesSuperReporteRouteImport } from './routes/reportes_.super-reporte'
 import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
 import { Route as ReportesFlowMeetingRouteImport } from './routes/reportes_.flow-meeting'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
@@ -93,6 +94,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportesSuperReporteRoute = ReportesSuperReporteRouteImport.update({
+  id: '/reportes_/super-reporte',
+  path: '/reportes/super-reporte',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportesPaquetesEnRiesgoRoute =
   ReportesPaquetesEnRiesgoRouteImport.update({
     id: '/reportes_/paquetes-en-riesgo',
@@ -137,6 +143,7 @@ export interface FileRoutesByFullPath {
   '/rec/$token': typeof RecTokenRoute
   '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
+  '/reportes/super-reporte': typeof ReportesSuperReporteRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/rec/$token': typeof RecTokenRoute
   '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
+  '/reportes/super-reporte': typeof ReportesSuperReporteRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -178,6 +186,7 @@ export interface FileRoutesById {
   '/rec/$token': typeof RecTokenRoute
   '/reportes_/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes_/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
+  '/reportes_/super-reporte': typeof ReportesSuperReporteRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/rec/$token'
     | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
+    | '/reportes/super-reporte'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/rec/$token'
     | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
+    | '/reportes/super-reporte'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   id:
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/rec/$token'
     | '/reportes_/flow-meeting'
     | '/reportes_/paquetes-en-riesgo'
+    | '/reportes_/super-reporte'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   fileRoutesById: FileRoutesById
@@ -261,6 +273,7 @@ export interface RootRouteChildren {
   RecTokenRoute: typeof RecTokenRoute
   ReportesFlowMeetingRoute: typeof ReportesFlowMeetingRoute
   ReportesPaquetesEnRiesgoRoute: typeof ReportesPaquetesEnRiesgoRoute
+  ReportesSuperReporteRoute: typeof ReportesSuperReporteRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
   ApiReportesIdRoute: typeof ApiReportesIdRoute
 }
@@ -358,6 +371,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reportes_/super-reporte': {
+      id: '/reportes_/super-reporte'
+      path: '/reportes/super-reporte'
+      fullPath: '/reportes/super-reporte'
+      preLoaderRoute: typeof ReportesSuperReporteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reportes_/paquetes-en-riesgo': {
       id: '/reportes_/paquetes-en-riesgo'
       path: '/reportes/paquetes-en-riesgo'
@@ -413,6 +433,7 @@ const rootRouteChildren: RootRouteChildren = {
   RecTokenRoute: RecTokenRoute,
   ReportesFlowMeetingRoute: ReportesFlowMeetingRoute,
   ReportesPaquetesEnRiesgoRoute: ReportesPaquetesEnRiesgoRoute,
+  ReportesSuperReporteRoute: ReportesSuperReporteRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,
   ApiReportesIdRoute: ApiReportesIdRoute,
 }

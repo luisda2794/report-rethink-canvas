@@ -13,6 +13,7 @@ import {
   Database,
   Copy,
   MapIcon,
+  Sparkles,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
@@ -407,6 +408,29 @@ function ReportesPage() {
                   </p>
                 </div>
                 <ArrowRight className="size-5 text-ink shrink-0 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </section>
+
+            {/* SÚPER REPORTE */}
+            <section className="mb-6 animate-fade-up" style={{ animationDelay: "30ms" }}>
+              <Link
+                to="/reportes/super-reporte"
+                className="group flex items-center gap-4 p-5 bg-ink border-2 border-ink rounded-lg hover:brightness-110 transition-all"
+              >
+                <div className="shrink-0 size-11 rounded-md bg-[#F5E100] text-ink flex items-center justify-center">
+                  <Sparkles className="size-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h2 className="font-syne font-bold text-white text-base tracking-tight">
+                      SÚPER REPORTE
+                    </h2>
+                  </div>
+                  <p className="text-white/80 text-[13px]">
+                    Entregas por <span className="italic font-serif">categoría</span>, CD5/CD13 y CD3 en un solo reporte.
+                  </p>
+                </div>
+                <ArrowRight className="size-5 text-white shrink-0 group-hover:translate-x-0.5 transition-transform" />
               </Link>
             </section>
 
