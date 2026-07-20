@@ -11,7 +11,6 @@ import {
   X,
   Database,
   Copy,
-  MapIcon,
   Sparkles,
   Users,
 } from "lucide-react";
@@ -335,12 +334,6 @@ function ReportesPage() {
                   icon={Copy}
                   title="Duplicados"
                   description="Detección de paquetes duplicados en el ePOD y tasas reales vs. Cainiao."
-                />
-                <ReportCard
-                  to="/mapas-provincia"
-                  icon={MapIcon}
-                  title="Mapas Provincia"
-                  description="Asignación de transportistas por código postal en Alicante."
                 />
                 <ReportCard
                   to="/reportes/super-reporte"
