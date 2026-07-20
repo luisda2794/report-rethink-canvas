@@ -43,16 +43,35 @@ const HUBS = [
 ] as const;
 type HubKey = (typeof HUBS)[number];
 
-const REQUIRED_COLS = [
-  "Número de Waybill",
-  "Fecha de la tarea",
-  "Estado de la Tarea",
-  "Detalles de la Excepción",
-  "Código postal",
-  "La ciudad de destino",
-  "Dirección detallada",
-  "Nombre del Repartidor",
-] as const;
+const COLUMN_ALIASES = {
+  waybill: ["Número de Waybill", "Waybill Number"],
+  fecha: ["Fecha de la tarea", "Task Date"],
+  estado: ["Estado de la Tarea", "Task Status"],
+  incidencia: ["Detalles de la Excepción", "Exception Detail"],
+  cp: ["Código postal", "Zip Code"],
+  ciudad: ["La ciudad de destino", "The destination city"],
+  direccion: ["Dirección detallada", "Detailed address"],
+  driver: ["Nombre del Repartidor", "Courier Name"],
+} as const;
+
+type ColumnField = keyof typeof COLUMN_ALIASES;
+
+function resolveColumns(
+  headers: string[],
+): { cols: Record<ColumnField, string>; missing?: never } | { cols?: never; missing: string[] } {
+  const cols = {} as Record<ColumnField, string>;
+  const missing: string[] = [];
+  for (const field of Object.keys(COLUMN_ALIASES) as ColumnField[]) {
+    const aliases = COLUMN_ALIASES[field];
+    const found = aliases.find((a) => headers.includes(a));
+    if (found) {
+      cols[field] = found;
+    } else {
+      missing.push(aliases.join(" / "));
+    }
+  }
+  return missing.length > 0 ? { missing } : { cols };
+}
 
 const EN_REPARTO_ESTADOS = new Set(["Driver_received", "Driver_received_incidencias"]);
 
@@ -201,24 +220,25 @@ function PaquetesEnRiesgoPage() {
       });
       if (json.length === 0) throw new Error("El archivo está vacío.");
       const headers = Object.keys(json[0]);
-      const missing = REQUIRED_COLS.filter((c) => !headers.includes(c));
-      if (missing.length > 0) {
+      const resolved = resolveColumns(headers);
+      if (resolved.missing) {
         throw new Error(
-          `Faltan columnas: ${missing.join(", ")}. Verifica el formato del archivo.`,
+          `Faltan columnas: ${resolved.missing.join(", ")}. Verifica el formato del archivo (se aceptan EPOD en español o en inglés).`,
         );
       }
+      const cols = resolved.cols;
       const parsed: RawRow[] = json.map((r, i) => {
-        const f = parseFecha(r["Fecha de la tarea"]);
+        const f = parseFecha(r[cols.fecha]);
         return {
-          waybill: String(r["Número de Waybill"] ?? "").trim(),
+          waybill: String(r[cols.waybill] ?? "").trim(),
           fecha: f.d,
           fechaRaw: f.raw,
-          estado: String(r["Estado de la Tarea"] ?? "").trim(),
-          incidencia: String(r["Detalles de la Excepción"] ?? "").trim(),
-          cp: String(r["Código postal"] ?? "").trim(),
-          ciudad: String(r["La ciudad de destino"] ?? "").trim(),
-          direccion: String(r["Dirección detallada"] ?? "").trim(),
-          repartidor: String(r["Nombre del Repartidor"] ?? "").trim(),
+          estado: String(r[cols.estado] ?? "").trim(),
+          incidencia: String(r[cols.incidencia] ?? "").trim(),
+          cp: String(r[cols.cp] ?? "").trim(),
+          ciudad: String(r[cols.ciudad] ?? "").trim(),
+          direccion: String(r[cols.direccion] ?? "").trim(),
+          repartidor: String(r[cols.driver] ?? "").trim(),
           rowIndex: i,
         };
       });
