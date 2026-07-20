@@ -1,8 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
-  ArrowRight,
   AlertTriangle,
   Check,
   Loader2,
@@ -14,10 +13,12 @@ import {
   Copy,
   MapIcon,
   Sparkles,
+  Users,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
 import { RequireAuth } from "@/components/RequireAuth";
+import { ReportCard } from "@/components/ReportCard";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -312,128 +313,46 @@ function ReportesPage() {
                 Reportes disponibles para el Hub <HubLabel />.
               </p>
             </header>
+          </div>
 
-            {/* REPORTE PRINCIPAL — PAQUETES EN RIESGO */}
-            <section className="mb-6 animate-fade-up" style={{ animationDelay: "10ms" }}>
-              <Link
-                to="/reportes/paquetes-en-riesgo"
-                className="group flex items-center gap-4 p-5 bg-[#F5E100] border-2 border-ink rounded-lg hover:brightness-95 transition-all"
-              >
-                <div className="shrink-0 size-11 rounded-md bg-ink text-[#F5E100] flex items-center justify-center">
-                  <AlertTriangle className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="font-syne font-bold text-ink text-base tracking-tight">
-                      PAQUETES EN RIESGO
-                    </h2>
-                    <span className="px-1.5 py-0.5 text-[9px] font-mono tracking-widest border border-ink/30 rounded text-ink">
-                      PRINCIPAL
-                    </span>
-                  </div>
-                  <p className="text-ink/80 text-[13px]">
-                    Paquetes en reparto que rompen <span className="italic font-serif">CD5</span> (5+ días desde inbound).
-                  </p>
-                </div>
-                <ArrowRight className="size-5 text-ink shrink-0 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
+          <div className="max-w-5xl mx-auto">
+            <section className="mb-12 animate-fade-up">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <ReportCard
+                  to="/reportes/paquetes-en-riesgo"
+                  icon={AlertTriangle}
+                  title="Paquetes en Riesgo"
+                  description="Paquetes en reparto que rompen CD5 (5+ días desde inbound)."
+                />
+                <ReportCard
+                  to="/reportes/flow-meeting"
+                  icon={Users}
+                  title="Flow Meeting"
+                  description="Dashboard de la reunión de flujo: KPIs, drivers, CPs e incidencias del día."
+                />
+                <ReportCard
+                  to="/duplicados"
+                  icon={Copy}
+                  title="Duplicados"
+                  description="Detección de paquetes duplicados en el ePOD y tasas reales vs. Cainiao."
+                />
+                <ReportCard
+                  to="/mapas-provincia"
+                  icon={MapIcon}
+                  title="Mapas Provincia"
+                  description="Asignación de transportistas por código postal en Alicante."
+                />
+                <ReportCard
+                  to="/reportes/super-reporte"
+                  icon={Sparkles}
+                  title="Súper Reporte"
+                  description="Entregas por categoría, CD5/CD13 y CD3 en un solo reporte."
+                />
+              </div>
             </section>
+          </div>
 
-            {/* FLOW MEETING */}
-            <section className="mb-6 animate-fade-up" style={{ animationDelay: "15ms" }}>
-              <Link
-                to="/reportes/flow-meeting"
-                className="group flex items-center gap-4 p-5 bg-ink border-2 border-ink rounded-lg hover:brightness-110 transition-all"
-              >
-                <div className="shrink-0 size-11 rounded-md bg-[#F5E100] text-ink flex items-center justify-center">
-                  <AlertTriangle className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="font-syne font-bold text-white text-base tracking-tight">
-                      FLOW MEETING
-                    </h2>
-                    <span className="px-1.5 py-0.5 text-[9px] font-mono tracking-widest border border-white/40 rounded text-white/80">
-                      DIARIO
-                    </span>
-                  </div>
-                  <p className="text-white/80 text-[13px]">
-                    Dashboard de la <span className="italic font-serif">reunión de flujo</span>: KPIs, drivers, CPs e incidencias del día.
-                  </p>
-                </div>
-                <ArrowRight className="size-5 text-white shrink-0 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </section>
-
-            {/* DUPLICADOS */}
-            <section className="mb-6 animate-fade-up" style={{ animationDelay: "20ms" }}>
-              <Link
-                to="/duplicados"
-                className="group flex items-center gap-4 p-5 bg-surface border-2 border-ink rounded-lg hover:bg-surface-2 transition-all"
-              >
-                <div className="shrink-0 size-11 rounded-md bg-ink text-white flex items-center justify-center">
-                  <Copy className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="font-syne font-bold text-ink text-base tracking-tight">
-                      DUPLICADOS
-                    </h2>
-                  </div>
-                  <p className="text-muted-text text-[13px]">
-                    Detección de paquetes duplicados en el <span className="italic font-serif">ePOD</span> y cálculo de tasas reales vs. Cainiao.
-                  </p>
-                </div>
-                <ArrowRight className="size-5 text-ink shrink-0 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </section>
-
-            {/* MAPAS PROVINCIA */}
-            <section className="mb-6 animate-fade-up" style={{ animationDelay: "25ms" }}>
-              <Link
-                to="/mapas-provincia"
-                className="group flex items-center gap-4 p-5 bg-surface border-2 border-ink rounded-lg hover:bg-surface-2 transition-all"
-              >
-                <div className="shrink-0 size-11 rounded-md bg-ink text-white flex items-center justify-center">
-                  <MapIcon className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="font-syne font-bold text-ink text-base tracking-tight">
-                      MAPAS PROVINCIA
-                    </h2>
-                  </div>
-                  <p className="text-muted-text text-[13px]">
-                    Visualización de la asignación de transportistas por código postal en <span className="italic font-serif">Alicante</span>.
-                  </p>
-                </div>
-                <ArrowRight className="size-5 text-ink shrink-0 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </section>
-
-            {/* SÚPER REPORTE */}
-            <section className="mb-6 animate-fade-up" style={{ animationDelay: "30ms" }}>
-              <Link
-                to="/reportes/super-reporte"
-                className="group flex items-center gap-4 p-5 bg-ink border-2 border-ink rounded-lg hover:brightness-110 transition-all"
-              >
-                <div className="shrink-0 size-11 rounded-md bg-[#F5E100] text-ink flex items-center justify-center">
-                  <Sparkles className="size-5" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <h2 className="font-syne font-bold text-white text-base tracking-tight">
-                      SÚPER REPORTE
-                    </h2>
-                  </div>
-                  <p className="text-white/80 text-[13px]">
-                    Entregas por <span className="italic font-serif">categoría</span>, CD5/CD13 y CD3 en un solo reporte.
-                  </p>
-                </div>
-                <ArrowRight className="size-5 text-white shrink-0 group-hover:translate-x-0.5 transition-transform" />
-              </Link>
-            </section>
-
+          <div className="max-w-3xl mx-auto">
             {SHOW_LEGACY_REPORT_TOOLS && (
               <>
             {/* GENERAR DESDE BASE */}
