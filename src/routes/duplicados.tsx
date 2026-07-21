@@ -11,6 +11,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
+import { resolveEventDate } from "@/lib/resolve-event-date";
 
 export const Route = createFileRoute("/duplicados")({
   component: () => (
@@ -37,9 +38,20 @@ const REQUIRED_COLS = [
   "Detalles de la Excepción",
 ] as const;
 
+// Fechas reales del evento (entrega/fallo) — opcionales: si el archivo no las
+// trae, resolveEventDate() cae de vuelta en "Fecha de la tarea".
+const OPTIONAL_DATE_ALIASES = {
+  tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
+  tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
+} as const;
+
+function findColumn(headers: string[], aliases: readonly string[]): string | undefined {
+  return aliases.find((a) => headers.includes(a));
+}
+
 type RawRow = {
   waybill: string;
-  fecha: string;
+  fecha: Date | null;
   estado: string;
   incidencia: string;
   rowIndex: number;
@@ -74,16 +86,22 @@ type Analysis = {
   canceladosCaiPct: number;
 };
 
-function normDate(v: unknown): string {
-  if (v == null) return "";
-  if (v instanceof Date) return v.toISOString();
+function parseFecha(v: unknown): Date | null {
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return v;
   if (typeof v === "number") {
-    // Excel serial
     const utcDays = Math.floor(v - 25569);
     const utcMs = utcDays * 86400 * 1000 + (v - Math.floor(v)) * 86400 * 1000;
-    return new Date(utcMs).toISOString();
+    return new Date(utcMs);
   }
-  return String(v).trim();
+  const s = String(v).trim();
+  const d = new Date(s.replace(" ", "T"));
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function formatFecha(d: Date | null): string {
+  if (!d) return "—";
+  return d.toISOString().slice(0, 16).replace("T", " ");
 }
 
 function analyze(rows: RawRow[]): Analysis {
@@ -99,8 +117,10 @@ function analyze(rows: RawRow[]): Analysis {
   for (const [waybill, rs] of byWaybill) {
     // sort by fecha asc, then rowIndex asc; final = last
     const sorted = [...rs].sort((a, b) => {
-      if (a.fecha === b.fecha) return a.rowIndex - b.rowIndex;
-      return a.fecha < b.fecha ? -1 : 1;
+      const at = a.fecha ? a.fecha.getTime() : 0;
+      const bt = b.fecha ? b.fecha.getTime() : 0;
+      if (at === bt) return a.rowIndex - b.rowIndex;
+      return at - bt;
     });
     const finalEstado = sorted[sorted.length - 1]?.estado ?? "";
     groups.push({ waybill, rows: sorted, finalEstado });
@@ -177,13 +197,24 @@ function DuplicadosPage() {
           `Faltan columnas: ${missing.join(", ")}. Verifica el formato del archivo.`,
         );
       }
-      const parsed: RawRow[] = json.map((r, i) => ({
-        waybill: String(r["Número de Waybill"] ?? "").trim(),
-        fecha: normDate(r["Fecha de la tarea"]),
-        estado: String(r["Estado de la Tarea"] ?? "").trim(),
-        incidencia: String(r["Detalles de la Excepción"] ?? "").trim(),
-        rowIndex: i,
-      }));
+      const tiempoEntregaCol = findColumn(headers, OPTIONAL_DATE_ALIASES.tiempoEntrega);
+      const tiempoFracasoCol = findColumn(headers, OPTIONAL_DATE_ALIASES.tiempoFracaso);
+      const parsed: RawRow[] = json.map((r, i) => {
+        const estado = String(r["Estado de la Tarea"] ?? "").trim();
+        const fecha = resolveEventDate({
+          estado,
+          fechaTarea: parseFecha(r["Fecha de la tarea"]),
+          tiempoEntrega: tiempoEntregaCol ? parseFecha(r[tiempoEntregaCol]) : null,
+          tiempoFracaso: tiempoFracasoCol ? parseFecha(r[tiempoFracasoCol]) : null,
+        });
+        return {
+          waybill: String(r["Número de Waybill"] ?? "").trim(),
+          fecha,
+          estado,
+          incidencia: String(r["Detalles de la Excepción"] ?? "").trim(),
+          rowIndex: i,
+        };
+      });
       setRows(parsed);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error leyendo el archivo.");
@@ -493,7 +524,7 @@ function DuplicateRow({ group }: { group: WaybillGroup }) {
               {group.rows.map((r, i) => (
                 <tr key={i} className="border-t border-border">
                   <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
-                  <td className="px-3 py-1.5 text-foreground">{r.fecha || "—"}</td>
+                  <td className="px-3 py-1.5 text-foreground">{formatFecha(r.fecha)}</td>
                   <td className="px-3 py-1.5 text-foreground">{r.estado || "—"}</td>
                   <td className="px-3 py-1.5 text-foreground">{r.incidencia || "—"}</td>
                 </tr>

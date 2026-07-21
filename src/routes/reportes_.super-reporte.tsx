@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/RequireAuth";
+import { resolveEventDate } from "@/lib/resolve-event-date";
 
 export const Route = createFileRoute("/reportes_/super-reporte")({
   component: () => (
@@ -61,9 +62,14 @@ type RequiredField = keyof typeof REQUIRED_ALIASES;
 
 // Estas dos no tienen equivalente en inglés conocido y son opcionales: si no
 // existen en el archivo, la categorización simplemente cae en LOCAL (regla 6).
+// tiempoEntrega/tiempoFracaso son las fechas REALES del evento (entrega/fallo)
+// — opcionales: si el archivo no las trae, resolveEventDate() cae de vuelta
+// en "Fecha de la tarea".
 const OPTIONAL_ALIASES = {
   mercado: ["Nombre del mercado"],
   vendedor: ["Nombre del vendedor"],
+  tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
+  tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
 } as const;
 type OptionalField = keyof typeof OPTIONAL_ALIASES;
 
@@ -993,10 +999,17 @@ function SuperReportePage() {
         const mercado = optCols.mercado ? String(r[optCols.mercado] ?? "").trim() : "";
         const vendedor = optCols.vendedor ? String(r[optCols.vendedor] ?? "").trim() : "";
         const { cliente, categoria } = categorizeCliente(mercado, vendedor);
+        const estado = String(r[cols.estado] ?? "").trim();
+        const fecha = resolveEventDate({
+          estado,
+          fechaTarea: parseFecha(r[cols.fecha]),
+          tiempoEntrega: optCols.tiempoEntrega ? parseFecha(r[optCols.tiempoEntrega]) : null,
+          tiempoFracaso: optCols.tiempoFracaso ? parseFecha(r[optCols.tiempoFracaso]) : null,
+        });
         return {
           waybill: String(r[cols.waybill] ?? "").trim(),
-          fecha: parseFecha(r[cols.fecha]),
-          estado: String(r[cols.estado] ?? "").trim(),
+          fecha,
+          estado,
           incidencia: String(r[cols.incidencia] ?? "").trim(),
           cp: String(r[cols.cp] ?? "").trim(),
           ciudad: String(r[cols.ciudad] ?? "").trim(),

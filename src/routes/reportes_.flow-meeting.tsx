@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/RequireAuth";
+import { resolveEventDate } from "@/lib/resolve-event-date";
 
 export const Route = createFileRoute("/reportes_/flow-meeting")({
   component: () => (
@@ -54,9 +55,19 @@ const COLUMN_ALIASES = {
 
 type ColumnField = keyof typeof COLUMN_ALIASES;
 
+// Fechas reales del evento (entrega/fallo) — opcionales: si el archivo no las
+// trae, resolveEventDate() cae de vuelta en "Fecha de la tarea".
+const OPTIONAL_DATE_ALIASES = {
+  tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
+  tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
+} as const;
+type OptionalDateField = keyof typeof OPTIONAL_DATE_ALIASES;
+
 function resolveColumns(
   headers: string[],
-): { cols: Record<ColumnField, string>; missing?: never } | { cols?: never; missing: string[] } {
+):
+  | { cols: Record<ColumnField, string>; optCols: Partial<Record<OptionalDateField, string>>; missing?: never }
+  | { cols?: never; optCols?: never; missing: string[] } {
   const cols = {} as Record<ColumnField, string>;
   const missing: string[] = [];
   for (const field of Object.keys(COLUMN_ALIASES) as ColumnField[]) {
@@ -68,7 +79,15 @@ function resolveColumns(
       missing.push(aliases.join(" / "));
     }
   }
-  return missing.length > 0 ? { missing } : { cols };
+  if (missing.length > 0) return { missing };
+
+  const optCols: Partial<Record<OptionalDateField, string>> = {};
+  for (const field of Object.keys(OPTIONAL_DATE_ALIASES) as OptionalDateField[]) {
+    const aliases = OPTIONAL_DATE_ALIASES[field];
+    const found = aliases.find((a) => headers.includes(a));
+    if (found) optCols[field] = found;
+  }
+  return { cols, optCols };
 }
 
 type Categoria = "COMPLETADO" | "DEVOLUCION" | "EN_REPARTO" | "FALLO" | "OTRO";
@@ -330,11 +349,18 @@ function FlowMeetingPage() {
         );
       }
       const cols = resolved.cols;
+      const optCols = resolved.optCols;
       const parsed: RawRow[] = json.map((r, i) => {
         const estado = String(r[cols.estado] ?? "").trim();
+        const fecha = resolveEventDate({
+          estado,
+          fechaTarea: parseFecha(r[cols.fecha]),
+          tiempoEntrega: optCols.tiempoEntrega ? parseFecha(r[optCols.tiempoEntrega]) : null,
+          tiempoFracaso: optCols.tiempoFracaso ? parseFecha(r[optCols.tiempoFracaso]) : null,
+        });
         return {
           waybill: String(r[cols.waybill] ?? "").trim(),
-          fecha: parseFecha(r[cols.fecha]),
+          fecha,
           estado,
           categoria: categorizar(estado),
           incidencia: String(r[cols.incidencia] ?? "").trim(),
