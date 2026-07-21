@@ -11,7 +11,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
-import { Topbar } from "@/components/Topbar";
 
 export const Route = createFileRoute("/duplicados")({
   component: () => (
@@ -195,24 +194,18 @@ function DuplicadosPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
-      <Topbar section="Duplicados" />
+    <div className="flex flex-col gap-6">
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Duplicados
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Detección de paquetes duplicados y cálculo de tasas reales vs. Cainiao.
+          Procesamiento local: nada se sube al servidor.
+        </p>
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14">
-        <div className="max-w-5xl mx-auto">
-          <header className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              DUPLICADOS
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Detección de paquetes duplicados y cálculo de tasas{" "}
-              <span className="italic font-serif">reales</span> vs.{" "}
-              <span className="italic font-serif">Cainiao</span>. Procesamiento
-              local: nada se sube al servidor.
-            </p>
-          </header>
-
-          {/* Dropzone */}
+      {/* Dropzone */}
           <section className="mb-6">
             <div
               onDragOver={(e) => {
@@ -227,10 +220,10 @@ function DuplicadosPage() {
                 if (f) void handleFile(f);
               }}
               onClick={() => inputRef.current?.click()}
-              className={`p-5 bg-surface border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+              className={`p-5 bg-card border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
                 dragOver
                   ? "border-electric bg-electric/5"
-                  : "border-hairline hover:border-electric/50"
+                  : "border-border hover:border-electric/50"
               }`}
             >
               <input
@@ -244,10 +237,10 @@ function DuplicadosPage() {
                 <div className="flex items-center gap-3">
                   <FileSpreadsheet className="size-6 text-electric shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-ink truncate">
+                    <div className="text-sm font-semibold text-foreground truncate">
                       {file.name}
                     </div>
-                    <div className="text-[11px] text-muted-text font-mono">
+                    <div className="text-[11px] text-muted-foreground">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
                       {rows ? ` · ${rows.length} filas` : ""}
                     </div>
@@ -258,20 +251,20 @@ function DuplicadosPage() {
                       void handleFile(null);
                       if (inputRef.current) inputRef.current.value = "";
                     }}
-                    className="p-1.5 rounded hover:bg-surface-2 text-muted-text hover:text-ink"
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                     aria-label="Quitar archivo"
                   >
                     <X className="size-4" />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 text-muted-text">
+                <div className="flex items-center gap-3 text-muted-foreground">
                   <Upload className="size-6 text-electric" />
                   <div>
-                    <div className="text-sm font-semibold text-ink">
+                    <div className="text-sm font-semibold text-foreground">
                       Sube el Excel del EPOD del día
                     </div>
-                    <div className="text-[11px] font-mono">
+                    <div className="text-[11px]">
                       .xlsx · Arrastra aquí o haz click
                     </div>
                   </div>
@@ -279,12 +272,12 @@ function DuplicadosPage() {
               )}
             </div>
             {loading && (
-              <p className="mt-2 text-[12px] font-mono text-muted-text">
+              <p className="mt-2 text-[12px] text-muted-foreground">
                 Procesando…
               </p>
             )}
             {error && (
-              <p className="mt-2 text-danger text-[12px] font-mono flex items-start gap-1.5">
+              <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
                 <AlertCircle className="size-3 mt-0.5 shrink-0" />
                 <span>{error}</span>
               </p>
@@ -321,11 +314,11 @@ function DuplicadosPage() {
               {/* Tabla comparativa */}
               <section className="mb-8">
                 <h2 className="text-lg font-semibold tracking-tight mb-3">
-                  REAL vs <span className="italic font-serif">Cainiao</span>
+                  Real vs Cainiao
                 </h2>
-                <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
+                <div className="bg-card border rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-surface-2 text-[11px] font-mono uppercase text-muted-text">
+                    <thead className="bg-muted text-[11px] uppercase text-muted-foreground">
                       <tr>
                         <th className="text-left px-4 py-2.5">Concepto</th>
                         <th className="text-right px-4 py-2.5">Real (dedup)</th>
@@ -333,7 +326,7 @@ function DuplicadosPage() {
                         <th className="text-right px-4 py-2.5">Δ</th>
                       </tr>
                     </thead>
-                    <tbody className="font-mono">
+                    <tbody>
                       <ComparisonRow
                         label="Entregados"
                         realAbs={analysis.entregadosReal}
@@ -368,16 +361,16 @@ function DuplicadosPage() {
                 <h2 className="text-lg font-semibold tracking-tight mb-3 flex items-center gap-2">
                   <Copy className="size-4 text-electric" />
                   Waybills duplicados
-                  <span className="text-[11px] font-mono text-muted-text font-normal">
+                  <span className="text-[11px] text-muted-foreground font-normal">
                     ({analysis.duplicatedGroups.length})
                   </span>
                 </h2>
                 {analysis.duplicatedGroups.length === 0 ? (
-                  <div className="p-6 bg-surface border border-hairline rounded-lg text-sm text-muted-text">
+                  <div className="p-6 bg-card border rounded-lg text-sm text-muted-foreground">
                     No hay waybills duplicados en este archivo.
                   </div>
                 ) : (
-                  <div className="bg-surface border border-hairline rounded-lg divide-y divide-hairline">
+                  <div className="bg-card border rounded-lg divide-y divide-border">
                     {analysis.duplicatedGroups.map((g) => (
                       <DuplicateRow key={g.waybill} group={g} />
                     ))}
@@ -386,8 +379,6 @@ function DuplicadosPage() {
               </section>
             </>
           )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -407,16 +398,16 @@ function KpiCard({
     <div
       className={`p-4 rounded-lg border ${
         accent
-          ? "bg-[#F5E100] border-[#F5E100] text-ink"
-          : "bg-surface border-hairline text-ink"
+          ? "bg-primary/10 border-primary/25 text-foreground"
+          : "bg-card text-foreground"
       }`}
     >
-      <div className="text-[11px] font-mono uppercase tracking-wide opacity-70">
+      <div className="text-[11px] uppercase tracking-wide opacity-70">
         {label}
       </div>
       <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
       {hint && (
-        <div className="mt-1 text-[11px] font-mono opacity-60">{hint}</div>
+        <div className="mt-1 text-[11px] opacity-60">{hint}</div>
       )}
     </div>
   );
@@ -444,17 +435,17 @@ function ComparisonRow({
     ? "text-emerald-600"
     : worse
       ? "text-rose-600"
-      : "text-muted-text";
+      : "text-muted-foreground";
   return (
-    <tr className="border-t border-hairline">
-      <td className="px-4 py-3 font-syne font-semibold text-ink">{label}</td>
+    <tr className="border-t border-border">
+      <td className="px-4 py-3 font-semibold text-foreground">{label}</td>
       <td className="px-4 py-3 text-right tabular-nums">
-        <div className="text-ink">{realAbs.toLocaleString("es-ES")}</div>
-        <div className="text-[11px] text-muted-text">{realPct.toFixed(2)}%</div>
+        <div className="text-foreground">{realAbs.toLocaleString("es-ES")}</div>
+        <div className="text-[11px] text-muted-foreground">{realPct.toFixed(2)}%</div>
       </td>
       <td className="px-4 py-3 text-right tabular-nums">
-        <div className="text-ink">{caiAbs.toLocaleString("es-ES")}</div>
-        <div className="text-[11px] text-muted-text">{caiPct.toFixed(2)}%</div>
+        <div className="text-foreground">{caiAbs.toLocaleString("es-ES")}</div>
+        <div className="text-[11px] text-muted-foreground">{caiPct.toFixed(2)}%</div>
       </td>
       <td className={`px-4 py-3 text-right tabular-nums font-semibold ${cls}`}>
         {delta >= 0 ? "+" : ""}
@@ -470,27 +461,27 @@ function DuplicateRow({ group }: { group: WaybillGroup }) {
     <div>
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2 text-left"
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted text-left"
       >
         {open ? (
-          <ChevronDown className="size-4 text-muted-text" />
+          <ChevronDown className="size-4 text-muted-foreground" />
         ) : (
-          <ChevronRight className="size-4 text-muted-text" />
+          <ChevronRight className="size-4 text-muted-foreground" />
         )}
-        <div className="flex-1 font-mono text-sm text-ink truncate">
+        <div className="flex-1 text-sm text-foreground truncate">
           {group.waybill}
         </div>
-        <span className="text-[11px] font-mono text-muted-text">
+        <span className="text-[11px] text-muted-foreground">
           {group.rows.length}×
         </span>
-        <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-2 text-ink">
+        <span className="text-[11px] px-2 py-0.5 rounded bg-muted text-foreground">
           {group.finalEstado || "—"}
         </span>
       </button>
       {open && (
         <div className="px-4 pb-3">
-          <table className="w-full text-[12px] font-mono border border-hairline rounded overflow-hidden">
-            <thead className="bg-surface-2 text-muted-text uppercase text-[10px]">
+          <table className="w-full text-[12px] border rounded overflow-hidden">
+            <thead className="bg-muted text-muted-foreground uppercase text-[10px]">
               <tr>
                 <th className="text-left px-3 py-1.5">#</th>
                 <th className="text-left px-3 py-1.5">Fecha</th>
@@ -500,11 +491,11 @@ function DuplicateRow({ group }: { group: WaybillGroup }) {
             </thead>
             <tbody>
               {group.rows.map((r, i) => (
-                <tr key={i} className="border-t border-hairline">
-                  <td className="px-3 py-1.5 text-muted-text">{i + 1}</td>
-                  <td className="px-3 py-1.5 text-ink">{r.fecha || "—"}</td>
-                  <td className="px-3 py-1.5 text-ink">{r.estado || "—"}</td>
-                  <td className="px-3 py-1.5 text-ink">{r.incidencia || "—"}</td>
+                <tr key={i} className="border-t border-border">
+                  <td className="px-3 py-1.5 text-muted-foreground">{i + 1}</td>
+                  <td className="px-3 py-1.5 text-foreground">{r.fecha || "—"}</td>
+                  <td className="px-3 py-1.5 text-foreground">{r.estado || "—"}</td>
+                  <td className="px-3 py-1.5 text-foreground">{r.incidencia || "—"}</td>
                 </tr>
               ))}
             </tbody>

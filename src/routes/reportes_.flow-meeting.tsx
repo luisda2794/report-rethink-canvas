@@ -11,8 +11,8 @@ import {
   Printer,
   Package,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/RequireAuth";
-import { Topbar } from "@/components/Topbar";
 
 export const Route = createFileRoute("/reportes_/flow-meeting")({
   component: () => (
@@ -274,7 +274,7 @@ function ProgressBar({ pct, className = "" }: { pct: number; className?: string 
           style={{ width: `${clamped}%`, backgroundColor: color }}
         />
       </div>
-      <span className="text-[11px] font-mono tabular-nums w-10 text-right" style={{ color }}>
+      <span className="text-[11px] tabular-nums w-10 text-right" style={{ color }}>
         {clamped.toFixed(0)}%
       </span>
     </div>
@@ -285,7 +285,7 @@ function IncBar({ count, max }: { count: number; max: number }) {
   const pct = max > 0 ? (count / max) * 100 : 0;
   return (
     <div className="flex-1 h-2 rounded-full bg-neutral-200 overflow-hidden">
-      <div className="h-full bg-ink rounded-full" style={{ width: `${pct}%` }} />
+      <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -379,50 +379,42 @@ function FlowMeetingPage() {
     : [];
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-syne flex flex-col print:bg-white">
-      <div className="print:hidden">
-        <Topbar section="Reportes" />
-      </div>
+    <div className="flex flex-col gap-6 print:bg-white">
+      <div className="print:px-6 print:py-4">
+        <div className="mb-4 print:hidden">
+          <Link
+            to="/reportes"
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="size-3.5" /> Volver a Reportes
+          </Link>
+        </div>
 
-      <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14 print:px-6 print:py-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-4 print:hidden">
-            <Link
-              to="/reportes"
-              className="inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-text hover:text-ink"
-            >
-              <ArrowLeft className="size-3" /> Volver a Reportes
-            </Link>
+        <header className="mb-6 print:mb-4 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight print:text-xl">
+              Flow Meeting
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground print:text-xs">
+              Dashboard de la reunión de flujo — foto del día operativo.
+              {analysis && (
+                <>
+                  {" "}Hub <strong>{hub}</strong> · Fecha <strong>{formatDate(analysis.maxDate)}</strong>
+                </>
+              )}
+            </p>
           </div>
-
-          <header className="mb-8 print:mb-4 flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground print:text-xl">
-                FLOW MEETING
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground print:text-xs">
-                Dashboard de la <span className="italic font-serif">reunión de flujo</span> — foto del día operativo.
-                {analysis && (
-                  <>
-                    {" "}Hub <strong>{hub}</strong> · Fecha <strong>{formatDate(analysis.maxDate)}</strong>
-                  </>
-                )}
-              </p>
-            </div>
-            {analysis && (
-              <button
-                onClick={() => window.print()}
-                className="print:hidden inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold font-syne rounded-md bg-ink text-white hover:bg-ink/90"
-              >
-                <Printer className="size-3.5" /> Exportar a PDF
-              </button>
-            )}
-          </header>
+          {analysis && (
+            <Button onClick={() => window.print()} className="print:hidden gap-2">
+              <Printer className="size-3.5" /> Exportar a PDF
+            </Button>
+          )}
+        </header>
 
           {/* Hub selector + Dropzone (hidden in print) */}
           <div className="print:hidden">
             <section className="mb-4">
-              <label className="text-[11px] font-mono uppercase text-muted-text tracking-wide">Hub</label>
+              <label className="text-[11px] uppercase text-muted-foreground tracking-wide">Hub</label>
               <div className="mt-1 relative w-full max-w-xs">
                 <select
                   value={hub}
@@ -431,14 +423,14 @@ function FlowMeetingPage() {
                     void handleFile(null);
                     if (inputRef.current) inputRef.current.value = "";
                   }}
-                  className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-surface border border-hairline rounded-md text-ink font-syne"
+                  className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
                 >
                   <option value="">— Selecciona hub —</option>
                   {HUBS.map((h) => (
                     <option key={h} value={h}>{h}</option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-4 text-muted-text" />
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               </div>
             </section>
 
@@ -453,12 +445,12 @@ function FlowMeetingPage() {
                   if (f) void handleFile(f);
                 }}
                 onClick={() => hub && inputRef.current?.click()}
-                className={`p-5 bg-surface border-2 border-dashed rounded-lg transition-colors ${
+                className={`p-5 bg-card border-2 border-dashed rounded-lg transition-colors ${
                   !hub
-                    ? "border-hairline opacity-60 cursor-not-allowed"
+                    ? "border-border opacity-60 cursor-not-allowed"
                     : dragOver
                       ? "border-electric bg-electric/5 cursor-pointer"
-                      : "border-hairline hover:border-electric/50 cursor-pointer"
+                      : "border-border hover:border-electric/50 cursor-pointer"
                 }`}
               >
                 <input
@@ -472,8 +464,8 @@ function FlowMeetingPage() {
                   <div className="flex items-center gap-3">
                     <FileSpreadsheet className="size-6 text-electric shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-ink truncate">{file.name}</div>
-                      <div className="text-[11px] text-muted-text font-mono">
+                      <div className="text-sm font-semibold text-foreground truncate">{file.name}</div>
+                      <div className="text-[11px] text-muted-foreground">
                         {(file.size / 1024 / 1024).toFixed(2)} MB
                         {rows ? ` · ${rows.length} filas` : ""}
                       </div>
@@ -484,29 +476,29 @@ function FlowMeetingPage() {
                         void handleFile(null);
                         if (inputRef.current) inputRef.current.value = "";
                       }}
-                      className="p-1.5 rounded hover:bg-surface-2 text-muted-text hover:text-ink"
+                      className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                       aria-label="Quitar archivo"
                     >
                       <X className="size-4" />
                     </button>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 text-muted-text">
+                  <div className="flex items-center gap-3 text-muted-foreground">
                     <Upload className="size-6 text-electric" />
                     <div>
-                      <div className="text-sm font-semibold text-ink">
+                      <div className="text-sm font-semibold text-foreground">
                         {hub ? `Sube el Excel EPOD de ${hub}` : "Primero selecciona un hub"}
                       </div>
-                      <div className="text-[11px] font-mono">.xlsx · Arrastra aquí o haz click</div>
+                      <div className="text-[11px]">.xlsx · Arrastra aquí o haz click</div>
                     </div>
                   </div>
                 )}
               </div>
               {loading && (
-                <p className="mt-2 text-[12px] font-mono text-muted-text">Procesando…</p>
+                <p className="mt-2 text-[12px] text-muted-foreground">Procesando…</p>
               )}
               {error && (
-                <p className="mt-2 text-danger text-[12px] font-mono flex items-start gap-1.5">
+                <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
                   <AlertCircle className="size-3 mt-0.5 shrink-0" />
                   <span>{error}</span>
                 </p>
@@ -535,29 +527,29 @@ function FlowMeetingPage() {
 
               {/* PUDOs card */}
               {analysis.pudoTotal > 0 && (
-                <section className="mb-6 p-4 rounded-lg border border-hairline bg-surface print:border-black">
+                <section className="mb-6 p-4 rounded-lg border bg-card print:border-black">
                   <div className="flex items-center gap-2 mb-3">
                     <Package className="size-4 text-electric" />
-                    <h3 className="text-sm font-semibold text-ink">PUDOs del día</h3>
+                    <h3 className="text-sm font-semibold text-foreground">PUDOs del día</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
                     <div>
-                      <div className="text-[11px] font-mono uppercase text-muted-text">Total PUDO</div>
+                      <div className="text-[11px] uppercase text-muted-foreground">Total PUDO</div>
                       <div className="text-2xl font-semibold tabular-nums">{analysis.pudoTotal}</div>
                     </div>
                     <div>
-                      <div className="text-[11px] font-mono uppercase text-muted-text">Entregados</div>
+                      <div className="text-[11px] uppercase text-muted-foreground">Entregados</div>
                       <div className="text-2xl font-semibold tabular-nums">{analysis.pudoEntregados}</div>
                     </div>
                     <div>
-                      <div className="text-[11px] font-mono uppercase text-muted-text mb-1">% Entrega PUDO</div>
+                      <div className="text-[11px] uppercase text-muted-foreground mb-1">% Entrega PUDO</div>
                       <ProgressBar
                         pct={analysis.pudoTotal > 0 ? (analysis.pudoEntregados / analysis.pudoTotal) * 100 : 0}
                       />
                     </div>
                   </div>
                   {analysis.pudoPendientes > 0 && (
-                    <div className="mt-3 p-2.5 rounded bg-[#F5E100] text-ink text-[13px] font-semibold border-2 border-ink">
+                    <div className="mt-3 p-2.5 rounded-md bg-warn/15 text-foreground text-[13px] font-semibold border border-warn/40">
                       ⚠ {analysis.pudoPendientes} PUDO{analysis.pudoPendientes === 1 ? "" : "s"} pendiente{analysis.pudoPendientes === 1 ? "" : "s"} por entregar
                     </div>
                   )}
@@ -566,12 +558,12 @@ function FlowMeetingPage() {
 
               {/* Drivers */}
               <section className="mb-6 print:break-before-page">
-                <h3 className="text-sm font-semibold text-ink mb-3 uppercase tracking-wide">
+                <h3 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
                   Resumen por Driver
                 </h3>
-                <div className="overflow-x-auto rounded-lg border border-hairline bg-surface print:border-black">
+                <div className="overflow-x-auto rounded-lg border bg-card print:border-black">
                   <table className="w-full text-[12px]">
-                    <thead className="bg-ink text-white print:bg-black">
+                    <thead className="bg-muted text-foreground">
                       <tr>
                         <Th>Driver</Th>
                         <Th right>Total</Th>
@@ -587,14 +579,14 @@ function FlowMeetingPage() {
                         const base = d.entregado + d.devolucion + d.enReparto + d.fallos;
                         const pct = base > 0 ? ((d.entregado + d.devolucion) / base) * 100 : 0;
                         return (
-                          <tr key={d.driver} className="border-t border-hairline">
-                            <Td className="font-mono">{d.driver}</Td>
+                          <tr key={d.driver} className="border-t border-border">
+                            <Td>{d.driver}</Td>
                             <Td right className="tabular-nums font-semibold">{d.total}</Td>
                             <Td right className="tabular-nums">{d.entregado}</Td>
                             <Td right className="tabular-nums">{d.devolucion}</Td>
                             <Td><ProgressBar pct={pct} /></Td>
                             <Td right className="tabular-nums">{d.enReparto}</Td>
-                            <Td right className={`tabular-nums ${d.fallos > 0 ? "text-danger font-semibold" : ""}`}>{d.fallos}</Td>
+                            <Td right className={`tabular-nums ${d.fallos > 0 ? "text-destructive font-semibold" : ""}`}>{d.fallos}</Td>
                           </tr>
                         );
                       })}
@@ -606,16 +598,16 @@ function FlowMeetingPage() {
               {/* CPs */}
               <section className="mb-6 print:break-before-page">
                 <div className="flex items-baseline justify-between mb-3 gap-3 flex-wrap">
-                  <h3 className="text-sm font-semibold text-ink uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                     {showFullCp ? "Detalle por CP" : "Puntos Críticos por CP"}
                   </h3>
-                  <span className="text-[11px] font-mono text-muted-text">
+                  <span className="text-[11px] text-muted-foreground">
                     {analysis.cpsCount} CPs · {showFullCp ? "vista completa" : `mostrando ${cpsToShow.length} combinaciones con paquetes en reparto`}
                   </span>
                 </div>
-                <div className="overflow-x-auto rounded-lg border border-hairline bg-surface print:border-black">
+                <div className="overflow-x-auto rounded-lg border bg-card print:border-black">
                   <table className="w-full text-[12px]">
-                    <thead className="bg-ink text-white print:bg-black">
+                    <thead className="bg-muted text-foreground">
                       <tr>
                         <Th>Driver</Th>
                         <Th>CP</Th>
@@ -629,7 +621,7 @@ function FlowMeetingPage() {
                     <tbody>
                       {cpsToShow.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="p-6 text-center text-muted-text font-mono text-[11px]">
+                          <td colSpan={7} className="p-6 text-center text-muted-foreground text-[11px]">
                             Sin combinaciones con paquetes en reparto — todo cerrado ✓
                           </td>
                         </tr>
@@ -638,14 +630,14 @@ function FlowMeetingPage() {
                         const pct = base > 0 ? (c.completado / base) * 100 : 0;
                         const alert = c.enReparto >= 10;
                         return (
-                          <tr key={`${c.driver}-${c.cp}`} className={`border-t border-hairline ${alert ? "bg-red-50 print:bg-red-100" : ""}`}>
-                            <Td className="font-mono">{c.driver}</Td>
-                            <Td className="font-mono">{c.cp}</Td>
+                          <tr key={`${c.driver}-${c.cp}`} className={`border-t border-border ${alert ? "bg-destructive/10 print:bg-destructive/10" : ""}`}>
+                            <Td>{c.driver}</Td>
+                            <Td>{c.cp}</Td>
                             <Td right className="tabular-nums font-semibold">{c.total}</Td>
                             <Td right className="tabular-nums">{c.completado}</Td>
                             <Td><ProgressBar pct={pct} /></Td>
-                            <Td right className={`tabular-nums ${alert ? "text-red-700 font-bold" : c.enReparto > 0 ? "font-semibold" : ""}`}>{c.enReparto}</Td>
-                            <Td right className={`tabular-nums ${c.fallos > 0 ? "text-danger font-semibold" : ""}`}>{c.fallos}</Td>
+                            <Td right className={`tabular-nums ${alert ? "text-destructive font-bold" : c.enReparto > 0 ? "font-semibold" : ""}`}>{c.enReparto}</Td>
+                            <Td right className={`tabular-nums ${c.fallos > 0 ? "text-destructive font-semibold" : ""}`}>{c.fallos}</Td>
                           </tr>
                         );
                       })}
@@ -657,16 +649,16 @@ function FlowMeetingPage() {
               {/* Incidencias */}
               {analysis.incidencias.length > 0 && (
                 <section className="mb-6 print:break-before-page">
-                  <h3 className="text-sm font-semibold text-ink mb-3 uppercase tracking-wide">
+                  <h3 className="text-sm font-semibold text-foreground mb-3 uppercase tracking-wide">
                     Incidencias por tipo
                   </h3>
-                  <div className="rounded-lg border border-hairline bg-surface p-4 print:border-black">
+                  <div className="rounded-lg border bg-card p-4 print:border-black">
                     <ul className="space-y-2">
                       {analysis.incidencias.map((i) => (
                         <li key={i.nombre} className="flex items-center gap-3 text-[12px]">
                           <span className="flex-1 min-w-0 truncate">{i.nombre}</span>
                           <IncBar count={i.count} max={analysis.incidencias[0].count} />
-                          <span className="w-8 text-right font-mono tabular-nums font-semibold">{i.count}</span>
+                          <span className="w-8 text-right tabular-nums font-semibold">{i.count}</span>
                         </li>
                       ))}
                     </ul>
@@ -676,7 +668,6 @@ function FlowMeetingPage() {
             </>
           )}
         </div>
-      </div>
 
       <style>{`
         @media print {
@@ -704,26 +695,26 @@ function Kpi({
 }) {
   const base = "p-4 rounded-lg border print:border-black";
   const style = highlight
-    ? "bg-[#F5E100] border-[#F5E100] text-ink"
+    ? "bg-primary/10 border-primary/25 text-foreground"
     : tone === "danger"
-      ? "bg-surface border-hairline text-red-700"
+      ? "bg-destructive/10 border-destructive/25 text-destructive"
       : tone === "warn"
-        ? "bg-[#F5E100]/40 border-[#F5E100] text-ink"
-        : "bg-surface border-hairline text-ink";
+        ? "bg-warn/15 border-warn/40 text-foreground"
+        : "bg-card border text-foreground";
   return (
     <div className={`${base} ${style}`}>
-      <div className="text-[11px] font-mono uppercase tracking-wide opacity-70">{label}</div>
+      <div className="text-[11px] uppercase tracking-wide opacity-70">{label}</div>
       <div className="mt-1 text-2xl md:text-3xl font-semibold tabular-nums">
         {typeof value === "number" ? value.toLocaleString("es-ES") : value}
       </div>
-      {sub && <div className="mt-1 text-[11px] font-mono opacity-70">{sub}</div>}
+      {sub && <div className="mt-1 text-[11px] opacity-70">{sub}</div>}
     </div>
   );
 }
 
 function Th({ children, right, className = "" }: { children: React.ReactNode; right?: boolean; className?: string }) {
   return (
-    <th className={`px-3 py-2 text-[10px] font-mono uppercase tracking-wide ${right ? "text-right" : "text-left"} ${className}`}>
+    <th className={`px-3 py-2 text-[10px] uppercase tracking-wide ${right ? "text-right" : "text-left"} ${className}`}>
       {children}
     </th>
   );

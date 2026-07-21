@@ -12,8 +12,8 @@ import {
   ArrowLeft,
   ChevronDown,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/RequireAuth";
-import { Topbar } from "@/components/Topbar";
 
 export const Route = createFileRoute("/reportes_/paquetes-en-riesgo")({
   component: () => (
@@ -182,9 +182,9 @@ function riskLevel(d: number): "critico" | "alto" | "medio" {
 }
 
 function riskColors(level: "critico" | "alto" | "medio") {
-  if (level === "critico") return { cell: "bg-red-700 text-white", hex: "B91C1C", fontHex: "FFFFFF" };
+  if (level === "critico") return { cell: "bg-destructive text-destructive-foreground", hex: "B91C1C", fontHex: "FFFFFF" };
   if (level === "alto") return { cell: "bg-rose-300 text-red-900", hex: "FDA4AF", fontHex: "7F1D1D" };
-  return { cell: "bg-[#F5E100] text-ink", hex: "F5E100", fontHex: "000000" };
+  return { cell: "bg-warn text-foreground", hex: "F59E0B", fontHex: "FFFFFF" };
 }
 
 function PaquetesEnRiesgoPage() {
@@ -340,33 +340,28 @@ function PaquetesEnRiesgoPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
-      <Topbar section="Reportes" />
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link
+          to="/reportes"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" /> Volver a Reportes
+        </Link>
+      </div>
 
-      <div className="flex-1 overflow-y-auto px-6 lg:px-12 py-10 lg:py-14">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-4">
-            <Link
-              to="/reportes"
-              className="inline-flex items-center gap-1.5 text-[11px] font-mono text-muted-text hover:text-ink"
-            >
-              <ArrowLeft className="size-3" /> Volver a Reportes
-            </Link>
-          </div>
-
-          <header className="mb-8">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              PAQUETES EN RIESGO
-            </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Paquetes en reparto que rompen <span className="italic font-serif">CD5</span> (5+ días desde inbound).
-              Procesamiento local: nada se sube al servidor.
-            </p>
-          </header>
+      <header>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Paquetes en Riesgo
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Paquetes en reparto que rompen CD5 (5+ días desde inbound). Procesamiento local: nada se sube al servidor.
+        </p>
+      </header>
 
           {/* Hub selector */}
           <section className="mb-4">
-            <label className="text-[11px] font-mono uppercase text-muted-text tracking-wide">
+            <label className="text-[11px] uppercase text-muted-foreground tracking-wide">
               Hub
             </label>
             <div className="mt-1 relative w-full max-w-xs">
@@ -377,14 +372,14 @@ function PaquetesEnRiesgoPage() {
                   void handleFile(null);
                   if (inputRef.current) inputRef.current.value = "";
                 }}
-                className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-surface border border-hairline rounded-md text-ink font-syne"
+                className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
               >
                 <option value="">— Selecciona hub —</option>
                 {HUBS.map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
               </select>
-              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-4 text-muted-text" />
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             </div>
           </section>
 
@@ -400,12 +395,12 @@ function PaquetesEnRiesgoPage() {
                 if (f) void handleFile(f);
               }}
               onClick={() => hub && inputRef.current?.click()}
-              className={`p-5 bg-surface border-2 border-dashed rounded-lg transition-colors ${
+              className={`p-5 bg-card border-2 border-dashed rounded-lg transition-colors ${
                 !hub
-                  ? "border-hairline opacity-60 cursor-not-allowed"
+                  ? "border-border opacity-60 cursor-not-allowed"
                   : dragOver
                     ? "border-electric bg-electric/5 cursor-pointer"
-                    : "border-hairline hover:border-electric/50 cursor-pointer"
+                    : "border-border hover:border-electric/50 cursor-pointer"
               }`}
             >
               <input
@@ -419,8 +414,8 @@ function PaquetesEnRiesgoPage() {
                 <div className="flex items-center gap-3">
                   <FileSpreadsheet className="size-6 text-electric shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-ink truncate">{file.name}</div>
-                    <div className="text-[11px] text-muted-text font-mono">
+                    <div className="text-sm font-semibold text-foreground truncate">{file.name}</div>
+                    <div className="text-[11px] text-muted-foreground">
                       {(file.size / 1024 / 1024).toFixed(2)} MB
                       {rows ? ` · ${rows.length} filas` : ""}
                     </div>
@@ -431,20 +426,20 @@ function PaquetesEnRiesgoPage() {
                       void handleFile(null);
                       if (inputRef.current) inputRef.current.value = "";
                     }}
-                    className="p-1.5 rounded hover:bg-surface-2 text-muted-text hover:text-ink"
+                    className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
                     aria-label="Quitar archivo"
                   >
                     <X className="size-4" />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 text-muted-text">
+                <div className="flex items-center gap-3 text-muted-foreground">
                   <Upload className="size-6 text-electric" />
                   <div>
-                    <div className="text-sm font-semibold text-ink">
+                    <div className="text-sm font-semibold text-foreground">
                       {hub ? `Sube el Excel EPOD de ${hub}` : "Primero selecciona un hub"}
                     </div>
-                    <div className="text-[11px] font-mono">
+                    <div className="text-[11px]">
                       .xlsx · Arrastra aquí o haz click
                     </div>
                   </div>
@@ -452,10 +447,10 @@ function PaquetesEnRiesgoPage() {
               )}
             </div>
             {loading && (
-              <p className="mt-2 text-[12px] font-mono text-muted-text">Procesando…</p>
+              <p className="mt-2 text-[12px] text-muted-foreground">Procesando…</p>
             )}
             {error && (
-              <p className="mt-2 text-danger text-[12px] font-mono flex items-start gap-1.5">
+              <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
                 <AlertCircle className="size-3 mt-0.5 shrink-0" />
                 <span>{error}</span>
               </p>
@@ -465,52 +460,48 @@ function PaquetesEnRiesgoPage() {
           {analysis && (
             <>
               <section className="mb-6 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 rounded-lg border bg-[#F5E100] border-[#F5E100] text-ink">
-                  <div className="text-[11px] font-mono uppercase tracking-wide opacity-70">
+                <div className="p-4 rounded-lg border border-primary/25 bg-primary/10 text-foreground">
+                  <div className="text-[11px] uppercase tracking-wide opacity-70">
                     Paquetes en riesgo
                   </div>
                   <div className="mt-1 text-3xl font-semibold tabular-nums">
                     {analysis.risk.length.toLocaleString("es-ES")}
                   </div>
-                  <div className="mt-1 text-[11px] font-mono opacity-70">
+                  <div className="mt-1 text-[11px] opacity-70">
                     Rompen CD5 (≥5 días desde inbound)
                   </div>
                 </div>
-                <div className="p-4 rounded-lg border bg-surface border-hairline text-ink">
-                  <div className="text-[11px] font-mono uppercase tracking-wide opacity-70">
+                <div className="p-4 rounded-lg border bg-card text-foreground">
+                  <div className="text-[11px] uppercase tracking-wide opacity-70">
                     Fecha del reporte
                   </div>
                   <div className="mt-1 text-2xl font-semibold tabular-nums">
                     {formatDate(analysis.maxDate)}
                   </div>
-                  <div className="mt-1 text-[11px] font-mono opacity-60">
+                  <div className="mt-1 text-[11px] opacity-60">
                     Última fecha del archivo
                   </div>
                 </div>
-                <div className="p-4 rounded-lg border bg-surface border-hairline text-ink flex flex-col justify-between">
+                <div className="p-4 rounded-lg border bg-card text-foreground flex flex-col justify-between">
                   <div>
-                    <div className="text-[11px] font-mono uppercase tracking-wide opacity-70">Hub</div>
+                    <div className="text-[11px] uppercase tracking-wide opacity-70">Hub</div>
                     <div className="mt-1 text-2xl font-semibold">{hub}</div>
                   </div>
-                  <button
-                    onClick={exportXlsx}
-                    disabled={analysis.risk.length === 0}
-                    className="mt-2 self-start inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold font-syne tracking-tight rounded-md bg-ink text-white hover:bg-ink/90 disabled:bg-surface-2 disabled:text-muted-text disabled:cursor-not-allowed"
-                  >
+                  <Button onClick={exportXlsx} disabled={analysis.risk.length === 0} size="sm" className="mt-2 self-start gap-2">
                     <Download className="size-3.5" /> Exportar Excel
-                  </button>
+                  </Button>
                 </div>
               </section>
 
               <section>
                 {analysis.risk.length === 0 ? (
-                  <div className="p-6 bg-surface border border-hairline rounded-lg text-sm text-ink">
+                  <div className="p-6 bg-card border rounded-lg text-sm text-foreground">
                     Sin paquetes en riesgo ✓
                   </div>
                 ) : (
-                  <div className="bg-surface border border-hairline rounded-lg overflow-x-auto">
+                  <div className="bg-card border rounded-lg overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-surface-2 text-[11px] font-mono uppercase text-muted-text">
+                      <thead className="bg-muted text-[11px] uppercase text-muted-foreground">
                         <tr>
                           <th className="text-left px-3 py-2.5">Waybill</th>
                           <th className="text-center px-3 py-2.5">Días desde Inbound</th>
@@ -522,25 +513,25 @@ function PaquetesEnRiesgoPage() {
                           <th className="text-left px-3 py-2.5">Repartidor</th>
                         </tr>
                       </thead>
-                      <tbody className="font-mono">
+                      <tbody>
                         {analysis.risk.map((r) => {
                           const level = riskLevel(r.diasDesdeInbound);
                           const colors = riskColors(level);
                           return (
-                            <tr key={r.waybill} className="border-t border-hairline">
-                              <td className="px-3 py-2 text-ink whitespace-nowrap">{r.waybill}</td>
+                            <tr key={r.waybill} className="border-t border-border">
+                              <td className="px-3 py-2 text-foreground whitespace-nowrap">{r.waybill}</td>
                               <td className="px-3 py-2 text-center">
                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-semibold tabular-nums ${colors.cell}`}>
                                   {level === "critico" && <AlertTriangle className="size-3" />}
                                   {r.diasDesdeInbound}d
                                 </span>
                               </td>
-                              <td className="px-3 py-2 text-center text-ink tabular-nums">{r.numIncidencias}</td>
-                              <td className="px-3 py-2 text-ink max-w-[280px] truncate" title={r.ultimaIncidencia}>{r.ultimaIncidencia}</td>
-                              <td className="px-3 py-2 text-ink">{r.cp || "—"}</td>
-                              <td className="px-3 py-2 text-ink">{r.ciudad || "—"}</td>
-                              <td className="px-3 py-2 text-ink max-w-[280px] truncate" title={r.direccion}>{r.direccion || "—"}</td>
-                              <td className="px-3 py-2 text-ink whitespace-nowrap">{r.repartidor || "—"}</td>
+                              <td className="px-3 py-2 text-center text-foreground tabular-nums">{r.numIncidencias}</td>
+                              <td className="px-3 py-2 text-foreground max-w-[280px] truncate" title={r.ultimaIncidencia}>{r.ultimaIncidencia}</td>
+                              <td className="px-3 py-2 text-foreground">{r.cp || "—"}</td>
+                              <td className="px-3 py-2 text-foreground">{r.ciudad || "—"}</td>
+                              <td className="px-3 py-2 text-foreground max-w-[280px] truncate" title={r.direccion}>{r.direccion || "—"}</td>
+                              <td className="px-3 py-2 text-foreground whitespace-nowrap">{r.repartidor || "—"}</td>
                             </tr>
                           );
                         })}
@@ -551,8 +542,6 @@ function PaquetesEnRiesgoPage() {
               </section>
             </>
           )}
-        </div>
-      </div>
     </div>
   );
 }
