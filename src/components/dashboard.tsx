@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Delta, DeltaIcon, DeltaValue } from "@/components/delta";
+import { DashboardDsrWidgets } from "@/components/dashboard-dsr-widgets";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -523,6 +524,7 @@ export function Dashboard() {
         <EntregasPorDia byDay={current.by_day} from={from} to={to} />
         <TipoEntrega byTipo={current.by_tipo} />
       </div>
+      <DashboardDsrWidgets />
     </div>
   );
 }

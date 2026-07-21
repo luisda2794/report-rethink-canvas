@@ -13,12 +13,12 @@ function normalizeEstadoForEventDate(s: string): string {
   return s.trim().toLowerCase().replace(/_/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function isDeliveredEstado(s: string): boolean {
+export function isDeliveredEstado(s: string): boolean {
   const n = normalizeEstadoForEventDate(s);
   return n === "entregado" || n === "delivered" || n === "return to seller success";
 }
 
-function isFailedEstado(s: string): boolean {
+export function isFailedEstado(s: string): boolean {
   const n = normalizeEstadoForEventDate(s);
   return n === "attempt failure" || n === "return to seller fail";
 }
