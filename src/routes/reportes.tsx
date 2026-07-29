@@ -13,6 +13,7 @@ import {
   Copy,
   Sparkles,
   Users,
+  MapPin,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
@@ -331,6 +332,12 @@ function ReportesPage() {
           icon={Sparkles}
           title="Súper Reporte"
           description="Entregas por categoría, CD5/CD13 y CD3 en un solo reporte."
+        />
+        <ReportCard
+          to="/reportes/clientes-locales"
+          icon={MapPin}
+          title="Clientes Locales"
+          description="Clientes locales en reparto, flow meeting por CP y CD4."
         />
       </div>
 

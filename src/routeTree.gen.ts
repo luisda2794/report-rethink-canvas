@@ -22,6 +22,8 @@ import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/reportes_.clientes-locales.admin'
+import { Route as ReportesClientesLocalesRouteImport } from './routes/reportes_.clientes-locales'
 import { Route as ReportesSuperReporteRouteImport } from './routes/reportes_.super-reporte'
 import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
 import { Route as ReportesFlowMeetingRouteImport } from './routes/reportes_.flow-meeting'
@@ -94,6 +96,17 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportesClientesLocalesRoute = ReportesClientesLocalesRouteImport.update({
+  id: '/reportes_/clientes-locales',
+  path: '/reportes/clientes-locales',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportesClientesLocalesAdminRoute =
+  ReportesClientesLocalesAdminRouteImport.update({
+    id: '/reportes_/clientes-locales/admin',
+    path: '/reportes/clientes-locales/admin',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ReportesSuperReporteRoute = ReportesSuperReporteRouteImport.update({
   id: '/reportes_/super-reporte',
   path: '/reportes/super-reporte',
@@ -144,6 +157,8 @@ export interface FileRoutesByFullPath {
   '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes/super-reporte': typeof ReportesSuperReporteRoute
+  '/reportes/clientes-locales': typeof ReportesClientesLocalesRoute
+  '/reportes/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -165,6 +180,8 @@ export interface FileRoutesByTo {
   '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes/super-reporte': typeof ReportesSuperReporteRoute
+  '/reportes/clientes-locales': typeof ReportesClientesLocalesRoute
+  '/reportes/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -187,6 +204,8 @@ export interface FileRoutesById {
   '/reportes_/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes_/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes_/super-reporte': typeof ReportesSuperReporteRoute
+  '/reportes_/clientes-locales': typeof ReportesClientesLocalesRoute
+  '/reportes_/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
 }
@@ -210,6 +229,8 @@ export interface FileRouteTypes {
     | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/reportes/super-reporte'
+    | '/reportes/clientes-locales'
+    | '/reportes/clientes-locales/admin'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -231,6 +252,8 @@ export interface FileRouteTypes {
     | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/reportes/super-reporte'
+    | '/reportes/clientes-locales'
+    | '/reportes/clientes-locales/admin'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   id:
@@ -252,6 +275,8 @@ export interface FileRouteTypes {
     | '/reportes_/flow-meeting'
     | '/reportes_/paquetes-en-riesgo'
     | '/reportes_/super-reporte'
+    | '/reportes_/clientes-locales'
+    | '/reportes_/clientes-locales/admin'
     | '/api/public/cd5'
     | '/api/reportes/$id'
   fileRoutesById: FileRoutesById
@@ -274,6 +299,8 @@ export interface RootRouteChildren {
   ReportesFlowMeetingRoute: typeof ReportesFlowMeetingRoute
   ReportesPaquetesEnRiesgoRoute: typeof ReportesPaquetesEnRiesgoRoute
   ReportesSuperReporteRoute: typeof ReportesSuperReporteRoute
+  ReportesClientesLocalesRoute: typeof ReportesClientesLocalesRoute
+  ReportesClientesLocalesAdminRoute: typeof ReportesClientesLocalesAdminRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
   ApiReportesIdRoute: typeof ApiReportesIdRoute
 }
@@ -371,6 +398,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reportes_/clientes-locales/admin': {
+      id: '/reportes_/clientes-locales/admin'
+      path: '/reportes/clientes-locales/admin'
+      fullPath: '/reportes/clientes-locales/admin'
+      preLoaderRoute: typeof ReportesClientesLocalesAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reportes_/clientes-locales': {
+      id: '/reportes_/clientes-locales'
+      path: '/reportes/clientes-locales'
+      fullPath: '/reportes/clientes-locales'
+      preLoaderRoute: typeof ReportesClientesLocalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reportes_/super-reporte': {
       id: '/reportes_/super-reporte'
       path: '/reportes/super-reporte'
@@ -434,6 +475,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReportesFlowMeetingRoute: ReportesFlowMeetingRoute,
   ReportesPaquetesEnRiesgoRoute: ReportesPaquetesEnRiesgoRoute,
   ReportesSuperReporteRoute: ReportesSuperReporteRoute,
+  ReportesClientesLocalesRoute: ReportesClientesLocalesRoute,
+  ReportesClientesLocalesAdminRoute: ReportesClientesLocalesAdminRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,
   ApiReportesIdRoute: ApiReportesIdRoute,
 }
