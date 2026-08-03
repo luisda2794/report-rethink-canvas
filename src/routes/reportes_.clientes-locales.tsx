@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Upload,
@@ -7,7 +7,6 @@ import {
   X,
   AlertCircle,
   ArrowLeft,
-  ArrowRight,
   Settings,
   Download,
   History,
@@ -20,10 +19,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
-import { HubCombobox } from "@/components/HubCombobox";
-import { getAllHubs, getEpodData, requireFields, type EpodField } from "@/lib/epodStore";
 import { isDeliveredEstado, isFailedEstado } from "@/lib/resolve-event-date";
-import { getClientesLocalesConfig, applyClientAlias, isClienteLocal, type CpLocalidad } from "@/lib/clientes-locales-config";
+import { getClientesLocalesConfig, type ClientesLocalesConfig, type CpLocalidad } from "@/lib/clientes-locales-config";
 import { exportStyledExcel } from "@/lib/xlsx-export";
 import {
   getHistorico,
@@ -52,8 +49,7 @@ export const Route = createFileRoute("/reportes_/clientes-locales")({
       { title: "Menssajero — Clientes Locales" },
       {
         name: "description",
-        content:
-          "Clientes locales en reparto, flow meeting por CP, CD4 y % Close Loop de SHEIN/resto de clientes locales, a partir de dos EPOD (histórico + del día).",
+        content: "Clientes locales en reparto, flow meeting por CP y CD4, a partir de dos EPOD (histórico + del día).",
       },
     ],
   }),
@@ -63,16 +59,37 @@ export const Route = createFileRoute("/reportes_/clientes-locales")({
 // Resolución de columnas (español / inglés)
 // ---------------------------------------------------------------------------
 
-const REQUIRED_FIELDS: EpodField[] = ["waybill", "fecha", "estado", "cp", "direccion", "driver", "mercado", "vendedor"];
+const REQUIRED_ALIASES = {
+  waybill: ["Número de Waybill", "Waybill Number"],
+  fecha: ["Fecha de la tarea", "Task Date"],
+  estado: ["Estado de la Tarea", "Task Status"],
+  cp: ["Código postal", "Zip Code"],
+  direccion: ["Dirección detallada", "Detailed address"],
+  driver: ["Nombre del Repartidor", "Courier Name"],
+  mercado: ["Nombre del mercado", "Market Place Name"],
+  vendedor: ["Nombre del vendedor", "Seller Name"],
+} as const;
+type RequiredField = keyof typeof REQUIRED_ALIASES;
 
-// El histórico necesita waybill/fecha/cp/driver/estado/mercado/vendedor: T0,
-// Cliente Local, y ahora también fecha de entrega (para los reportes % Close Loop).
+function resolveColumns(
+  headers: string[],
+): { cols: Record<RequiredField, string>; missing?: never } | { cols?: never; missing: string[] } {
+  const cols = {} as Record<RequiredField, string>;
+  const missing: string[] = [];
+  for (const field of Object.keys(REQUIRED_ALIASES) as RequiredField[]) {
+    const aliases = REQUIRED_ALIASES[field];
+    const found = aliases.find((a) => headers.includes(a));
+    if (found) cols[field] = found;
+    else missing.push(aliases.join(" / "));
+  }
+  return missing.length > 0 ? { missing } : { cols };
+}
+
+// El histórico solo necesita waybill/fecha/cp/mercado/vendedor (para T0 y Cliente Local).
 const HISTORICO_ALIASES = {
   waybill: ["Número de Waybill", "Waybill Number"],
   fecha: ["Fecha de la tarea", "Task Date"],
   cp: ["Código postal", "Zip Code"],
-  driver: ["Nombre del Repartidor", "Courier Name"],
-  estado: ["Estado de la Tarea", "Task Status"],
   mercado: ["Nombre del mercado", "Market Place Name"],
   vendedor: ["Nombre del vendedor", "Seller Name"],
 } as const;
@@ -159,8 +176,18 @@ function computeBadgeLabel(prevEstado: EstadoActual | undefined, currEstado: Est
 }
 
 // ---------------------------------------------------------------------------
-// Localidad
+// Regla de negocio: Cliente Local
 // ---------------------------------------------------------------------------
+
+function isClienteLocal(mercado: string, vendedor: string, config: ClientesLocalesConfig): boolean {
+  const excludeSet = new Set(config.excludeMarketplace.map((s) => s.trim().toLowerCase()));
+  const includeSet = new Set(config.includeSeller.map((s) => s.trim().toLowerCase()));
+  const mercadoTrim = mercado.trim();
+  const vendedorTrim = vendedor.trim();
+  const condA = mercadoTrim !== "" && !excludeSet.has(mercadoTrim.toLowerCase());
+  const condB = vendedorTrim !== "" && includeSet.has(vendedorTrim.toLowerCase());
+  return condA || condB;
+}
 
 function localidadForCp(cp: string, mapping: CpLocalidad[]): string {
   const found = mapping.find((m) => m.cp.trim() !== "" && m.cp.trim() === cp.trim());
@@ -229,75 +256,6 @@ type Cd4Row = {
   consecutiveDays: number;
 };
 
-// ---------------------------------------------------------------------------
-// % Close Loop (SHEIN CD4 / Resto de Clientes Locales CD5)
-//
-// Numerador = paquetes entregados dentro de `windowDays` desde su inbound (T0).
-// Denominador = paquetes cuyo T0 fue hace `windowDays` días o más (ventana ya
-// cerrada — un paquete con T0 de ayer/antier todavía no cuenta).
-// Fuente: el EPOD Histórico es la única fuente con el rastro de CUÁNDO se
-// entregó cada waybill a lo largo de varios días; el EPOD del Día solo
-// complementa cp/driver y una entrega ocurrida hoy que el histórico aún no
-// capturó (o sirve de único origen, con alcance más limitado, si no hay
-// histórico cargado).
-// ---------------------------------------------------------------------------
-
-type CloseLoopEntry = {
-  waybill: string;
-  cliente: string; // ya con el alias aplicado (p.ej. "SHEIN")
-  cp: string;
-  driver: string;
-  t0Ts: number;
-  fechaEntregaTs: number | null;
-};
-
-type CloseLoopBreakdownRow = { key: string; total: number; enTiempo: number; pct: number };
-
-type CloseLoopReport = {
-  total: number;
-  enTiempo: number;
-  pct: number;
-  porCp: CloseLoopBreakdownRow[];
-  porDriver: CloseLoopBreakdownRow[];
-};
-
-function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: number): CloseLoopReport {
-  const isOnTime = (e: CloseLoopEntry) =>
-    e.fechaEntregaTs != null && Math.floor((e.fechaEntregaTs - e.t0Ts) / 86400000) <= windowDays;
-  const evaluable = entries.filter((e) => Math.floor((nowTs - e.t0Ts) / 86400000) >= windowDays);
-  const total = evaluable.length;
-  const enTiempo = evaluable.filter(isOnTime).length;
-  const pct = total > 0 ? (enTiempo / total) * 100 : 0;
-
-  const buildBreakdown = (keyFn: (e: CloseLoopEntry) => string): CloseLoopBreakdownRow[] => {
-    const map = new Map<string, { total: number; enTiempo: number }>();
-    for (const e of evaluable) {
-      const key = keyFn(e) || "—";
-      const b = map.get(key) ?? { total: 0, enTiempo: 0 };
-      b.total++;
-      if (isOnTime(e)) b.enTiempo++;
-      map.set(key, b);
-    }
-    return Array.from(map.entries())
-      .map(([key, b]) => ({ key, total: b.total, enTiempo: b.enTiempo, pct: b.total > 0 ? (b.enTiempo / b.total) * 100 : 0 }))
-      .sort((a, b) => b.total - a.total);
-  };
-
-  return {
-    total,
-    enTiempo,
-    pct,
-    porCp: buildBreakdown((e) => e.cp),
-    porDriver: buildBreakdown((e) => e.driver || "— Sin asignar —"),
-  };
-}
-
-function closeLoopColor(pct: number): string {
-  if (pct >= 99.5) return "var(--success)";
-  if (pct >= 95) return "var(--warn)";
-  return "var(--danger)";
-}
-
 type Analysis = {
   epodDate: Date;
   epodDateStr: string;
@@ -311,8 +269,6 @@ type Analysis = {
   cd4UsedFallbackT0: boolean;
   snapshotToSave: DiaSnapshot;
   cd4LogEntries: Cd4LogEntry[];
-  sheinCloseLoop: CloseLoopReport;
-  localCloseLoop: CloseLoopReport;
 };
 
 function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoStore | null): Analysis | null {
@@ -439,45 +395,6 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
   }
   cd4.sort((a, b) => b.dias - a.dias);
 
-  // ---- Reportes 4/5: % Close Loop (SHEIN CD4 y Resto de Clientes Locales CD5) ----
-  const closeLoopMap = new Map<string, CloseLoopEntry>();
-  if (historico) {
-    for (const h of historico.entries) {
-      if (!h.clienteLocal) continue;
-      closeLoopMap.set(h.waybill, {
-        waybill: h.waybill,
-        cliente: h.cliente,
-        cp: h.cp,
-        driver: h.driver,
-        t0Ts: dayStart(new Date(h.t0)),
-        fechaEntregaTs: h.fechaEntrega ? dayStart(new Date(h.fechaEntrega)) : null,
-      });
-    }
-  }
-  for (const r of report1RowsFlat) {
-    const todayEntregaTs = r.estado === "ENTREGADO" ? maxTs : null;
-    const existing = closeLoopMap.get(r.waybill);
-    if (existing) {
-      existing.cp = r.cp;
-      existing.driver = r.driver;
-      if (existing.fechaEntregaTs == null && todayEntregaTs != null) existing.fechaEntregaTs = todayEntregaTs;
-    } else {
-      const datesForWaybill = localRows.filter((x) => x.waybill === r.waybill).map((x) => dayStart(x.fecha!));
-      const t0Ts = datesForWaybill.length > 0 ? Math.min(...datesForWaybill) : maxTs;
-      closeLoopMap.set(r.waybill, {
-        waybill: r.waybill,
-        cliente: r.cliente,
-        cp: r.cp,
-        driver: r.driver,
-        t0Ts,
-        fechaEntregaTs: todayEntregaTs,
-      });
-    }
-  }
-  const allCloseLoopEntries = Array.from(closeLoopMap.values());
-  const sheinCloseLoop = buildCloseLoop(allCloseLoopEntries.filter((e) => e.cliente === "SHEIN"), 4, maxTs);
-  const localCloseLoop = buildCloseLoop(allCloseLoopEntries.filter((e) => e.cliente !== "SHEIN"), 5, maxTs);
-
   return {
     epodDate,
     epodDateStr,
@@ -491,8 +408,6 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
     cd4UsedFallbackT0,
     snapshotToSave: { fecha: epodDateStr, updatedAt: new Date().toISOString(), entries: snapshotEntries },
     cd4LogEntries,
-    sheinCloseLoop,
-    localCloseLoop,
   };
 }
 
@@ -637,115 +552,6 @@ function Dropzone({
   );
 }
 
-function CloseLoopSection({
-  windowDays,
-  report,
-  hasHistorico,
-  onExport,
-}: {
-  windowDays: number;
-  report: CloseLoopReport;
-  hasHistorico: boolean;
-  onExport: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      {!hasHistorico && (
-        <p className="text-xs text-muted-foreground flex items-start gap-1.5 p-3 rounded-md border bg-muted">
-          <Info className="size-3.5 mt-0.5 shrink-0" />
-          <span>
-            Sube un EPOD Histórico para un cálculo completo. Sin él, este % solo considera los waybills vistos en el
-            EPOD del día de hoy.
-          </span>
-        </p>
-      )}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Ventana de {windowDays} días desde inbound · target 99.5%
-        </p>
-        <Button onClick={onExport} disabled={report.total === 0} size="sm" className="gap-2">
-          <Download className="size-3.5" /> Exportar a Excel
-        </Button>
-      </div>
-
-      <div className="p-4 rounded-lg border bg-card max-w-xs">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Close Loop General</div>
-        <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: closeLoopColor(report.pct) }}>
-          {report.total > 0 ? `${report.pct.toFixed(1)}%` : "—"}
-        </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          {report.enTiempo} de {report.total} paquetes con ventana cerrada
-        </div>
-      </div>
-
-      {report.total === 0 ? (
-        <Card className="shadow-none">
-          <CardContent className="pt-6 text-sm text-muted-foreground">
-            Todavía no hay paquetes con ventana cerrada (T0 hace {windowDays}+ días).
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div>
-            <h4 className="text-sm font-semibold text-foreground mb-2">Por CP</h4>
-            <div className="rounded-lg border overflow-x-auto">
-              <table className="w-full text-[13px]">
-                <thead className="bg-muted">
-                  <tr>
-                    <Th>CP</Th>
-                    <Th right>Total</Th>
-                    <Th right>En Tiempo</Th>
-                    <Th right>%</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.porCp.map((r) => (
-                    <tr key={r.key} className="border-t border-border">
-                      <Td className="whitespace-nowrap">{r.key}</Td>
-                      <Td right className="tabular-nums">{r.total}</Td>
-                      <Td right className="tabular-nums">{r.enTiempo}</Td>
-                      <Td right className="tabular-nums font-semibold">
-                        <span style={{ color: closeLoopColor(r.pct) }}>{r.pct.toFixed(1)}%</span>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold text-foreground mb-2">Por Driver</h4>
-            <div className="rounded-lg border overflow-x-auto">
-              <table className="w-full text-[13px]">
-                <thead className="bg-muted">
-                  <tr>
-                    <Th>Driver</Th>
-                    <Th right>Total</Th>
-                    <Th right>En Tiempo</Th>
-                    <Th right>%</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.porDriver.map((r) => (
-                    <tr key={r.key} className="border-t border-border">
-                      <Td className="whitespace-nowrap">{r.key}</Td>
-                      <Td right className="tabular-nums">{r.total}</Td>
-                      <Td right className="tabular-nums">{r.enTiempo}</Td>
-                      <Td right className="tabular-nums font-semibold">
-                        <span style={{ color: closeLoopColor(r.pct) }}>{r.pct.toFixed(1)}%</span>
-                      </Td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Página
 // ---------------------------------------------------------------------------
@@ -760,82 +566,15 @@ function ClientesLocalesPage() {
     return h ? { count: h.entries.length, updatedAt: h.updatedAt } : null;
   });
 
-  const [hub, setHub] = useState("");
+  const [diaFile, setDiaFile] = useState<File | null>(null);
+  const [diaDragOver, setDiaDragOver] = useState(false);
   const [diaLoading, setDiaLoading] = useState(false);
   const [diaError, setDiaError] = useState<string | null>(null);
-  const [hasAnyHub, setHasAnyHub] = useState<boolean | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [lastUpdateAt, setLastUpdateAt] = useState<string | null>(() => {
     const snap = getDiaSnapshot(formatDate(new Date()));
     return snap?.updatedAt ?? null;
   });
-
-  useEffect(() => {
-    getAllHubs()
-      .then((list) => setHasAnyHub(list.length > 0))
-      .catch(() => setHasAnyHub(false));
-  }, []);
-
-  useEffect(() => {
-    if (!hub.trim()) {
-      setAnalysis(null);
-      setDiaError(null);
-      return;
-    }
-    let cancelled = false;
-    setDiaLoading(true);
-    setDiaError(null);
-    getEpodData(hub.trim())
-      .then((record) => {
-        if (cancelled) return;
-        if (!record) {
-          setAnalysis(null);
-          setDiaError(`No hay datos cargados para "${hub.trim()}".`);
-          return;
-        }
-        requireFields(record.metadata.detectedFields, REQUIRED_FIELDS);
-        const config = getClientesLocalesConfig();
-        const parsed: RawRow[] = record.rows.map((r) => {
-          const mercado = r.mercado;
-          const vendedor = r.vendedor;
-          return {
-            waybill: r.waybill,
-            fecha: r.fecha ? new Date(r.fecha) : null,
-            estado: r.estado,
-            cp: r.cp,
-            direccion: r.direccion,
-            driver: r.driver,
-            mercado,
-            vendedor,
-            cliente: applyClientAlias(mercado || vendedor, config),
-            clienteLocal: isClienteLocal(mercado, vendedor, config),
-            rowIndex: r.rowIndex,
-          };
-        });
-        const historico = getHistorico();
-        const result = analyze(parsed, config.cpMapping, historico);
-        if (!result) {
-          setAnalysis(null);
-          setDiaError("No se encontraron clientes locales con fecha válida en este hub.");
-          return;
-        }
-        saveDiaSnapshot(result.snapshotToSave);
-        saveCd4LogForDate(result.epodDateStr, result.cd4LogEntries);
-        setAnalysis(result);
-        setLastUpdateAt(result.snapshotToSave.updatedAt);
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setAnalysis(null);
-        setDiaError(e instanceof Error ? e.message : "Error cargando los datos del hub.");
-      })
-      .finally(() => {
-        if (!cancelled) setDiaLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [hub]);
 
   const handleHistorico = async (f: File | null) => {
     setHistoricoFile(f);
@@ -858,15 +597,7 @@ function ClientesLocalesPage() {
         );
       }
       const cols = resolved.cols;
-      type HistRow = {
-        waybill: string;
-        fecha: Date | null;
-        cp: string;
-        driver: string;
-        estado: string;
-        cliente: string;
-        clienteLocal: boolean;
-      };
+      type HistRow = { waybill: string; fecha: Date | null; cp: string; cliente: string; clienteLocal: boolean };
       const parsed: HistRow[] = json.map((r) => {
         const mercado = String(r[cols.mercado] ?? "").trim();
         const vendedor = String(r[cols.vendedor] ?? "").trim();
@@ -874,9 +605,7 @@ function ClientesLocalesPage() {
           waybill: String(r[cols.waybill] ?? "").trim(),
           fecha: parseFecha(r[cols.fecha]),
           cp: String(r[cols.cp] ?? "").trim(),
-          driver: String(r[cols.driver] ?? "").trim(),
-          estado: String(r[cols.estado] ?? "").trim(),
-          cliente: applyClientAlias(mercado || vendedor, config),
+          cliente: mercado || vendedor,
           clienteLocal: isClienteLocal(mercado, vendedor, config),
         };
       });
@@ -893,16 +622,7 @@ function ClientesLocalesPage() {
         const sorted = [...rs].sort((a, b) => a.fecha!.getTime() - b.fecha!.getTime());
         const t0 = sorted[0].fecha!;
         const last = sorted[sorted.length - 1];
-        const firstDelivered = sorted.find((r) => isDeliveredEstado(r.estado));
-        entries.push({
-          waybill,
-          t0: t0.toISOString(),
-          cp: last.cp,
-          cliente: last.cliente,
-          driver: last.driver,
-          clienteLocal: true,
-          fechaEntrega: firstDelivered ? firstDelivered.fecha!.toISOString() : null,
-        });
+        entries.push({ waybill, t0: t0.toISOString(), cp: last.cp, cliente: last.cliente });
       }
       saveHistorico(entries);
       setHistoricoInfo({ count: entries.length, updatedAt: new Date().toISOString() });
@@ -911,6 +631,62 @@ function ClientesLocalesPage() {
       setHistoricoFile(null);
     } finally {
       setHistoricoLoading(false);
+    }
+  };
+
+  const handleDia = async (f: File | null) => {
+    setDiaFile(f);
+    setDiaError(null);
+    if (!f) return;
+    setDiaLoading(true);
+    try {
+      const config = getClientesLocalesConfig();
+      const buf = await f.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      if (!ws) throw new Error("El archivo no tiene hojas.");
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "", raw: true });
+      if (json.length === 0) throw new Error("El archivo está vacío.");
+      const headers = Object.keys(json[0]);
+      const resolved = resolveColumns(headers);
+      if (resolved.missing) {
+        throw new Error(
+          `Faltan columnas: ${resolved.missing.join(", ")}. Verifica el formato del archivo (se aceptan EPOD en español o en inglés).`,
+        );
+      }
+      const cols = resolved.cols;
+      const parsed: RawRow[] = json.map((r, i) => {
+        const mercado = String(r[cols.mercado] ?? "").trim();
+        const vendedor = String(r[cols.vendedor] ?? "").trim();
+        return {
+          waybill: String(r[cols.waybill] ?? "").trim(),
+          fecha: parseFecha(r[cols.fecha]),
+          estado: String(r[cols.estado] ?? "").trim(),
+          cp: String(r[cols.cp] ?? "").trim(),
+          direccion: String(r[cols.direccion] ?? "").trim(),
+          driver: String(r[cols.driver] ?? "").trim(),
+          mercado,
+          vendedor,
+          cliente: mercado || vendedor,
+          clienteLocal: isClienteLocal(mercado, vendedor, config),
+          rowIndex: i,
+        };
+      });
+      const historico = getHistorico();
+      const result = analyze(parsed, config.cpMapping, historico);
+      if (!result) {
+        setAnalysis(null);
+        throw new Error("No se encontraron clientes locales con fecha válida en este archivo.");
+      }
+      saveDiaSnapshot(result.snapshotToSave);
+      saveCd4LogForDate(result.epodDateStr, result.cd4LogEntries);
+      setAnalysis(result);
+      setLastUpdateAt(result.snapshotToSave.updatedAt);
+    } catch (e) {
+      setDiaError(e instanceof Error ? e.message : "Error leyendo el archivo.");
+      setDiaFile(null);
+    } finally {
+      setDiaLoading(false);
     }
   };
 
@@ -961,47 +737,6 @@ function ClientesLocalesPage() {
     });
   };
 
-  const closeLoopRowFill = (row: (string | number)[]) => {
-    const pct = Number(row[4]);
-    if (pct >= 99.5) return undefined;
-    if (pct >= 95) return "FEF3C7";
-    return "FADBD8";
-  };
-
-  const exportSheinCloseLoop = () => {
-    if (!analysis || analysis.sheinCloseLoop.total === 0) return;
-    const r = analysis.sheinCloseLoop;
-    const rows: (string | number)[][] = [["General", "-", r.total, r.enTiempo, Number(r.pct.toFixed(1))]];
-    for (const c of r.porCp) rows.push(["CP", c.key, c.total, c.enTiempo, Number(c.pct.toFixed(1))]);
-    for (const d of r.porDriver) rows.push(["Driver", d.key, d.total, d.enTiempo, Number(d.pct.toFixed(1))]);
-    exportStyledExcel({
-      title: "SHEIN — % Close Loop (CD4)",
-      date: analysis.epodDateStr,
-      headers: ["Nivel", "Clave", "Total", "En Tiempo", "% Close Loop"],
-      rows,
-      filename: `shein_close_loop_cd4_${analysis.epodDateStr}.xlsx`,
-      colWidths: [10, 24, 10, 12, 14],
-      rowFill: closeLoopRowFill,
-    });
-  };
-
-  const exportLocalCloseLoop = () => {
-    if (!analysis || analysis.localCloseLoop.total === 0) return;
-    const r = analysis.localCloseLoop;
-    const rows: (string | number)[][] = [["General", "-", r.total, r.enTiempo, Number(r.pct.toFixed(1))]];
-    for (const c of r.porCp) rows.push(["CP", c.key, c.total, c.enTiempo, Number(c.pct.toFixed(1))]);
-    for (const d of r.porDriver) rows.push(["Driver", d.key, d.total, d.enTiempo, Number(d.pct.toFixed(1))]);
-    exportStyledExcel({
-      title: "Resto de Clientes Locales — % Close Loop (CD5)",
-      date: analysis.epodDateStr,
-      headers: ["Nivel", "Clave", "Total", "En Tiempo", "% Close Loop"],
-      rows,
-      filename: `resto_locales_close_loop_cd5_${analysis.epodDateStr}.xlsx`,
-      colWidths: [10, 24, 10, 12, 14],
-      rowFill: closeLoopRowFill,
-    });
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -1016,7 +751,7 @@ function ClientesLocalesPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Clientes Locales</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Clientes locales en reparto, flow meeting por CP, CD4, y % Close Loop de SHEIN y del resto de clientes locales.
+          Clientes locales en reparto, flow meeting por CP y CD4.
           {analysis && (
             <>
               {" "}Fecha del EPOD del día <strong>{analysis.epodDateStr}</strong>
@@ -1035,7 +770,7 @@ function ClientesLocalesPage() {
           <CardContent>
             <Dropzone
               label="Sube el EPOD histórico (multi-día)"
-              hint="Calcula T0 (inbound) y fecha de entrega por waybill — habilita SHEIN CD4% y Resto Locales CD5% · .xlsx"
+              hint="Se usa para calcular T0 (inbound) por waybill · .xlsx"
               file={historicoFile}
               dragOver={historicoDragOver}
               loading={historicoLoading}
@@ -1055,26 +790,21 @@ function ClientesLocalesPage() {
         <Card className="shadow-none">
           <CardHeader>
             <CardTitle className="text-sm flex items-center gap-2">
-              <FileSpreadsheet className="size-4 text-primary" /> 2. EPOD del Día (elige el hub para ver la foto en vivo)
+              <FileSpreadsheet className="size-4 text-primary" /> 2. EPOD del Día (súbelo cada vez que quieras actualizar)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <HubCombobox value={hub} onChange={setHub} className="max-w-xs" />
-            {diaLoading && <p className="mt-2 text-xs text-muted-foreground">Cargando datos del hub…</p>}
-            {diaError && (
-              <p className="mt-2 text-destructive text-xs flex items-start gap-1.5">
-                <AlertCircle className="size-3 mt-0.5 shrink-0" />
-                <span>{diaError}</span>
-              </p>
-            )}
-            {hasAnyHub === false && (
-              <p className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
-                No hay datos cargados. Ve a la sección ePOD para subir el archivo de un hub.
-                <Link to="/epod" className="inline-flex items-center gap-1 text-primary hover:underline">
-                  Ir a ePOD <ArrowRight className="size-3.5" />
-                </Link>
-              </p>
-            )}
+            <Dropzone
+              label="Sube el EPOD del día (Cainiao)"
+              hint="Foto en vivo del reparto de hoy · .xlsx"
+              file={diaFile}
+              dragOver={diaDragOver}
+              loading={diaLoading}
+              error={diaError}
+              onFile={(f) => void handleDia(f)}
+              onDragOver={setDiaDragOver}
+              onDragLeave={() => setDiaDragOver(false)}
+            />
             {lastUpdateAt && (
               <p className="mt-2 text-xs text-muted-foreground">Última actualización: {formatUpdatedAt(lastUpdateAt)}</p>
             )}
@@ -1088,8 +818,6 @@ function ClientesLocalesPage() {
             <TabsTrigger value="enreparto">Clientes Locales en Reparto</TabsTrigger>
             <TabsTrigger value="flow">Flow Meeting</TabsTrigger>
             <TabsTrigger value="cd4">CD4</TabsTrigger>
-            <TabsTrigger value="shein-cd4">SHEIN CD4 %</TabsTrigger>
-            <TabsTrigger value="local-cd5">Resto Locales CD5 %</TabsTrigger>
           </TabsList>
 
           {/* REPORTE 1 */}
@@ -1263,26 +991,6 @@ function ClientesLocalesPage() {
                 </table>
               </div>
             )}
-          </TabsContent>
-
-          {/* REPORTE 4 */}
-          <TabsContent value="shein-cd4" className="flex flex-col gap-4 mt-4">
-            <CloseLoopSection
-              windowDays={4}
-              report={analysis.sheinCloseLoop}
-              hasHistorico={!!historicoInfo}
-              onExport={exportSheinCloseLoop}
-            />
-          </TabsContent>
-
-          {/* REPORTE 5 */}
-          <TabsContent value="local-cd5" className="flex flex-col gap-4 mt-4">
-            <CloseLoopSection
-              windowDays={5}
-              report={analysis.localCloseLoop}
-              hasHistorico={!!historicoInfo}
-              onExport={exportLocalCloseLoop}
-            />
           </TabsContent>
         </Tabs>
       )}

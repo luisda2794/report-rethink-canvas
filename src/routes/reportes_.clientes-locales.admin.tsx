@@ -12,7 +12,6 @@ import {
   saveClientesLocalesConfig,
   type ClientesLocalesConfig,
   type CpLocalidad,
-  type RenameClientRule,
 } from "@/lib/clientes-locales-config";
 
 export const Route = createFileRoute("/reportes_/clientes-locales/admin")({
@@ -94,64 +93,6 @@ function StringListEditor({
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function RenameRulesEditor({ rows, onChange }: { rows: RenameClientRule[]; onChange: (rows: RenameClientRule[]) => void }) {
-  const updateRow = (i: number, patch: Partial<RenameClientRule>) => {
-    onChange(rows.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
-  };
-  const removeRow = (i: number) => onChange(rows.filter((_, idx) => idx !== i));
-  const addRow = () => onChange([...rows, { from: "", to: "" }]);
-
-  return (
-    <Card className="shadow-none">
-      <CardHeader>
-        <CardTitle>Alias de Cliente</CardTitle>
-        <CardDescription>
-          Si "Nombre del mercado" o "Nombre del vendedor" coincide exactamente con "De", se muestra como "A" en toda
-          la app y en los Excel exportados (el dato original no se modifica). Si "A" es "SHEIN", además agrupa esos
-          paquetes en su propia categoría en el Súper Reporte, con prioridad sobre las demás reglas de clasificación.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="rounded-lg border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>De (nombre original)</TableHead>
-                <TableHead>A (nombre a mostrar)</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Input value={r.from} onChange={(e) => updateRow(i, { from: e.target.value })} className="h-8" />
-                  </TableCell>
-                  <TableCell>
-                    <Input value={r.to} onChange={(e) => updateRow(i, { to: e.target.value })} className="h-8" />
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      onClick={() => removeRow(i)}
-                      className="text-muted-foreground hover:text-destructive"
-                      aria-label="Quitar fila"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <Button onClick={addRow} size="sm" variant="outline" className="mt-3 gap-2">
-          <Plus className="size-4" /> Agregar regla
-        </Button>
       </CardContent>
     </Card>
   );
@@ -261,10 +202,6 @@ function ClientesLocalesAdminPage() {
             description='Si "Nombre del vendedor" coincide exactamente con un valor de esta lista, el paquete SÍ es cliente local.'
             items={config.includeSeller}
             onChange={(items) => update({ includeSeller: items })}
-          />
-          <RenameRulesEditor
-            rows={config.renameClientRules}
-            onChange={(rows) => update({ renameClientRules: rows })}
           />
         </TabsContent>
         <TabsContent value="mapeo" className="mt-4">
