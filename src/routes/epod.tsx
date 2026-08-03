@@ -18,6 +18,8 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LocalEpodTab } from "@/components/LocalEpodTab";
 
 export const Route = createFileRoute("/epod")({
   component: () => (
@@ -433,20 +435,31 @@ function EpodPage() {
       <Topbar section="ePOD" />
 
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
-        <div className="max-w-4xl mx-auto space-y-12">
+        <div className="max-w-5xl mx-auto space-y-8">
           <header>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Subir ePOD
+              ePOD
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Sube el ePOD diario para actualizar el dashboard, reportes y borradores automáticamente.
-              {selectedHub && (
-                <span className="block mt-1 text-xs text-muted-foreground/80">
-                  Hub: {selectedHub.marca} · {selectedHub.nombre}
-                </span>
-              )}
+              Sube el ePOD a la base de datos (dashboard/borradores/reclamaciones), o cárgalo localmente para usarlo directo en los reportes — sin subir nada a ningún servidor.
             </p>
           </header>
+
+          <Tabs defaultValue="supabase">
+            <TabsList>
+              <TabsTrigger value="supabase">ePOD → Base de datos</TabsTrigger>
+              <TabsTrigger value="local">ePOD → Reportes (local)</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="supabase" className="mt-6 space-y-12">
+          <p className="text-sm text-muted-foreground">
+            Sube el ePOD diario para actualizar el dashboard, reportes y borradores automáticamente.
+            {selectedHub && (
+              <span className="block mt-1 text-xs text-muted-foreground/80">
+                Hub: {selectedHub.marca} · {selectedHub.nombre}
+              </span>
+            )}
+          </p>
 
           {!selectedHub ? (
             <div className="px-4 py-6 border-l-2 border-danger bg-danger/10 text-danger font-mono text-xs rounded-r">
@@ -669,6 +682,12 @@ function EpodPage() {
               </section>
             </>
           )}
+            </TabsContent>
+
+            <TabsContent value="local" className="mt-6">
+              <LocalEpodTab />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>

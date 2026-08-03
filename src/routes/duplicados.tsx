@@ -1,17 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
-import {
-  Upload,
-  FileSpreadsheet,
-  X,
-  AlertCircle,
-  Copy,
-  ChevronDown,
-  ChevronRight,
-} from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, ArrowRight, Copy, ChevronDown, ChevronRight } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
+import { HubCombobox } from "@/components/HubCombobox";
 import { resolveEventDate } from "@/lib/resolve-event-date";
+import { getAllHubs, getEpodData, requireFields, type EpodField } from "@/lib/epodStore";
 
 export const Route = createFileRoute("/duplicados")({
   component: () => (
@@ -31,22 +24,22 @@ export const Route = createFileRoute("/duplicados")({
   }),
 });
 
-const REQUIRED_COLS = [
-  "Número de Waybill",
-  "Fecha de la tarea",
-  "Estado de la Tarea",
-  "Detalles de la Excepción",
-] as const;
+const REQUIRED_FIELDS: EpodField[] = ["waybill", "fecha", "estado", "incidencia"];
 
-// Fechas reales del evento (entrega/fallo) — opcionales: si el archivo no las
-// trae, resolveEventDate() cae de vuelta en "Fecha de la tarea".
-const OPTIONAL_DATE_ALIASES = {
-  tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
-  tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
-} as const;
-
-function findColumn(headers: string[], aliases: readonly string[]): string | undefined {
-  return aliases.find((a) => headers.includes(a));
+function normalizeEstado(s: string): string {
+  return s.trim().toLowerCase().replace(/_/g, " ").replace(/\s+/g, " ").trim();
+}
+function isDeliveredState(s: string): boolean {
+  const n = normalizeEstado(s);
+  return n === "entregado" || n === "delivered" || n === "return to seller success";
+}
+function isFailedState(s: string): boolean {
+  const n = normalizeEstado(s);
+  return n === "attempt failure" || n === "return to seller fail";
+}
+function isCancelarState(s: string): boolean {
+  const n = normalizeEstado(s);
+  return n === "cancelar" || n === "cancel" || n === "cancelled" || n === "canceled";
 }
 
 type RawRow = {
@@ -86,19 +79,6 @@ type Analysis = {
   canceladosCaiPct: number;
 };
 
-function parseFecha(v: unknown): Date | null {
-  if (v == null || v === "") return null;
-  if (v instanceof Date) return v;
-  if (typeof v === "number") {
-    const utcDays = Math.floor(v - 25569);
-    const utcMs = utcDays * 86400 * 1000 + (v - Math.floor(v)) * 86400 * 1000;
-    return new Date(utcMs);
-  }
-  const s = String(v).trim();
-  const d = new Date(s.replace(" ", "T"));
-  return isNaN(d.getTime()) ? null : d;
-}
-
 function formatFecha(d: Date | null): string {
   if (!d) return "—";
   return d.toISOString().slice(0, 16).replace("T", " ");
@@ -132,13 +112,13 @@ function analyze(rows: RawRow[]): Analysis {
     .filter((g) => g.rows.length > 1)
     .sort((a, b) => b.rows.length - a.rows.length);
 
-  const entregadosReal = groups.filter((g) => g.finalEstado === "Entregado").length;
-  const incidenciasReal = groups.filter((g) => g.finalEstado === "Attempt Failure").length;
-  const canceladosReal = groups.filter((g) => g.finalEstado === "Cancelar").length;
+  const entregadosReal = groups.filter((g) => isDeliveredState(g.finalEstado)).length;
+  const incidenciasReal = groups.filter((g) => isFailedState(g.finalEstado)).length;
+  const canceladosReal = groups.filter((g) => isCancelarState(g.finalEstado)).length;
 
-  const entregadosCai = rows.filter((r) => r.estado === "Entregado").length;
-  const incidenciasCai = rows.filter((r) => r.estado === "Attempt Failure").length;
-  const canceladosCai = rows.filter((r) => r.estado === "Cancelar").length;
+  const entregadosCai = rows.filter((r) => isDeliveredState(r.estado)).length;
+  const incidenciasCai = rows.filter((r) => isFailedState(r.estado)).length;
+  const canceladosCai = rows.filter((r) => isCancelarState(r.estado)).length;
 
   const pct = (a: number, b: number) => (b > 0 ? (a / b) * 100 : 0);
 
@@ -165,64 +145,67 @@ function analyze(rows: RawRow[]): Analysis {
 }
 
 function DuplicadosPage() {
-  const [file, setFile] = useState<File | null>(null);
+  const [hub, setHub] = useState("");
   const [rows, setRows] = useState<RawRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [hasAnyHub, setHasAnyHub] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getAllHubs()
+      .then((list) => setHasAnyHub(list.length > 0))
+      .catch(() => setHasAnyHub(false));
+  }, []);
+
+  useEffect(() => {
+    if (!hub.trim()) {
+      setRows(null);
+      setError(null);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getEpodData(hub.trim())
+      .then((record) => {
+        if (cancelled) return;
+        if (!record) {
+          setRows(null);
+          setError(`No hay datos cargados para "${hub.trim()}".`);
+          return;
+        }
+        requireFields(record.metadata.detectedFields, REQUIRED_FIELDS);
+        const parsed: RawRow[] = record.rows.map((r) => {
+          const fecha = resolveEventDate({
+            estado: r.estado,
+            fechaTarea: r.fecha ? new Date(r.fecha) : null,
+            tiempoEntrega: r.tiempoEntrega ? new Date(r.tiempoEntrega) : null,
+            tiempoFracaso: r.tiempoFracaso ? new Date(r.tiempoFracaso) : null,
+          });
+          return {
+            waybill: r.waybill,
+            fecha,
+            estado: r.estado,
+            incidencia: r.incidencia,
+            rowIndex: r.rowIndex,
+          };
+        });
+        setRows(parsed);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setRows(null);
+        setError(e instanceof Error ? e.message : "Error cargando los datos del hub.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hub]);
 
   const analysis = useMemo(() => (rows ? analyze(rows) : null), [rows]);
-
-  const handleFile = async (f: File | null) => {
-    setFile(f);
-    setRows(null);
-    setError(null);
-    if (!f) return;
-    setLoading(true);
-    try {
-      const buf = await f.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      if (!ws) throw new Error("El archivo no tiene hojas.");
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-        defval: "",
-        raw: true,
-      });
-      if (json.length === 0) throw new Error("El archivo está vacío.");
-      const headers = Object.keys(json[0]);
-      const missing = REQUIRED_COLS.filter((c) => !headers.includes(c));
-      if (missing.length > 0) {
-        throw new Error(
-          `Faltan columnas: ${missing.join(", ")}. Verifica el formato del archivo.`,
-        );
-      }
-      const tiempoEntregaCol = findColumn(headers, OPTIONAL_DATE_ALIASES.tiempoEntrega);
-      const tiempoFracasoCol = findColumn(headers, OPTIONAL_DATE_ALIASES.tiempoFracaso);
-      const parsed: RawRow[] = json.map((r, i) => {
-        const estado = String(r["Estado de la Tarea"] ?? "").trim();
-        const fecha = resolveEventDate({
-          estado,
-          fechaTarea: parseFecha(r["Fecha de la tarea"]),
-          tiempoEntrega: tiempoEntregaCol ? parseFecha(r[tiempoEntregaCol]) : null,
-          tiempoFracaso: tiempoFracasoCol ? parseFecha(r[tiempoFracasoCol]) : null,
-        });
-        return {
-          waybill: String(r["Número de Waybill"] ?? "").trim(),
-          fecha,
-          estado,
-          incidencia: String(r["Detalles de la Excepción"] ?? "").trim(),
-          rowIndex: i,
-        };
-      });
-      setRows(parsed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error leyendo el archivo.");
-      setFile(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -232,184 +215,129 @@ function DuplicadosPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Detección de paquetes duplicados y cálculo de tasas reales vs. Cainiao.
-          Procesamiento local: nada se sube al servidor.
         </p>
       </header>
 
-      {/* Dropzone */}
-          <section className="mb-6">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                const f = e.dataTransfer.files?.[0];
-                if (f) void handleFile(f);
-              }}
-              onClick={() => inputRef.current?.click()}
-              className={`p-5 bg-card border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
-                dragOver
-                  ? "border-electric bg-electric/5"
-                  : "border-border hover:border-electric/50"
-              }`}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                accept=".xlsx,.xls"
-                className="hidden"
-                onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
-              />
-              {file ? (
-                <div className="flex items-center gap-3">
-                  <FileSpreadsheet className="size-6 text-electric shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-semibold text-foreground truncate">
-                      {file.name}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground">
-                      {(file.size / 1024 / 1024).toFixed(2)} MB
-                      {rows ? ` · ${rows.length} filas` : ""}
-                    </div>
-                  </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleFile(null);
-                      if (inputRef.current) inputRef.current.value = "";
-                    }}
-                    className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-                    aria-label="Quitar archivo"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-3 text-muted-foreground">
-                  <Upload className="size-6 text-electric" />
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">
-                      Sube el Excel del EPOD del día
-                    </div>
-                    <div className="text-[11px]">
-                      .xlsx · Arrastra aquí o haz click
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            {loading && (
-              <p className="mt-2 text-[12px] text-muted-foreground">
-                Procesando…
-              </p>
-            )}
-            {error && (
-              <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
-                <AlertCircle className="size-3 mt-0.5 shrink-0" />
-                <span>{error}</span>
-              </p>
-            )}
+      {/* Hub selector */}
+      <section className="mb-4">
+        <label className="text-[11px] uppercase text-muted-foreground tracking-wide">
+          Hub
+        </label>
+        <div className="mt-1">
+          <HubCombobox value={hub} onChange={setHub} className="max-w-xs" />
+        </div>
+        {loading && <p className="mt-2 text-[12px] text-muted-foreground">Cargando datos del hub…</p>}
+        {error && (
+          <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
+            <AlertCircle className="size-3 mt-0.5 shrink-0" />
+            <span>{error}</span>
+          </p>
+        )}
+        {hasAnyHub === false && (
+          <p className="mt-2 text-sm text-muted-foreground flex items-center gap-2">
+            No hay datos cargados. Ve a la sección ePOD para subir el archivo de un hub.
+            <Link to="/epod" className="inline-flex items-center gap-1 text-primary hover:underline">
+              Ir a ePOD <ArrowRight className="size-3.5" />
+            </Link>
+          </p>
+        )}
+      </section>
+
+      {analysis && (
+        <>
+          {/* KPI cards */}
+          <section className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <KpiCard
+              label="Total registros"
+              value={analysis.total.toLocaleString("es-ES")}
+              hint="Filas del Excel (Cainiao)"
+            />
+            <KpiCard
+              label="Paquetes reales"
+              value={analysis.reales.toLocaleString("es-ES")}
+              hint="Waybills únicos"
+            />
+            <KpiCard
+              label="Duplicados"
+              value={analysis.duplicados.toLocaleString("es-ES")}
+              hint={`${analysis.duplicatedGroups.length} waybills repetidos`}
+              accent
+            />
+            <KpiCard
+              label="% diferencia"
+              value={`${analysis.duplicadosPct.toFixed(1)}%`}
+              hint="Duplicados / Total"
+            />
           </section>
 
-          {analysis && (
-            <>
-              {/* KPI cards */}
-              <section className="mb-8 grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KpiCard
-                  label="Total registros"
-                  value={analysis.total.toLocaleString("es-ES")}
-                  hint="Filas del Excel (Cainiao)"
-                />
-                <KpiCard
-                  label="Paquetes reales"
-                  value={analysis.reales.toLocaleString("es-ES")}
-                  hint="Waybills únicos"
-                />
-                <KpiCard
-                  label="Duplicados"
-                  value={analysis.duplicados.toLocaleString("es-ES")}
-                  hint={`${analysis.duplicatedGroups.length} waybills repetidos`}
-                  accent
-                />
-                <KpiCard
-                  label="% diferencia"
-                  value={`${analysis.duplicadosPct.toFixed(1)}%`}
-                  hint="Duplicados / Total"
-                />
-              </section>
+          {/* Tabla comparativa */}
+          <section className="mb-8">
+            <h2 className="text-lg font-semibold tracking-tight mb-3">
+              Real vs Cainiao
+            </h2>
+            <div className="bg-card border rounded-lg overflow-hidden">
+              <table className="w-full text-sm">
+                <thead className="bg-muted text-[11px] uppercase text-muted-foreground">
+                  <tr>
+                    <th className="text-left px-4 py-2.5">Concepto</th>
+                    <th className="text-right px-4 py-2.5">Real (dedup)</th>
+                    <th className="text-right px-4 py-2.5">Cainiao (bruto)</th>
+                    <th className="text-right px-4 py-2.5">Δ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ComparisonRow
+                    label="Entregados"
+                    realAbs={analysis.entregadosReal}
+                    realPct={analysis.entregaRealPct}
+                    caiAbs={analysis.entregadosCai}
+                    caiPct={analysis.entregaCaiPct}
+                    higherIsBetter
+                  />
+                  <ComparisonRow
+                    label="Incidencias"
+                    realAbs={analysis.incidenciasReal}
+                    realPct={analysis.incidenciasRealPct}
+                    caiAbs={analysis.incidenciasCai}
+                    caiPct={analysis.incidenciasCaiPct}
+                    higherIsBetter={false}
+                  />
+                  <ComparisonRow
+                    label="Cancelados"
+                    realAbs={analysis.canceladosReal}
+                    realPct={analysis.canceladosRealPct}
+                    caiAbs={analysis.canceladosCai}
+                    caiPct={analysis.canceladosCaiPct}
+                    higherIsBetter={false}
+                  />
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-              {/* Tabla comparativa */}
-              <section className="mb-8">
-                <h2 className="text-lg font-semibold tracking-tight mb-3">
-                  Real vs Cainiao
-                </h2>
-                <div className="bg-card border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted text-[11px] uppercase text-muted-foreground">
-                      <tr>
-                        <th className="text-left px-4 py-2.5">Concepto</th>
-                        <th className="text-right px-4 py-2.5">Real (dedup)</th>
-                        <th className="text-right px-4 py-2.5">Cainiao (bruto)</th>
-                        <th className="text-right px-4 py-2.5">Δ</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <ComparisonRow
-                        label="Entregados"
-                        realAbs={analysis.entregadosReal}
-                        realPct={analysis.entregaRealPct}
-                        caiAbs={analysis.entregadosCai}
-                        caiPct={analysis.entregaCaiPct}
-                        higherIsBetter
-                      />
-                      <ComparisonRow
-                        label="Incidencias"
-                        realAbs={analysis.incidenciasReal}
-                        realPct={analysis.incidenciasRealPct}
-                        caiAbs={analysis.incidenciasCai}
-                        caiPct={analysis.incidenciasCaiPct}
-                        higherIsBetter={false}
-                      />
-                      <ComparisonRow
-                        label="Cancelados"
-                        realAbs={analysis.canceladosReal}
-                        realPct={analysis.canceladosRealPct}
-                        caiAbs={analysis.canceladosCai}
-                        caiPct={analysis.canceladosCaiPct}
-                        higherIsBetter={false}
-                      />
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-
-              {/* Detalle duplicados */}
-              <section className="mb-12">
-                <h2 className="text-lg font-semibold tracking-tight mb-3 flex items-center gap-2">
-                  <Copy className="size-4 text-electric" />
-                  Waybills duplicados
-                  <span className="text-[11px] text-muted-foreground font-normal">
-                    ({analysis.duplicatedGroups.length})
-                  </span>
-                </h2>
-                {analysis.duplicatedGroups.length === 0 ? (
-                  <div className="p-6 bg-card border rounded-lg text-sm text-muted-foreground">
-                    No hay waybills duplicados en este archivo.
-                  </div>
-                ) : (
-                  <div className="bg-card border rounded-lg divide-y divide-border">
-                    {analysis.duplicatedGroups.map((g) => (
-                      <DuplicateRow key={g.waybill} group={g} />
-                    ))}
-                  </div>
-                )}
-              </section>
-            </>
-          )}
+          {/* Detalle duplicados */}
+          <section className="mb-12">
+            <h2 className="text-lg font-semibold tracking-tight mb-3 flex items-center gap-2">
+              <Copy className="size-4 text-electric" />
+              Waybills duplicados
+              <span className="text-[11px] text-muted-foreground font-normal">
+                ({analysis.duplicatedGroups.length})
+              </span>
+            </h2>
+            {analysis.duplicatedGroups.length === 0 ? (
+              <div className="p-6 bg-card border rounded-lg text-sm text-muted-foreground">
+                No hay waybills duplicados en este archivo.
+              </div>
+            ) : (
+              <div className="bg-card border rounded-lg divide-y divide-border">
+                {analysis.duplicatedGroups.map((g) => (
+                  <DuplicateRow key={g.waybill} group={g} />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </div>
   );
 }
