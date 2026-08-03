@@ -20,6 +20,14 @@ export type HistoricoEntry = {
   t0: string; // ISO date/time de la fecha mínima encontrada para ese waybill
   cp: string;
   cliente: string;
+  driver: string;
+  clienteLocal: boolean;
+  // ISO date de la primera vez que el waybill llegó a estado Entregado dentro
+  // del histórico, o null si nunca se vio entregado en ese archivo.
+  fechaEntrega: string | null;
+  // Última incidencia no vacía vista para el waybill (para excluir Dirección
+  // Incorrecta de los reportes % Close Loop).
+  ultimaIncidencia: string;
 };
 
 export type HistoricoStore = {

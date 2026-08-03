@@ -12,8 +12,10 @@ import {
   Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequireAuth } from "@/components/RequireAuth";
 import { resolveEventDate } from "@/lib/resolve-event-date";
+import { getClientesLocalesConfig, isClienteLocal, isSheinClient } from "@/lib/clientes-locales-config";
 
 export const Route = createFileRoute("/reportes_/flow-meeting")({
   component: () => (
@@ -55,18 +57,22 @@ const COLUMN_ALIASES = {
 
 type ColumnField = keyof typeof COLUMN_ALIASES;
 
-// Fechas reales del evento (entrega/fallo) — opcionales: si el archivo no las
-// trae, resolveEventDate() cae de vuelta en "Fecha de la tarea".
-const OPTIONAL_DATE_ALIASES = {
+// Fechas reales del evento (entrega/fallo) y mercado/vendedor (para las
+// pestañas SHEIN/Clientes Locales) — opcionales: si el archivo no las trae,
+// resolveEventDate() cae de vuelta en "Fecha de la tarea" y las pestañas de
+// cliente simplemente no encuentran coincidencias.
+const OPTIONAL_ALIASES = {
   tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
   tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
+  mercado: ["Nombre del mercado", "Market Place Name"],
+  vendedor: ["Nombre del vendedor", "Seller Name"],
 } as const;
-type OptionalDateField = keyof typeof OPTIONAL_DATE_ALIASES;
+type OptionalField = keyof typeof OPTIONAL_ALIASES;
 
 function resolveColumns(
   headers: string[],
 ):
-  | { cols: Record<ColumnField, string>; optCols: Partial<Record<OptionalDateField, string>>; missing?: never }
+  | { cols: Record<ColumnField, string>; optCols: Partial<Record<OptionalField, string>>; missing?: never }
   | { cols?: never; optCols?: never; missing: string[] } {
   const cols = {} as Record<ColumnField, string>;
   const missing: string[] = [];
@@ -81,9 +87,9 @@ function resolveColumns(
   }
   if (missing.length > 0) return { missing };
 
-  const optCols: Partial<Record<OptionalDateField, string>> = {};
-  for (const field of Object.keys(OPTIONAL_DATE_ALIASES) as OptionalDateField[]) {
-    const aliases = OPTIONAL_DATE_ALIASES[field];
+  const optCols: Partial<Record<OptionalField, string>> = {};
+  for (const field of Object.keys(OPTIONAL_ALIASES) as OptionalField[]) {
+    const aliases = OPTIONAL_ALIASES[field];
     const found = aliases.find((a) => headers.includes(a));
     if (found) optCols[field] = found;
   }
@@ -101,6 +107,8 @@ type RawRow = {
   cp: string;
   driver: string;
   tipoEntrega: string;
+  mercado: string;
+  vendedor: string;
   rowIndex: number;
 };
 
@@ -309,6 +317,8 @@ function IncBar({ count, max }: { count: number; max: number }) {
   );
 }
 
+type ClienteTab = "todos" | "shein" | "locales";
+
 function FlowMeetingPage() {
   const [hub, setHub] = useState<HubKey | "">("");
   const [file, setFile] = useState<File | null>(null);
@@ -316,9 +326,21 @@ function FlowMeetingPage() {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [clienteTab, setClienteTab] = useState<ClienteTab>("todos");
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const analysis = useMemo(() => (rows ? analyze(rows) : null), [rows]);
+  const filteredRows = useMemo(() => {
+    if (!rows) return null;
+    if (clienteTab === "todos") return rows;
+    const config = getClientesLocalesConfig();
+    if (clienteTab === "shein") {
+      return rows.filter((r) => isSheinClient(r.mercado, r.vendedor, config));
+    }
+    // "locales": Cliente Local menos SHEIN
+    return rows.filter((r) => isClienteLocal(r.mercado, r.vendedor, config) && !isSheinClient(r.mercado, r.vendedor, config));
+  }, [rows, clienteTab]);
+
+  const analysis = useMemo(() => (filteredRows ? analyze(filteredRows) : null), [filteredRows]);
 
   const handleFile = async (f: File | null) => {
     setFile(f);
@@ -367,6 +389,8 @@ function FlowMeetingPage() {
           cp: String(r[cols.cp] ?? "").trim(),
           driver: String(r[cols.driver] ?? "").trim(),
           tipoEntrega: String(r[cols.tipoEntrega] ?? "").trim(),
+          mercado: optCols.mercado ? String(r[optCols.mercado] ?? "").trim() : "",
+          vendedor: optCols.vendedor ? String(r[optCols.vendedor] ?? "").trim() : "",
           rowIndex: i,
         };
       });
@@ -531,6 +555,16 @@ function FlowMeetingPage() {
               )}
             </section>
           </div>
+
+          {rows && (
+            <Tabs value={clienteTab} onValueChange={(v) => setClienteTab(v as ClienteTab)} className="print:hidden mb-6">
+              <TabsList>
+                <TabsTrigger value="todos">Todos</TabsTrigger>
+                <TabsTrigger value="shein">SHEIN</TabsTrigger>
+                <TabsTrigger value="locales">Clientes Locales</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          )}
 
           {analysis && (
             <>
