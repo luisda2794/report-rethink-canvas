@@ -20,7 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { isDeliveredEstado, isFailedEstado } from "@/lib/resolve-event-date";
-import { getClientesLocalesConfig, applyClientAlias, isClienteLocal, type CpLocalidad } from "@/lib/clientes-locales-config";
+import { getClientesLocalesConfig, applyClientAlias, isClienteLocal, isSheinClient, type ClientesLocalesConfig, type CpLocalidad } from "@/lib/clientes-locales-config";
 import { exportStyledExcel } from "@/lib/xlsx-export";
 import {
   getHistorico,
@@ -189,6 +189,17 @@ function computeBadgeLabel(prevEstado: EstadoActual | undefined, currEstado: Est
 function localidadForCp(cp: string, mapping: CpLocalidad[]): string {
   const found = mapping.find((m) => m.cp.trim() !== "" && m.cp.trim() === cp.trim());
   return found?.localidad || "—";
+}
+
+// Nombre de cliente a mostrar. OJO: NO usar `applyClientAlias(mercado || vendedor, config)`
+// directamente — si mercado trae un valor distinto de vacío (aunque no sea el
+// alias buscado) el operador `||` se queda con mercado y nunca llega a
+// revisar vendedor, dejando pasar por alto un "INFINITE REMIT" en vendedor.
+// Por eso el chequeo de SHEIN revisa mercado y vendedor por separado (mismo
+// patrón que categorizeCliente en Súper Reporte) y tiene prioridad.
+function resolveClienteDisplay(mercado: string, vendedor: string, config: ClientesLocalesConfig): string {
+  if (isSheinClient(mercado, vendedor, config)) return "SHEIN";
+  return applyClientAlias(mercado || vendedor, config);
 }
 
 // Excluye la Dirección Incorrecta de los reportes % Close Loop (numerador Y
@@ -858,7 +869,7 @@ function ClientesLocalesPage() {
           driver: String(r[cols.driver] ?? "").trim(),
           estado: String(r[cols.estado] ?? "").trim(),
           incidencia: String(r[cols.incidencia] ?? "").trim(),
-          cliente: applyClientAlias(mercado || vendedor, config),
+          cliente: resolveClienteDisplay(mercado, vendedor, config),
           clienteLocal: isClienteLocal(mercado, vendedor, config),
         };
       });
@@ -932,11 +943,17 @@ function ClientesLocalesPage() {
           driver: String(r[cols.driver] ?? "").trim(),
           mercado,
           vendedor,
-          cliente: applyClientAlias(mercado || vendedor, config),
+          cliente: resolveClienteDisplay(mercado, vendedor, config),
           clienteLocal: isClienteLocal(mercado, vendedor, config),
           rowIndex: i,
         };
       });
+      // DEBUG TEMPORAL — quitar una vez confirmado el causante de "SHEIN en 0".
+      // Muestra los valores únicos y crudos (tal cual vienen del Excel, antes
+      // de aplicar el alias) de mercado/vendedor para verificar mayúsculas,
+      // espacios u otro texto distinto al esperado ("INFINITE REMIT").
+      console.log("[DEBUG SHEIN] valores únicos de mercado:", Array.from(new Set(parsed.map((r) => r.mercado))));
+      console.log("[DEBUG SHEIN] valores únicos de vendedor:", Array.from(new Set(parsed.map((r) => r.vendedor))));
       const historico = getHistorico();
       const result = analyze(parsed, config.cpMapping, historico);
       if (!result) {

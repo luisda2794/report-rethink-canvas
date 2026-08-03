@@ -108,10 +108,16 @@ export function isSheinClient(mercado: string, vendedor: string, config: Cliente
 }
 
 /**
- * Regla de negocio "Cliente Local": mercado con valor y no excluido, o
- * vendedor coincidiendo exactamente con la lista de sellers incluidos.
+ * Regla de negocio "Cliente Local": SHEIN (vía el alias configurado) siempre
+ * cuenta como cliente local, sin depender de las listas de exclusión/inclusión
+ * — de lo contrario, si "Nombre del mercado" viene vacío para estos pedidos y
+ * "INFINITE REMIT" no está en Incluir Seller, estas filas nunca llegarían a
+ * clasificarse como SHEIN (se descartarían antes, como si no fueran cliente
+ * local). Fuera de eso: mercado con valor y no excluido, o vendedor
+ * coincidiendo exactamente con la lista de sellers incluidos.
  */
 export function isClienteLocal(mercado: string, vendedor: string, config: ClientesLocalesConfig): boolean {
+  if (isSheinClient(mercado, vendedor, config)) return true;
   const excludeSet = new Set(config.excludeMarketplace.map((s) => s.trim().toLowerCase()));
   const includeSet = new Set(config.includeSeller.map((s) => s.trim().toLowerCase()));
   const mercadoTrim = mercado.trim();
