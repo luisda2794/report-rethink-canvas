@@ -1,3 +1,5 @@
+import type { Categoria } from "@/lib/client-category";
+
 /**
  * Snapshots del módulo "Clientes Locales" persistidos en localStorage (sin
  * backend). Solo se guardan los campos esenciales por waybill, nunca el
@@ -22,6 +24,14 @@ export type HistoricoEntry = {
   cliente: string;
   driver: string;
   clienteLocal: boolean;
+  // Clasificación LOCAL/TEMU/ALIEXPRESS/SHEIN — se calcula para TODAS las
+  // filas (no solo las de clienteLocal=true), para poder armar los reportes
+  // % Close Loop de TEMU y ALIEXPRESS además de SHEIN/Resto Locales.
+  categoria: Categoria;
+  // Estado actual (clasificado) de la última fila vista para el waybill
+  // dentro del histórico. Se sobreescribe con el del EPOD del Día si el
+  // waybill también aparece ahí (más reciente).
+  estadoActual: EstadoActual;
   // ISO date de la primera vez que el waybill llegó a estado Entregado dentro
   // del histórico, o null si nunca se vio entregado en ese archivo.
   fechaEntrega: string | null;
