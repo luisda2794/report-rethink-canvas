@@ -261,17 +261,19 @@ type FlowRow = {
 // ---------------------------------------------------------------------------
 // % CD4 (SHEIN) / % CD5 (Resto Locales, TEMU, ALIEXPRESS)
 //
-// Esto es una métrica de PROBLEMA, no de éxito: mide qué porcentaje de los
-// paquetes ya "maduros" (T0 hace `windowDays` días o más — SIN importar su
-// estado actual: entregado, cancelado, en reparto, lo que sea) sigue HOY sin
-// resolverse, es decir, todavía en Driver_received/Driver_received_incidencias.
-// Denominador = TODOS los waybills con T0 vencido. Numerador = de esos,
-// cuántos siguen en reparto hoy. Más bajo = mejor.
-// Se excluyen de numerador Y denominador los waybills cuya última incidencia
-// sea Dirección Incorrecta. Fuente: el EPOD Histórico es la única fuente con
-// el rastro de T0 a lo largo de varios días; el EPOD del Día complementa
-// cp/driver/incidencia/estado actual (o sirve de único origen, con alcance
-// más limitado, si no hay histórico cargado).
+// Dos métricas sobre el MISMO denominador: waybills ya "maduros" (T0 hace
+// `windowDays` días o más — SIN importar su estado actual al momento de
+// calcular el denominador).
+// - % Entregado: de esos, cuántos ya llegaron a Entregado/Delivered (éxito —
+//   más alto es mejor, target 99.5%).
+// - % Rompiendo: de esos, cuántos siguen HOY sin resolverse, todavía en
+//   Driver_received/Driver_received_incidencias (problema — más bajo es
+//   mejor, target ≤0.5%).
+// Se excluyen de ambos (y del denominador) los waybills cuya última
+// incidencia sea Dirección Incorrecta. Fuente: el EPOD Histórico es la única
+// fuente con el rastro de T0 a lo largo de varios días; el EPOD del Día
+// complementa cp/driver/incidencia/estado actual (o sirve de único origen,
+// con alcance más limitado, si no hay histórico cargado).
 // ---------------------------------------------------------------------------
 
 type CloseLoopEntry = {
@@ -284,7 +286,14 @@ type CloseLoopEntry = {
   estadoActual: EstadoActual;
 };
 
-type CloseLoopBreakdownRow = { key: string; total: number; rompiendo: number; pct: number };
+type CloseLoopBreakdownRow = {
+  key: string;
+  total: number;
+  entregado: number;
+  pctEntregado: number;
+  rompiendo: number;
+  pctRompiendo: number;
+};
 
 type CloseLoopDetalleRow = {
   waybill: string;
@@ -297,33 +306,46 @@ type CloseLoopDetalleRow = {
 
 type CloseLoopReport = {
   total: number;
+  entregado: number;
+  pctEntregado: number;
   rompiendo: number;
-  pct: number;
+  pctRompiendo: number;
   porCp: CloseLoopBreakdownRow[];
   porDriver: CloseLoopBreakdownRow[];
-  // Los que forman el numerador: T0 vencido y todavía en reparto hoy — los
-  // que hay que atacar. Ordenado por días desde inbound desc.
+  // Los que forman el numerador de % Rompiendo: T0 vencido y todavía en
+  // reparto hoy — los que hay que atacar. Ordenado por días desde inbound desc.
   detalleRompiendo: CloseLoopDetalleRow[];
 };
 
 function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: number): CloseLoopReport {
   const isRompiendo = (e: CloseLoopEntry) => e.estadoActual === "EN_REPARTO";
+  const isEntregado = (e: CloseLoopEntry) => e.estadoActual === "ENTREGADO";
   const evaluable = entries.filter((e) => Math.floor((nowTs - e.t0Ts) / 86400000) >= windowDays);
   const total = evaluable.length;
   const rompiendo = evaluable.filter(isRompiendo).length;
-  const pct = total > 0 ? (rompiendo / total) * 100 : 0;
+  const entregado = evaluable.filter(isEntregado).length;
+  const pctRompiendo = total > 0 ? (rompiendo / total) * 100 : 0;
+  const pctEntregado = total > 0 ? (entregado / total) * 100 : 0;
 
   const buildBreakdown = (keyFn: (e: CloseLoopEntry) => string): CloseLoopBreakdownRow[] => {
-    const map = new Map<string, { total: number; rompiendo: number }>();
+    const map = new Map<string, { total: number; entregado: number; rompiendo: number }>();
     for (const e of evaluable) {
       const key = keyFn(e) || "—";
-      const b = map.get(key) ?? { total: 0, rompiendo: 0 };
+      const b = map.get(key) ?? { total: 0, entregado: 0, rompiendo: 0 };
       b.total++;
+      if (isEntregado(e)) b.entregado++;
       if (isRompiendo(e)) b.rompiendo++;
       map.set(key, b);
     }
     return Array.from(map.entries())
-      .map(([key, b]) => ({ key, total: b.total, rompiendo: b.rompiendo, pct: b.total > 0 ? (b.rompiendo / b.total) * 100 : 0 }))
+      .map(([key, b]) => ({
+        key,
+        total: b.total,
+        entregado: b.entregado,
+        pctEntregado: b.total > 0 ? (b.entregado / b.total) * 100 : 0,
+        rompiendo: b.rompiendo,
+        pctRompiendo: b.total > 0 ? (b.rompiendo / b.total) * 100 : 0,
+      }))
       .sort((a, b) => b.total - a.total);
   };
 
@@ -341,16 +363,25 @@ function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: nu
 
   return {
     total,
+    entregado,
+    pctEntregado,
     rompiendo,
-    pct,
+    pctRompiendo,
     porCp: buildBreakdown((e) => e.cp),
     porDriver: buildBreakdown((e) => e.driver || "— Sin asignar —"),
     detalleRompiendo,
   };
 }
 
-// Semáforo invertido: esta métrica mide el % que ROMPE el umbral, no el % de
-// éxito — más bajo es mejor.
+// % Entregado: semáforo normal — más alto es mejor, target 99.5%.
+function entregadoColor(pct: number): string {
+  if (pct >= 99.5) return "var(--success)";
+  if (pct >= 95) return "var(--warn)";
+  return "var(--danger)";
+}
+
+// % Rompiendo: semáforo invertido — mide el % que ROMPE el umbral, no el %
+// de éxito, así que más bajo es mejor.
 function closeLoopColor(pct: number): string {
   if (pct <= 0.5) return "var(--success)";
   if (pct <= 5) return "var(--warn)";
@@ -773,21 +804,32 @@ function CloseLoopSection({
       )}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          % que rompe el umbral — waybills con {windowDays}+ días desde inbound que siguen en reparto sin resolverse
-          (más bajo = mejor) · target ≤0.5% · excluye Dirección Incorrecta
+          Sobre waybills con {windowDays}+ días desde inbound: % ya Entregado (target 99.5%, más alto = mejor) y %
+          que sigue Rompiendo el umbral sin resolverse (target ≤0.5%, más bajo = mejor) · excluye Dirección Incorrecta
         </p>
         <Button onClick={onExport} disabled={report.total === 0} size="sm" className="gap-2">
           <Download className="size-3.5" /> Exportar a Excel
         </Button>
       </div>
 
-      <div className="p-4 rounded-lg border bg-card max-w-xs">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Rompiendo CD{windowDays}</div>
-        <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: closeLoopColor(report.pct) }}>
-          {report.total > 0 ? `${report.pct.toFixed(1)}%` : "—"}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
+        <div className="p-4 rounded-lg border bg-card">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Entregado (target 99.5%)</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: entregadoColor(report.pctEntregado) }}>
+            {report.total > 0 ? `${report.pctEntregado.toFixed(1)}%` : "—"}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {report.entregado} de {report.total} entregados
+          </div>
         </div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          {report.rompiendo} de {report.total} paquetes con {windowDays}+ días aún en reparto
+        <div className="p-4 rounded-lg border bg-card">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Rompiendo CD{windowDays} (target ≤0.5%)</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: closeLoopColor(report.pctRompiendo) }}>
+            {report.total > 0 ? `${report.pctRompiendo.toFixed(1)}%` : "—"}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {report.rompiendo} de {report.total} aún en reparto
+          </div>
         </div>
       </div>
 
@@ -807,8 +849,10 @@ function CloseLoopSection({
                   <tr>
                     <Th>CP</Th>
                     <Th right>Total</Th>
+                    <Th right>Entregado</Th>
+                    <Th right>% Entregado</Th>
                     <Th right>Rompiendo</Th>
-                    <Th right>%</Th>
+                    <Th right>% Rompiendo</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -816,9 +860,13 @@ function CloseLoopSection({
                     <tr key={r.key} className="border-t border-border">
                       <Td className="whitespace-nowrap">{r.key}</Td>
                       <Td right className="tabular-nums">{r.total}</Td>
+                      <Td right className="tabular-nums">{r.entregado}</Td>
+                      <Td right className="tabular-nums font-semibold">
+                        <span style={{ color: entregadoColor(r.pctEntregado) }}>{r.pctEntregado.toFixed(1)}%</span>
+                      </Td>
                       <Td right className="tabular-nums">{r.rompiendo}</Td>
                       <Td right className="tabular-nums font-semibold">
-                        <span style={{ color: closeLoopColor(r.pct) }}>{r.pct.toFixed(1)}%</span>
+                        <span style={{ color: closeLoopColor(r.pctRompiendo) }}>{r.pctRompiendo.toFixed(1)}%</span>
                       </Td>
                     </tr>
                   ))}
@@ -834,8 +882,10 @@ function CloseLoopSection({
                   <tr>
                     <Th>Driver</Th>
                     <Th right>Total</Th>
+                    <Th right>Entregado</Th>
+                    <Th right>% Entregado</Th>
                     <Th right>Rompiendo</Th>
-                    <Th right>%</Th>
+                    <Th right>% Rompiendo</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -843,9 +893,13 @@ function CloseLoopSection({
                     <tr key={r.key} className="border-t border-border">
                       <Td className="whitespace-nowrap">{r.key}</Td>
                       <Td right className="tabular-nums">{r.total}</Td>
+                      <Td right className="tabular-nums">{r.entregado}</Td>
+                      <Td right className="tabular-nums font-semibold">
+                        <span style={{ color: entregadoColor(r.pctEntregado) }}>{r.pctEntregado.toFixed(1)}%</span>
+                      </Td>
                       <Td right className="tabular-nums">{r.rompiendo}</Td>
                       <Td right className="tabular-nums font-semibold">
-                        <span style={{ color: closeLoopColor(r.pct) }}>{r.pct.toFixed(1)}%</span>
+                        <span style={{ color: closeLoopColor(r.pctRompiendo) }}>{r.pctRompiendo.toFixed(1)}%</span>
                       </Td>
                     </tr>
                   ))}
@@ -911,14 +965,22 @@ function DashboardCard({ title, report, onClick }: { title: string; report: Clos
       className="text-left p-5 rounded-lg border bg-card hover:border-primary/50 transition-colors cursor-pointer"
     >
       <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{title}</div>
-      <div className="mt-2 text-4xl font-semibold tabular-nums" style={{ color: closeLoopColor(report.pct) }}>
-        {report.total > 0 ? `${report.pct.toFixed(1)}%` : "—"}
+      <div className="mt-2 text-4xl font-semibold tabular-nums" style={{ color: entregadoColor(report.pctEntregado) }}>
+        {report.total > 0 ? `${report.pctEntregado.toFixed(1)}%` : "—"}
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         {report.total > 0
-          ? `${report.rompiendo} de ${report.total} aún en reparto sin resolverse`
+          ? `${report.entregado} de ${report.total} entregados`
           : "Sin paquetes con ventana vencida"}
       </div>
+      {report.total > 0 && (
+        <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Rompiendo</span>
+          <span className="font-semibold tabular-nums" style={{ color: closeLoopColor(report.pctRompiendo) }}>
+            {report.pctRompiendo.toFixed(1)}% ({report.rompiendo})
+          </span>
+        </div>
+      )}
     </button>
   );
 }
@@ -1132,23 +1194,79 @@ function ClientesLocalesPage() {
   const exportCloseLoop = (report: CloseLoopReport, title: string, filenamePrefix: string) => {
     if (!analysis || report.total === 0) return;
     const rows: (string | number)[][] = [
-      ["General", "-", report.total, report.rompiendo, Number(report.pct.toFixed(1)), "", "", "", "", ""],
+      [
+        "General",
+        "-",
+        report.total,
+        report.entregado,
+        Number(report.pctEntregado.toFixed(1)),
+        report.rompiendo,
+        Number(report.pctRompiendo.toFixed(1)),
+        "",
+        "",
+        "",
+        "",
+        "",
+      ],
     ];
-    for (const c of report.porCp) rows.push(["CP", c.key, c.total, c.rompiendo, Number(c.pct.toFixed(1)), "", "", "", "", ""]);
-    for (const d of report.porDriver) rows.push(["Driver", d.key, d.total, d.rompiendo, Number(d.pct.toFixed(1)), "", "", "", "", ""]);
+    for (const c of report.porCp) {
+      rows.push([
+        "CP",
+        c.key,
+        c.total,
+        c.entregado,
+        Number(c.pctEntregado.toFixed(1)),
+        c.rompiendo,
+        Number(c.pctRompiendo.toFixed(1)),
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
+    }
+    for (const d of report.porDriver) {
+      rows.push([
+        "Driver",
+        d.key,
+        d.total,
+        d.entregado,
+        Number(d.pctEntregado.toFixed(1)),
+        d.rompiendo,
+        Number(d.pctRompiendo.toFixed(1)),
+        "",
+        "",
+        "",
+        "",
+        "",
+      ]);
+    }
     for (const n of report.detalleRompiendo) {
-      rows.push(["Detalle", n.waybill, "", "", "", n.cp, n.driver, n.dias, ESTADO_LABEL[n.estadoActual], n.ultimaIncidencia]);
+      rows.push(["Detalle", n.waybill, "", "", "", "", "", n.cp, n.driver, n.dias, ESTADO_LABEL[n.estadoActual], n.ultimaIncidencia]);
     }
     exportStyledExcel({
       title,
       date: analysis.epodDateStr,
-      headers: ["Nivel", "Clave", "Total", "Rompiendo", "% Rompiendo", "CP", "Driver", "Días desde Inbound", "Estado Actual", "Última Incidencia"],
+      headers: [
+        "Nivel",
+        "Clave",
+        "Total",
+        "Entregado",
+        "% Entregado",
+        "Rompiendo",
+        "% Rompiendo",
+        "CP",
+        "Driver",
+        "Días desde Inbound",
+        "Estado Actual",
+        "Última Incidencia",
+      ],
       rows,
       filename: `${filenamePrefix}_${analysis.epodDateStr}.xlsx`,
-      colWidths: [10, 22, 8, 10, 12, 8, 20, 10, 14, 28],
+      colWidths: [10, 22, 8, 10, 12, 10, 12, 8, 20, 10, 14, 28],
       rowFill: (row) => {
         if (row[0] === "Detalle") return "FADBD8";
-        const pct = Number(row[4]);
+        const pct = Number(row[6]);
         if (pct <= 0.5) return undefined;
         if (pct <= 5) return "FEF3C7";
         return "FADBD8";
