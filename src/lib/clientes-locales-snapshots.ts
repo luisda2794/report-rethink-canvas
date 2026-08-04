@@ -28,10 +28,10 @@ export type HistoricoEntry = {
   // de TEMU y ALIEXPRESS además de SHEIN/Resto Locales.
   categoria: Categoria;
   // Estado actual (clasificado) de la última fila vista para el waybill
-  // dentro del histórico. Se sobreescribe con el del EPOD del Día si el
-  // waybill también aparece ahí (más reciente). Es la base del % CD4/CD5:
-  // el numerador es "sigue en EN_REPARTO hoy" entre los waybills con T0
-  // vencido, sin importar si alguna vez se entregó o no.
+  // dentro del histórico, al momento de subir ese archivo. Es solo un valor
+  // de partida: en tiempo de análisis siempre se recalcula el "estado de
+  // hoy" real (ver resolveWaybillToday en reportes_.clientes-locales.tsx) —
+  // si el waybill tiene fila hoy, se usa esa; si no, se asume Entregado.
   estadoActual: EstadoActual;
   // Última incidencia no vacía vista para el waybill (para excluir Dirección
   // Incorrecta de los reportes % CD4/CD5).
@@ -66,7 +66,7 @@ export function saveHistorico(entries: HistoricoEntry[]): void {
 // Snapshot del EPOD del Día (uno por fecha, se reemplaza en cada resubida)
 // ---------------------------------------------------------------------------
 
-export type EstadoActual = "ENTREGADO" | "EN_REPARTO" | "FALLO" | "CANCELADO" | "OTRO";
+export type EstadoActual = "ENTREGADO" | "EN_REPARTO" | "FALLO" | "CANCELADO" | "ASIGNADO" | "OTRO";
 
 export type DiaSnapshotEntry = {
   waybill: string;

@@ -157,11 +157,16 @@ function isCancelarEstado(s: string): boolean {
   const n = normalizeEstado(s);
   return n === "cancelar" || n === "cancel" || n === "cancelled" || n === "canceled";
 }
+function isAsignadoEstado(s: string): boolean {
+  const n = normalizeEstado(s);
+  return n === "asignado" || n === "assigned";
+}
 function classifyEstadoActual(estado: string): EstadoActual {
   if (isDeliveredEstado(estado)) return "ENTREGADO";
   if (isEnRepartoEstado(estado)) return "EN_REPARTO";
   if (isFailedEstado(estado)) return "FALLO";
   if (isCancelarEstado(estado)) return "CANCELADO";
+  if (isAsignadoEstado(estado)) return "ASIGNADO";
   return "OTRO";
 }
 const ESTADO_LABEL: Record<EstadoActual, string> = {
@@ -169,8 +174,46 @@ const ESTADO_LABEL: Record<EstadoActual, string> = {
   EN_REPARTO: "En Reparto",
   FALLO: "Fallado",
   CANCELADO: "Cancelado",
+  ASIGNADO: "Asignado",
   OTRO: "—",
 };
+// Prioridad para resolver el "estado de hoy" cuando un waybill tiene más de
+// una fila con la misma Fecha de la tarea (el Task Date no cambia con cada
+// transición de estado, así que no sirve para ordenar cronológicamente):
+// Entregado > En Reparto > En Incidencia > Cancelado > Asignado.
+const ESTADO_PRIORITY: Record<EstadoActual, number> = {
+  ENTREGADO: 5,
+  EN_REPARTO: 4,
+  FALLO: 3,
+  CANCELADO: 2,
+  ASIGNADO: 1,
+  OTRO: 0,
+};
+// Entre varias filas del mismo waybill (mismo día o no), elige la de mayor
+// prioridad de estado; en empate, la más reciente por fecha/orden de fila.
+function pickBestRow(rs: RawRow[]): RawRow {
+  return [...rs].sort((a, b) => {
+    const pa = ESTADO_PRIORITY[classifyEstadoActual(a.estado)];
+    const pb = ESTADO_PRIORITY[classifyEstadoActual(b.estado)];
+    if (pa !== pb) return pb - pa;
+    const at = a.fecha?.getTime() ?? 0;
+    const bt = b.fecha?.getTime() ?? 0;
+    if (at !== bt) return bt - at;
+    return b.rowIndex - a.rowIndex;
+  })[0];
+}
+// Regla de negocio del "estado de hoy" de un waybill: si tiene alguna fila
+// con Fecha de la tarea = fecha más reciente del archivo, se usa la de mayor
+// prioridad de ese día. Si no tiene ninguna fila hoy (su última actividad fue
+// un día anterior y ya no aparece más), se asume resuelto → Entregado.
+function resolveWaybillToday(rs: RawRow[], nowTs: number): { row: RawRow; estadoActual: EstadoActual } {
+  const todayRows = rs.filter((r) => r.fecha && dayStart(r.fecha) === nowTs);
+  if (todayRows.length > 0) {
+    const row = pickBestRow(todayRows);
+    return { row, estadoActual: classifyEstadoActual(row.estado) };
+  }
+  return { row: pickBestRow(rs), estadoActual: "ENTREGADO" };
+}
 function computeBadgeLabel(prevEstado: EstadoActual | undefined, currEstado: EstadoActual): string {
   if (currEstado === "EN_REPARTO") return prevEstado === "EN_REPARTO" ? "Sigue en reparto" : "Nuevo en reparto";
   if (currEstado === "ENTREGADO") return prevEstado === "EN_REPARTO" ? "Recién entregado" : "Entregado";
@@ -423,14 +466,10 @@ function buildCategoryCloseLoop(
     arr.push(r);
     byWaybillToday.set(r.waybill, arr);
   }
+  const seenToday = new Set<string>();
   for (const [waybill, rs] of byWaybillToday) {
-    const sorted = [...rs].sort((a, b) => {
-      const at = a.fecha!.getTime();
-      const bt = b.fecha!.getTime();
-      if (at === bt) return a.rowIndex - b.rowIndex;
-      return at - bt;
-    });
-    const r = sorted[sorted.length - 1];
+    seenToday.add(waybill);
+    const r = pickBestRow(rs);
     const estadoActual = classifyEstadoActual(r.estado);
     const existing = map.get(waybill);
     if (existing) {
@@ -453,6 +492,12 @@ function buildCategoryCloseLoop(
         estadoActual,
       });
     }
+  }
+
+  // Waybills que solo venían del histórico y hoy no tienen ninguna fila: se
+  // asumen resueltos (Entregado), sin importar su último estado conocido.
+  for (const [waybill, entry] of map) {
+    if (!seenToday.has(waybill)) entry.estadoActual = "ENTREGADO";
   }
 
   const entries = Array.from(map.values()).filter((e) => !isDireccionIncorrecta(e.ultimaIncidencia));
@@ -482,24 +527,19 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
   const epodDate = new Date(maxTs);
   const epodDateStr = formatDate(epodDate);
 
-  const todayLocalRows = localRows.filter((r) => dayStart(r.fecha!) === maxTs);
-
-  // Dedup por waybill: último registro cronológico de hoy = "estado actual".
-  const byWaybillToday = new Map<string, RawRow[]>();
-  for (const r of todayLocalRows) {
-    const arr = byWaybillToday.get(r.waybill) ?? [];
+  // "Estado de hoy" por waybill: si tiene fila con Fecha de la tarea = hoy,
+  // se usa la de mayor prioridad de ese día; si no tiene ninguna fila hoy
+  // (su última actividad fue un día anterior y ya no aparece más), se asume
+  // resuelto → Entregado.
+  const allLocalByWaybill = new Map<string, RawRow[]>();
+  for (const r of localRows) {
+    const arr = allLocalByWaybill.get(r.waybill) ?? [];
     arr.push(r);
-    byWaybillToday.set(r.waybill, arr);
+    allLocalByWaybill.set(r.waybill, arr);
   }
-  const currentByWaybill = new Map<string, RawRow>();
-  for (const [waybill, rs] of byWaybillToday) {
-    const sorted = [...rs].sort((a, b) => {
-      const at = a.fecha!.getTime();
-      const bt = b.fecha!.getTime();
-      if (at === bt) return a.rowIndex - b.rowIndex;
-      return at - bt;
-    });
-    currentByWaybill.set(waybill, sorted[sorted.length - 1]);
+  const currentByWaybill = new Map<string, { row: RawRow; estadoActual: EstadoActual }>();
+  for (const [waybill, rs] of allLocalByWaybill) {
+    currentByWaybill.set(waybill, resolveWaybillToday(rs, maxTs));
   }
 
   // Snapshot anterior de HOY (antes de reemplazarlo).
@@ -510,8 +550,7 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
   // ---- Reporte 1: todos los Cliente Local de hoy, con badge de cambio ----
   const report1RowsFlat: Report1Row[] = [];
   const snapshotEntries: DiaSnapshotEntry[] = [];
-  for (const [waybill, r] of currentByWaybill) {
-    const estadoActual = classifyEstadoActual(r.estado);
+  for (const [waybill, { row: r, estadoActual }] of currentByWaybill) {
     const badgeLabel = computeBadgeLabel(prevByWaybill.get(waybill), estadoActual);
     const localidad = localidadForCp(r.cp, cpMapping);
     report1RowsFlat.push({
@@ -588,13 +627,12 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
       });
     }
   }
-  for (const [waybill, r] of currentByWaybill) {
-    const estadoActual = classifyEstadoActual(r.estado);
+  for (const [waybill, { row: r, estadoActual }] of currentByWaybill) {
     const existing = closeLoopMap.get(waybill);
     if (existing) {
       existing.cp = r.cp;
       existing.driver = r.driver;
-      existing.estadoActual = estadoActual; // hoy siempre es lo más reciente
+      existing.estadoActual = estadoActual; // hoy (o Entregado forzado) siempre manda
       if (r.incidencia.trim() !== "") existing.ultimaIncidencia = r.incidencia;
     } else {
       const datesForWaybill = localRows.filter((x) => x.waybill === waybill).map((x) => dayStart(x.fecha!));
@@ -609,6 +647,11 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
         estadoActual,
       });
     }
+  }
+  // Waybills que solo venían del histórico y hoy ya no aparecen en absoluto
+  // en el EPOD del Día: se asumen resueltos (Entregado).
+  for (const [waybill, entry] of closeLoopMap) {
+    if (!currentByWaybill.has(waybill)) entry.estadoActual = "ENTREGADO";
   }
   const allCloseLoopEntries = Array.from(closeLoopMap.values()).filter((e) => !isDireccionIncorrecta(e.ultimaIncidencia));
   const sheinCloseLoop = buildCloseLoop(allCloseLoopEntries.filter((e) => e.cliente === "SHEIN"), 4, maxTs);
