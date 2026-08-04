@@ -10,7 +10,6 @@ const MAX_AGE_DAYS = 30;
 const MAX_AGE_MS = MAX_AGE_DAYS * 86400000;
 
 const HISTORICO_KEY = "epod_historico";
-const CD4_LOG_KEY = "cd4_log";
 const DIA_SNAPSHOT_PREFIX = "epod_dia_snapshot_";
 
 // ---------------------------------------------------------------------------
@@ -25,18 +24,17 @@ export type HistoricoEntry = {
   driver: string;
   clienteLocal: boolean;
   // Clasificación LOCAL/TEMU/ALIEXPRESS/SHEIN — se calcula para TODAS las
-  // filas (no solo las de clienteLocal=true), para poder armar los reportes
-  // % Close Loop de TEMU y ALIEXPRESS además de SHEIN/Resto Locales.
+  // filas (no solo las de clienteLocal=true), para poder armar los % CD4/CD5
+  // de TEMU y ALIEXPRESS además de SHEIN/Resto Locales.
   categoria: Categoria;
   // Estado actual (clasificado) de la última fila vista para el waybill
   // dentro del histórico. Se sobreescribe con el del EPOD del Día si el
-  // waybill también aparece ahí (más reciente).
+  // waybill también aparece ahí (más reciente). Es la base del % CD4/CD5:
+  // el numerador es "sigue en EN_REPARTO hoy" entre los waybills con T0
+  // vencido, sin importar si alguna vez se entregó o no.
   estadoActual: EstadoActual;
-  // ISO date de la primera vez que el waybill llegó a estado Entregado dentro
-  // del histórico, o null si nunca se vio entregado en ese archivo.
-  fechaEntrega: string | null;
   // Última incidencia no vacía vista para el waybill (para excluir Dirección
-  // Incorrecta de los reportes % Close Loop).
+  // Incorrecta de los reportes % CD4/CD5).
   ultimaIncidencia: string;
 };
 
@@ -109,53 +107,6 @@ export function saveDiaSnapshot(snapshot: DiaSnapshot): void {
 }
 
 // ---------------------------------------------------------------------------
-// CD4 — log histórico ligero para "días consecutivos"
-// ---------------------------------------------------------------------------
-
-export type Cd4LogEntry = {
-  waybill: string;
-  dias: number;
-  cliente: string;
-  cp: string;
-};
-
-export type Cd4Log = Record<string, Cd4LogEntry[]>; // fecha ("YYYY-MM-DD") -> entradas
-
-export function getCd4Log(): Cd4Log {
-  try {
-    const raw = localStorage.getItem(CD4_LOG_KEY);
-    if (!raw) return {};
-    return JSON.parse(raw) as Cd4Log;
-  } catch {
-    return {};
-  }
-}
-
-export function saveCd4LogForDate(fecha: string, entries: Cd4LogEntry[]): void {
-  try {
-    const log = getCd4Log();
-    log[fecha] = entries;
-    localStorage.setItem(CD4_LOG_KEY, JSON.stringify(log));
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Cuenta cuántos días seguidos (sin contar hoy) aparece el waybill en el log, mirando hacia atrás desde `fecha`. */
-export function countConsecutivePriorDays(waybill: string, fecha: string, log: Cd4Log): number {
-  let count = 0;
-  const cursor = new Date(`${fecha}T00:00:00Z`);
-  for (;;) {
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-    const key = cursor.toISOString().slice(0, 10);
-    const entries = log[key];
-    if (!entries || !entries.some((e) => e.waybill === waybill)) break;
-    count++;
-  }
-  return count;
-}
-
-// ---------------------------------------------------------------------------
 // Limpieza de datos antiguos (>30 días)
 // ---------------------------------------------------------------------------
 
@@ -170,17 +121,6 @@ export function cleanupOldData(): void {
       const ts = Date.parse(`${fecha}T00:00:00Z`);
       if (!isNaN(ts) && ts < cutoff) localStorage.removeItem(key);
     }
-
-    const log = getCd4Log();
-    let changed = false;
-    for (const fecha of Object.keys(log)) {
-      const ts = Date.parse(`${fecha}T00:00:00Z`);
-      if (!isNaN(ts) && ts < cutoff) {
-        delete log[fecha];
-        changed = true;
-      }
-    }
-    if (changed) localStorage.setItem(CD4_LOG_KEY, JSON.stringify(log));
   } catch {
     /* ignore */
   }

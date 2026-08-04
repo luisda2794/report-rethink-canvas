@@ -28,14 +28,10 @@ import {
   saveHistorico,
   getDiaSnapshot,
   saveDiaSnapshot,
-  getCd4Log,
-  saveCd4LogForDate,
-  countConsecutivePriorDays,
   type HistoricoEntry,
   type HistoricoStore,
   type DiaSnapshot,
   type DiaSnapshotEntry,
-  type Cd4LogEntry,
   type EstadoActual,
 } from "@/lib/clientes-locales-snapshots";
 
@@ -51,7 +47,7 @@ export const Route = createFileRoute("/reportes_/clientes-locales")({
       {
         name: "description",
         content:
-          "Clientes locales en reparto, flow meeting por CP, CD4 y % Close Loop de SHEIN/resto de clientes locales, a partir de dos EPOD (histórico + del día).",
+          "Clientes locales en reparto, flow meeting por CP y % CD4/CD5 (SHEIN, resto de locales, TEMU, Aliexpress), a partir de dos EPOD (histórico + del día).",
       },
     ],
   }),
@@ -89,8 +85,8 @@ function resolveColumns(
 }
 
 // El histórico necesita waybill/fecha/cp/driver/estado/incidencia/mercado/vendedor:
-// T0, Cliente Local, y ahora también fecha de entrega y última incidencia
-// (para los reportes % Close Loop).
+// T0, Cliente Local, categoría, estado actual y última incidencia (para los
+// reportes % CD4/CD5).
 const HISTORICO_ALIASES = {
   waybill: ["Número de Waybill", "Waybill Number"],
   fecha: ["Fecha de la tarea", "Task Date"],
@@ -192,7 +188,7 @@ function localidadForCp(cp: string, mapping: CpLocalidad[]): string {
   return found?.localidad || "—";
 }
 
-// Excluye la Dirección Incorrecta de los reportes % Close Loop (numerador Y
+// Excluye la Dirección Incorrecta de los reportes % CD4/CD5 (numerador Y
 // denominador). Un intento fallido con motivo "Falta de Tiempo"/"Fuerza
 // Mayor"/"Vehículo Averiado" NO se excluye — el waybill sigue en el
 // denominador con normalidad, simplemente esa falla no cuenta como entrega.
@@ -262,27 +258,19 @@ type FlowRow = {
   pctEntrega: number;
 };
 
-type Cd4Row = {
-  waybill: string;
-  cp: string;
-  localidad: string;
-  dias: number;
-  cliente: string;
-  driver: string;
-  consecutiveDays: number;
-};
-
 // ---------------------------------------------------------------------------
-// % Close Loop (SHEIN CD4 / Resto de Clientes Locales CD5)
+// % CD4 (SHEIN) / % CD5 (Resto Locales, TEMU, ALIEXPRESS)
 //
-// Numerador = paquetes entregados dentro de `windowDays` desde su inbound (T0).
-// Denominador = paquetes cuyo T0 fue hace `windowDays` días o más (ventana ya
-// cerrada — un paquete con T0 de ayer/antier todavía no cuenta).
+// Esto es una métrica de PROBLEMA, no de éxito: mide qué porcentaje de los
+// paquetes ya "maduros" (T0 hace `windowDays` días o más — SIN importar su
+// estado actual: entregado, cancelado, en reparto, lo que sea) sigue HOY sin
+// resolverse, es decir, todavía en Driver_received/Driver_received_incidencias.
+// Denominador = TODOS los waybills con T0 vencido. Numerador = de esos,
+// cuántos siguen en reparto hoy. Más bajo = mejor.
 // Se excluyen de numerador Y denominador los waybills cuya última incidencia
 // sea Dirección Incorrecta. Fuente: el EPOD Histórico es la única fuente con
-// el rastro de CUÁNDO se entregó cada waybill a lo largo de varios días; el
-// EPOD del Día solo complementa cp/driver/incidencia y una entrega ocurrida
-// hoy que el histórico aún no capturó (o sirve de único origen, con alcance
+// el rastro de T0 a lo largo de varios días; el EPOD del Día complementa
+// cp/driver/incidencia/estado actual (o sirve de único origen, con alcance
 // más limitado, si no hay histórico cargado).
 // ---------------------------------------------------------------------------
 
@@ -292,12 +280,11 @@ type CloseLoopEntry = {
   cp: string;
   driver: string;
   t0Ts: number;
-  fechaEntregaTs: number | null;
   ultimaIncidencia: string;
   estadoActual: EstadoActual;
 };
 
-type CloseLoopBreakdownRow = { key: string; total: number; enTiempo: number; pct: number };
+type CloseLoopBreakdownRow = { key: string; total: number; rompiendo: number; pct: number };
 
 type CloseLoopDetalleRow = {
   waybill: string;
@@ -310,41 +297,38 @@ type CloseLoopDetalleRow = {
 
 type CloseLoopReport = {
   total: number;
-  enTiempo: number;
+  rompiendo: number;
   pct: number;
   porCp: CloseLoopBreakdownRow[];
   porDriver: CloseLoopBreakdownRow[];
-  // Waybills en el denominador (ventana ya cerrada) que NO fueron entregados
-  // dentro de la ventana — entrega efectiva (Estado = Entregado/Delivered),
-  // no intento de entrega: un Attempt Failure sigue contando como "no
-  // entregado" sin importar el motivo. Ordenado por días desde inbound desc.
-  noEntregados: CloseLoopDetalleRow[];
+  // Los que forman el numerador: T0 vencido y todavía en reparto hoy — los
+  // que hay que atacar. Ordenado por días desde inbound desc.
+  detalleRompiendo: CloseLoopDetalleRow[];
 };
 
 function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: number): CloseLoopReport {
-  const isOnTime = (e: CloseLoopEntry) =>
-    e.fechaEntregaTs != null && Math.floor((e.fechaEntregaTs - e.t0Ts) / 86400000) <= windowDays;
+  const isRompiendo = (e: CloseLoopEntry) => e.estadoActual === "EN_REPARTO";
   const evaluable = entries.filter((e) => Math.floor((nowTs - e.t0Ts) / 86400000) >= windowDays);
   const total = evaluable.length;
-  const enTiempo = evaluable.filter(isOnTime).length;
-  const pct = total > 0 ? (enTiempo / total) * 100 : 0;
+  const rompiendo = evaluable.filter(isRompiendo).length;
+  const pct = total > 0 ? (rompiendo / total) * 100 : 0;
 
   const buildBreakdown = (keyFn: (e: CloseLoopEntry) => string): CloseLoopBreakdownRow[] => {
-    const map = new Map<string, { total: number; enTiempo: number }>();
+    const map = new Map<string, { total: number; rompiendo: number }>();
     for (const e of evaluable) {
       const key = keyFn(e) || "—";
-      const b = map.get(key) ?? { total: 0, enTiempo: 0 };
+      const b = map.get(key) ?? { total: 0, rompiendo: 0 };
       b.total++;
-      if (isOnTime(e)) b.enTiempo++;
+      if (isRompiendo(e)) b.rompiendo++;
       map.set(key, b);
     }
     return Array.from(map.entries())
-      .map(([key, b]) => ({ key, total: b.total, enTiempo: b.enTiempo, pct: b.total > 0 ? (b.enTiempo / b.total) * 100 : 0 }))
+      .map(([key, b]) => ({ key, total: b.total, rompiendo: b.rompiendo, pct: b.total > 0 ? (b.rompiendo / b.total) * 100 : 0 }))
       .sort((a, b) => b.total - a.total);
   };
 
-  const noEntregados: CloseLoopDetalleRow[] = evaluable
-    .filter((e) => !isOnTime(e))
+  const detalleRompiendo: CloseLoopDetalleRow[] = evaluable
+    .filter(isRompiendo)
     .map((e) => ({
       waybill: e.waybill,
       cp: e.cp || "—",
@@ -357,21 +341,23 @@ function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: nu
 
   return {
     total,
-    enTiempo,
+    rompiendo,
     pct,
     porCp: buildBreakdown((e) => e.cp),
     porDriver: buildBreakdown((e) => e.driver || "— Sin asignar —"),
-    noEntregados,
+    detalleRompiendo,
   };
 }
 
+// Semáforo invertido: esta métrica mide el % que ROMPE el umbral, no el % de
+// éxito — más bajo es mejor.
 function closeLoopColor(pct: number): string {
-  if (pct >= 99.5) return "var(--success)";
-  if (pct >= 95) return "var(--warn)";
+  if (pct <= 0.5) return "var(--success)";
+  if (pct <= 5) return "var(--warn)";
   return "var(--danger)";
 }
 
-// % Close Loop por categoría (TEMU / ALIEXPRESS): a diferencia de SHEIN/Resto
+// % CD5 por categoría (TEMU / ALIEXPRESS): a diferencia de SHEIN/Resto
 // Locales, NO depende de `clienteLocal` — usa `categoria` directamente
 // (calculada para TODAS las filas del histórico y del día), porque TEMU y
 // ALIEXPRESS por definición no son "cliente local" bajo la regla de
@@ -393,7 +379,6 @@ function buildCategoryCloseLoop(
         cp: h.cp,
         driver: h.driver,
         t0Ts: dayStart(new Date(h.t0)),
-        fechaEntregaTs: h.fechaEntrega ? dayStart(new Date(h.fechaEntrega)) : null,
         ultimaIncidencia: h.ultimaIncidencia,
         estadoActual: h.estadoActual,
       });
@@ -416,14 +401,12 @@ function buildCategoryCloseLoop(
     });
     const r = sorted[sorted.length - 1];
     const estadoActual = classifyEstadoActual(r.estado);
-    const todayEntregaTs = estadoActual === "ENTREGADO" ? nowTs : null;
     const existing = map.get(waybill);
     if (existing) {
       existing.cp = r.cp;
       existing.driver = r.driver;
       existing.estadoActual = estadoActual;
       if (r.incidencia.trim() !== "") existing.ultimaIncidencia = r.incidencia;
-      if (existing.fechaEntregaTs == null && todayEntregaTs != null) existing.fechaEntregaTs = todayEntregaTs;
     } else {
       const datesForWaybill = rows
         .filter((x) => x.waybill === waybill && x.categoria === targetCategoria && x.fecha)
@@ -435,7 +418,6 @@ function buildCategoryCloseLoop(
         cp: r.cp,
         driver: r.driver,
         t0Ts,
-        fechaEntregaTs: todayEntregaTs,
         ultimaIncidencia: r.incidencia,
         estadoActual,
       });
@@ -455,10 +437,7 @@ type Analysis = {
   volumeByCp: { name: string; total: number }[];
   volumeByCliente: { name: string; total: number }[];
   flow: FlowRow[];
-  cd4: Cd4Row[];
-  cd4UsedFallbackT0: boolean;
   snapshotToSave: DiaSnapshot;
-  cd4LogEntries: Cd4LogEntry[];
   sheinCloseLoop: CloseLoopReport;
   localCloseLoop: CloseLoopReport;
   temuCloseLoop: CloseLoopReport;
@@ -562,34 +541,7 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
     .map(([cp, b]) => ({ cp, localidad: localidadForCp(cp, cpMapping), ...b, pctEntrega: b.total > 0 ? (b.entregados / b.total) * 100 : 0 }))
     .sort((a, b) => b.total - a.total);
 
-  // ---- Reporte 3: CD4 (T0 del histórico, o respaldo dentro del mismo archivo) ----
-  const historicoMap = new Map<string, HistoricoEntry>();
-  if (historico) for (const e of historico.entries) historicoMap.set(e.waybill, e);
-
-  const cd4Log = getCd4Log();
-  let cd4UsedFallbackT0 = false;
-  const cd4: Cd4Row[] = [];
-  const cd4LogEntries: Cd4LogEntry[] = [];
-  for (const r of report1RowsFlat) {
-    if (r.estado !== "EN_REPARTO") continue;
-    let t0Ts: number;
-    const hist = historicoMap.get(r.waybill);
-    if (hist) {
-      t0Ts = dayStart(new Date(hist.t0));
-    } else {
-      const datesForWaybill = localRows.filter((x) => x.waybill === r.waybill).map((x) => dayStart(x.fecha!));
-      t0Ts = Math.min(...datesForWaybill);
-      cd4UsedFallbackT0 = true;
-    }
-    const dias = Math.floor((maxTs - t0Ts) / 86400000);
-    if (dias < 4) continue;
-    const consecutiveDays = countConsecutivePriorDays(r.waybill, epodDateStr, cd4Log) + 1;
-    cd4.push({ waybill: r.waybill, cp: r.cp, localidad: r.localidad, dias, cliente: r.cliente, driver: r.driver, consecutiveDays });
-    cd4LogEntries.push({ waybill: r.waybill, dias, cliente: r.cliente, cp: r.cp });
-  }
-  cd4.sort((a, b) => b.dias - a.dias);
-
-  // ---- Reportes 4/5: % Close Loop (SHEIN CD4 y Resto de Clientes Locales CD5) ----
+  // ---- Reportes 4/5: % CD4 (SHEIN) y % CD5 (Resto de Clientes Locales) ----
   const closeLoopMap = new Map<string, CloseLoopEntry>();
   if (historico) {
     for (const h of historico.entries) {
@@ -600,7 +552,6 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
         cp: h.cp,
         driver: h.driver,
         t0Ts: dayStart(new Date(h.t0)),
-        fechaEntregaTs: h.fechaEntrega ? dayStart(new Date(h.fechaEntrega)) : null,
         ultimaIncidencia: h.ultimaIncidencia,
         estadoActual: h.estadoActual,
       });
@@ -608,14 +559,12 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
   }
   for (const [waybill, r] of currentByWaybill) {
     const estadoActual = classifyEstadoActual(r.estado);
-    const todayEntregaTs = estadoActual === "ENTREGADO" ? maxTs : null;
     const existing = closeLoopMap.get(waybill);
     if (existing) {
       existing.cp = r.cp;
       existing.driver = r.driver;
       existing.estadoActual = estadoActual; // hoy siempre es lo más reciente
       if (r.incidencia.trim() !== "") existing.ultimaIncidencia = r.incidencia;
-      if (existing.fechaEntregaTs == null && todayEntregaTs != null) existing.fechaEntregaTs = todayEntregaTs;
     } else {
       const datesForWaybill = localRows.filter((x) => x.waybill === waybill).map((x) => dayStart(x.fecha!));
       const t0Ts = datesForWaybill.length > 0 ? Math.min(...datesForWaybill) : maxTs;
@@ -625,7 +574,6 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
         cp: r.cp,
         driver: r.driver,
         t0Ts,
-        fechaEntregaTs: todayEntregaTs,
         ultimaIncidencia: r.incidencia,
         estadoActual,
       });
@@ -635,7 +583,7 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
   const sheinCloseLoop = buildCloseLoop(allCloseLoopEntries.filter((e) => e.cliente === "SHEIN"), 4, maxTs);
   const localCloseLoop = buildCloseLoop(allCloseLoopEntries.filter((e) => e.cliente !== "SHEIN"), 5, maxTs);
 
-  // ---- Reportes 6/7: % Close Loop por categoría (TEMU / ALIEXPRESS) ----
+  // ---- Reportes 6/7: % CD5 por categoría (TEMU / ALIEXPRESS) ----
   // A diferencia de SHEIN/Resto Locales, estas dos categorías NO dependen de
   // `clienteLocal` — se basan directamente en `categoria` (calculada para
   // TODAS las filas), ya que TEMU/ALIEXPRESS por definición no son "cliente
@@ -652,10 +600,7 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
     volumeByCp,
     volumeByCliente,
     flow,
-    cd4,
-    cd4UsedFallbackT0,
     snapshotToSave: { fecha: epodDateStr, updatedAt: new Date().toISOString(), entries: snapshotEntries },
-    cd4LogEntries,
     sheinCloseLoop,
     localCloseLoop,
     temuCloseLoop,
@@ -828,7 +773,8 @@ function CloseLoopSection({
       )}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Ventana de {windowDays} días desde inbound · target 99.5% · excluye Dirección Incorrecta
+          % que rompe el umbral — waybills con {windowDays}+ días desde inbound que siguen en reparto sin resolverse
+          (más bajo = mejor) · target ≤0.5% · excluye Dirección Incorrecta
         </p>
         <Button onClick={onExport} disabled={report.total === 0} size="sm" className="gap-2">
           <Download className="size-3.5" /> Exportar a Excel
@@ -836,19 +782,19 @@ function CloseLoopSection({
       </div>
 
       <div className="p-4 rounded-lg border bg-card max-w-xs">
-        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Close Loop General</div>
+        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Rompiendo CD{windowDays}</div>
         <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: closeLoopColor(report.pct) }}>
           {report.total > 0 ? `${report.pct.toFixed(1)}%` : "—"}
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
-          {report.enTiempo} de {report.total} paquetes con ventana cerrada
+          {report.rompiendo} de {report.total} paquetes con {windowDays}+ días aún en reparto
         </div>
       </div>
 
       {report.total === 0 ? (
         <Card className="shadow-none">
           <CardContent className="pt-6 text-sm text-muted-foreground">
-            Todavía no hay paquetes con ventana cerrada (T0 hace {windowDays}+ días).
+            Todavía no hay paquetes con {windowDays}+ días desde inbound.
           </CardContent>
         </Card>
       ) : (
@@ -861,7 +807,7 @@ function CloseLoopSection({
                   <tr>
                     <Th>CP</Th>
                     <Th right>Total</Th>
-                    <Th right>En Tiempo</Th>
+                    <Th right>Rompiendo</Th>
                     <Th right>%</Th>
                   </tr>
                 </thead>
@@ -870,7 +816,7 @@ function CloseLoopSection({
                     <tr key={r.key} className="border-t border-border">
                       <Td className="whitespace-nowrap">{r.key}</Td>
                       <Td right className="tabular-nums">{r.total}</Td>
-                      <Td right className="tabular-nums">{r.enTiempo}</Td>
+                      <Td right className="tabular-nums">{r.rompiendo}</Td>
                       <Td right className="tabular-nums font-semibold">
                         <span style={{ color: closeLoopColor(r.pct) }}>{r.pct.toFixed(1)}%</span>
                       </Td>
@@ -888,7 +834,7 @@ function CloseLoopSection({
                   <tr>
                     <Th>Driver</Th>
                     <Th right>Total</Th>
-                    <Th right>En Tiempo</Th>
+                    <Th right>Rompiendo</Th>
                     <Th right>%</Th>
                   </tr>
                 </thead>
@@ -897,7 +843,7 @@ function CloseLoopSection({
                     <tr key={r.key} className="border-t border-border">
                       <Td className="whitespace-nowrap">{r.key}</Td>
                       <Td right className="tabular-nums">{r.total}</Td>
-                      <Td right className="tabular-nums">{r.enTiempo}</Td>
+                      <Td right className="tabular-nums">{r.rompiendo}</Td>
                       <Td right className="tabular-nums font-semibold">
                         <span style={{ color: closeLoopColor(r.pct) }}>{r.pct.toFixed(1)}%</span>
                       </Td>
@@ -913,15 +859,15 @@ function CloseLoopSection({
       {report.total > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-foreground mb-2">
-            Detalle — Paquetes No Entregados
+            Detalle — Paquetes Rompiendo (a atacar)
             <span className="ml-2 text-[11px] text-muted-foreground font-normal">
-              ({report.noEntregados.length}) · entrega efectiva, no intento — un Attempt Failure sigue sin contar como entregado
+              ({report.detalleRompiendo.length}) · {windowDays}+ días desde inbound y todavía en Driver_received hoy
             </span>
           </h4>
-          {report.noEntregados.length === 0 ? (
+          {report.detalleRompiendo.length === 0 ? (
             <Card className="shadow-none">
               <CardContent className="pt-6 text-sm text-muted-foreground">
-                ✓ Todos los paquetes con ventana cerrada fueron entregados a tiempo.
+                ✓ Ningún paquete con {windowDays}+ días sigue en reparto sin resolverse.
               </CardContent>
             </Card>
           ) : (
@@ -938,7 +884,7 @@ function CloseLoopSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {report.noEntregados.map((r) => (
+                  {report.detalleRompiendo.map((r) => (
                     <tr key={r.waybill} className="border-t border-border">
                       <Td className="whitespace-nowrap">{r.waybill}</Td>
                       <Td className="whitespace-nowrap">{r.cp}</Td>
@@ -970,8 +916,8 @@ function DashboardCard({ title, report, onClick }: { title: string; report: Clos
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         {report.total > 0
-          ? `${report.enTiempo} de ${report.total} entregados a tiempo`
-          : "Sin paquetes con ventana cerrada"}
+          ? `${report.rompiendo} de ${report.total} aún en reparto sin resolverse`
+          : "Sin paquetes con ventana vencida"}
       </div>
     </button>
   );
@@ -1051,7 +997,7 @@ function ClientesLocalesPage() {
         };
       });
       // No se filtra solo por clienteLocal: TEMU/ALIEXPRESS también necesitan
-      // su T0/fecha de entrega para los reportes % Close Loop por categoría.
+      // su T0 para los reportes % CD4/CD5 por categoría.
       const validRows = parsed.filter((r) => r.fecha && r.waybill);
       if (validRows.length === 0) throw new Error("No se encontraron waybills con fecha válida en este archivo.");
       const byWaybill = new Map<string, HistRow[]>();
@@ -1065,7 +1011,6 @@ function ClientesLocalesPage() {
         const sorted = [...rs].sort((a, b) => a.fecha!.getTime() - b.fecha!.getTime());
         const t0 = sorted[0].fecha!;
         const last = sorted[sorted.length - 1];
-        const firstDelivered = sorted.find((r) => isDeliveredEstado(r.estado));
         const withInc = sorted.filter((r) => r.incidencia.trim() !== "");
         entries.push({
           waybill,
@@ -1076,7 +1021,6 @@ function ClientesLocalesPage() {
           clienteLocal: last.clienteLocal,
           categoria: last.categoria,
           estadoActual: classifyEstadoActual(last.estado),
-          fechaEntrega: firstDelivered ? firstDelivered.fecha!.toISOString() : null,
           ultimaIncidencia: withInc.length > 0 ? withInc[withInc.length - 1].incidencia : "",
         });
       }
@@ -1144,7 +1088,6 @@ function ClientesLocalesPage() {
         throw new Error("No se encontraron clientes locales con fecha válida en este archivo.");
       }
       saveDiaSnapshot(result.snapshotToSave);
-      saveCd4LogForDate(result.epodDateStr, result.cd4LogEntries);
       setAnalysis(result);
       setLastUpdateAt(result.snapshotToSave.updatedAt);
     } catch (e) {
@@ -1183,59 +1126,40 @@ function ClientesLocalesPage() {
     });
   };
 
-  const exportCd4 = () => {
-    if (!analysis || analysis.cd4.length === 0) return;
-    exportStyledExcel({
-      title: "Clientes Locales — CD4",
-      date: analysis.epodDateStr,
-      headers: ["Waybill", "CP", "Localidad", "Días desde Inbound", "Cliente", "Driver", "Días Consecutivos CD4"],
-      rows: analysis.cd4.map((r) => [r.waybill, r.cp, r.localidad, r.dias, r.cliente, r.driver, r.consecutiveDays]),
-      filename: `clientes_locales_cd4_${analysis.epodDateStr}.xlsx`,
-      colWidths: [22, 10, 20, 18, 24, 22, 20],
-      rowFill: (row) => {
-        const consecutive = Number(row[6]);
-        const dias = Number(row[3]);
-        if (consecutive >= 3) return "F5A623";
-        if (dias >= 6) return "FADBD8";
-        return undefined;
-      },
-    });
-  };
-
-  // Un solo export genérico para los 4 reportes % Close Loop (SHEIN/Resto
+  // Un solo export genérico para los 4 reportes % CD4/CD5 (SHEIN/Resto
   // Locales/TEMU/ALIEXPRESS): mismas columnas, mismo semáforo, y ahora
-  // también el detalle de no entregados en el mismo archivo.
+  // también el detalle de los que rompen el umbral en el mismo archivo.
   const exportCloseLoop = (report: CloseLoopReport, title: string, filenamePrefix: string) => {
     if (!analysis || report.total === 0) return;
     const rows: (string | number)[][] = [
-      ["General", "-", report.total, report.enTiempo, Number(report.pct.toFixed(1)), "", "", "", "", ""],
+      ["General", "-", report.total, report.rompiendo, Number(report.pct.toFixed(1)), "", "", "", "", ""],
     ];
-    for (const c of report.porCp) rows.push(["CP", c.key, c.total, c.enTiempo, Number(c.pct.toFixed(1)), "", "", "", "", ""]);
-    for (const d of report.porDriver) rows.push(["Driver", d.key, d.total, d.enTiempo, Number(d.pct.toFixed(1)), "", "", "", "", ""]);
-    for (const n of report.noEntregados) {
+    for (const c of report.porCp) rows.push(["CP", c.key, c.total, c.rompiendo, Number(c.pct.toFixed(1)), "", "", "", "", ""]);
+    for (const d of report.porDriver) rows.push(["Driver", d.key, d.total, d.rompiendo, Number(d.pct.toFixed(1)), "", "", "", "", ""]);
+    for (const n of report.detalleRompiendo) {
       rows.push(["Detalle", n.waybill, "", "", "", n.cp, n.driver, n.dias, ESTADO_LABEL[n.estadoActual], n.ultimaIncidencia]);
     }
     exportStyledExcel({
       title,
       date: analysis.epodDateStr,
-      headers: ["Nivel", "Clave", "Total", "En Tiempo", "% Close Loop", "CP", "Driver", "Días desde Inbound", "Estado Actual", "Última Incidencia"],
+      headers: ["Nivel", "Clave", "Total", "Rompiendo", "% Rompiendo", "CP", "Driver", "Días desde Inbound", "Estado Actual", "Última Incidencia"],
       rows,
       filename: `${filenamePrefix}_${analysis.epodDateStr}.xlsx`,
       colWidths: [10, 22, 8, 10, 12, 8, 20, 10, 14, 28],
       rowFill: (row) => {
         if (row[0] === "Detalle") return "FADBD8";
         const pct = Number(row[4]);
-        if (pct >= 99.5) return undefined;
-        if (pct >= 95) return "FEF3C7";
+        if (pct <= 0.5) return undefined;
+        if (pct <= 5) return "FEF3C7";
         return "FADBD8";
       },
     });
   };
 
-  const exportSheinCloseLoop = () => analysis && exportCloseLoop(analysis.sheinCloseLoop, "SHEIN — % Close Loop (CD4)", "shein_close_loop_cd4");
-  const exportLocalCloseLoop = () => analysis && exportCloseLoop(analysis.localCloseLoop, "Resto de Clientes Locales — % Close Loop (CD5)", "resto_locales_close_loop_cd5");
-  const exportTemuCloseLoop = () => analysis && exportCloseLoop(analysis.temuCloseLoop, "TEMU — % Close Loop (CD5)", "temu_close_loop_cd5");
-  const exportAliexpressCloseLoop = () => analysis && exportCloseLoop(analysis.aliexpressCloseLoop, "ALIEXPRESS/Dropshipper China — % Close Loop (CD5)", "aliexpress_close_loop_cd5");
+  const exportSheinCloseLoop = () => analysis && exportCloseLoop(analysis.sheinCloseLoop, "SHEIN — % CD4", "shein_cd4");
+  const exportLocalCloseLoop = () => analysis && exportCloseLoop(analysis.localCloseLoop, "Resto de Clientes Locales — % CD5", "resto_locales_cd5");
+  const exportTemuCloseLoop = () => analysis && exportCloseLoop(analysis.temuCloseLoop, "TEMU — % CD5", "temu_cd5");
+  const exportAliexpressCloseLoop = () => analysis && exportCloseLoop(analysis.aliexpressCloseLoop, "ALIEXPRESS/Dropshipper China — % CD5", "aliexpress_cd5");
 
   return (
     <div className="flex flex-col gap-6">
@@ -1251,7 +1175,7 @@ function ClientesLocalesPage() {
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Clientes Locales</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Clientes locales en reparto, flow meeting por CP, CD4, y % Close Loop de SHEIN y del resto de clientes locales.
+          Clientes locales en reparto, flow meeting por CP, y % CD4/CD5 de SHEIN, resto de locales, TEMU y Aliexpress.
           {analysis && (
             <>
               {" "}Fecha del EPOD del día <strong>{analysis.epodDateStr}</strong>
@@ -1270,7 +1194,7 @@ function ClientesLocalesPage() {
           <CardContent>
             <Dropzone
               label="Sube el EPOD histórico (multi-día)"
-              hint="Calcula T0 (inbound) y fecha de entrega por waybill — habilita SHEIN CD4% y Resto Locales CD5% · .xlsx"
+              hint="Calcula T0 (inbound) por waybill — habilita los % CD4/CD5 del Dashboard · .xlsx"
               file={historicoFile}
               dragOver={historicoDragOver}
               loading={historicoLoading}
@@ -1318,7 +1242,6 @@ function ClientesLocalesPage() {
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="enreparto">Clientes Locales en Reparto</TabsTrigger>
             <TabsTrigger value="flow">Flow Meeting</TabsTrigger>
-            <TabsTrigger value="cd4">CD4</TabsTrigger>
             <TabsTrigger value="shein-cd4">SHEIN CD4 %</TabsTrigger>
             <TabsTrigger value="local-cd5">Resto Locales CD5 %</TabsTrigger>
             <TabsTrigger value="temu-cd5">TEMU CD5 %</TabsTrigger>
@@ -1328,7 +1251,7 @@ function ClientesLocalesPage() {
           {/* DASHBOARD */}
           <TabsContent value="dashboard" className="flex flex-col gap-4 mt-4">
             <p className="text-sm text-muted-foreground">
-              % Close Loop por categoría — click en una tarjeta para ver el detalle completo.
+              % que rompe CD4/CD5 por categoría (más bajo = mejor) — click en una tarjeta para ver el detalle completo.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <DashboardCard title="CD4 SHEIN %" report={analysis.sheinCloseLoop} onClick={() => setActiveTab("shein-cd4")} />
@@ -1450,61 +1373,6 @@ function ClientesLocalesPage() {
                         </Td>
                       </tr>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* REPORTE 3 */}
-          <TabsContent value="cd4" className="flex flex-col gap-4 mt-4">
-            {!historicoInfo && (
-              <p className="text-xs text-muted-foreground flex items-start gap-1.5 p-3 rounded-md border bg-muted">
-                <Info className="size-3.5 mt-0.5 shrink-0" />
-                <span>Sube un EPOD Histórico para un cálculo de antigüedad más preciso. Por ahora, CD4 usa el T0 calculado dentro del propio EPOD del día.</span>
-              </p>
-            )}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {analysis.cd4.length} waybills de clientes locales rompiendo CD4 (≥4 días desde inbound)
-              </p>
-              <Button onClick={exportCd4} disabled={analysis.cd4.length === 0} size="sm" className="gap-2">
-                <Download className="size-3.5" /> Exportar a Excel
-              </Button>
-            </div>
-            {analysis.cd4.length === 0 ? (
-              <Card className="shadow-none"><CardContent className="pt-6 text-sm text-muted-foreground">Sin paquetes rompiendo CD4 ✓</CardContent></Card>
-            ) : (
-              <div className="rounded-lg border overflow-x-auto">
-                <table className="w-full text-[13px]">
-                  <thead className="bg-muted">
-                    <tr>
-                      <Th>Waybill</Th>
-                      <Th>CP</Th>
-                      <Th>Localidad</Th>
-                      <Th right>Días desde Inbound</Th>
-                      <Th>Cliente</Th>
-                      <Th>Driver</Th>
-                      <Th right>Días Consecutivos CD4</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analysis.cd4.map((r) => {
-                      const consecutiveCritical = r.consecutiveDays >= 3;
-                      const diasCritical = r.dias >= 6;
-                      const rowClass = consecutiveCritical ? "bg-orange-500/15" : diasCritical ? "bg-destructive/10" : "";
-                      return (
-                        <tr key={r.waybill} className={`border-t border-border ${rowClass}`}>
-                          <Td className="whitespace-nowrap">{r.waybill}</Td>
-                          <Td className="whitespace-nowrap">{r.cp}</Td>
-                          <Td>{r.localidad}</Td>
-                          <Td right className={`tabular-nums font-semibold ${diasCritical ? "text-destructive" : ""}`}>{r.dias}d</Td>
-                          <Td>{r.cliente || "—"}</Td>
-                          <Td className="whitespace-nowrap">{r.driver || "—"}</Td>
-                          <Td right className={`tabular-nums font-semibold ${consecutiveCritical ? "text-orange-600" : ""}`}>{r.consecutiveDays}</Td>
-                        </tr>
-                      );
-                    })}
                   </tbody>
                 </table>
               </div>
