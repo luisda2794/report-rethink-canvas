@@ -17,6 +17,8 @@ const THIN_BORDER = {
   right: { style: "thin", color: { rgb: BORDER_COLOR } },
 };
 
+export type CellFillSpec = { bg: string; fg?: string };
+
 export function exportStyledExcel(opts: {
   title: string;
   date: string;
@@ -25,10 +27,10 @@ export function exportStyledExcel(opts: {
   filename: string;
   sheetName?: string;
   colWidths?: number[];
-  /** Devuelve un color de fondo hex (sin '#') para resaltar toda la fila, o undefined para no resaltarla. */
-  rowFill?: (row: (string | number)[], index: number) => string | undefined;
+  /** Color (y opcionalmente texto) de una celda puntual, o undefined para dejarla sin resaltar. */
+  cellFill?: (row: (string | number)[], colIndex: number, rowIndex: number) => CellFillSpec | undefined;
 }): void {
-  const { title, date, headers, rows, filename, sheetName = "Reporte", colWidths, rowFill } = opts;
+  const { title, date, headers, rows, filename, sheetName = "Reporte", colWidths, cellFill } = opts;
 
   const aoa: (string | number)[][] = [[`${title} — ${date}`], headers, ...rows];
   const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
@@ -59,13 +61,13 @@ export function exportStyledExcel(opts: {
   }
 
   for (let r = 0; r < rows.length; r++) {
-    const fill = rowFill?.(rows[r], r);
     for (let c = 0; c < headers.length; c++) {
       const ref = XLSXStyle.utils.encode_cell({ r: r + 2, c });
       const cell = (ws as Record<string, unknown>)[ref] as { s?: unknown } | undefined;
       if (!cell) continue;
+      const fill = cellFill?.(rows[r], c, r);
       cell.s = fill
-        ? { border: THIN_BORDER, fill: { patternType: "solid", fgColor: { rgb: fill } }, font: { color: { rgb: "7F1D1D" } } }
+        ? { border: THIN_BORDER, fill: { patternType: "solid", fgColor: { rgb: fill.bg } }, font: { color: { rgb: fill.fg ?? "7F1D1D" } } }
         : { border: THIN_BORDER };
     }
   }

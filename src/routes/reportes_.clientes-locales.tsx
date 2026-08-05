@@ -84,14 +84,15 @@ function resolveColumns(
   return missing.length > 0 ? { missing } : { cols };
 }
 
-// El histórico necesita waybill/fecha/cp/driver/estado/incidencia/mercado/vendedor:
-// T0, Cliente Local, categoría, estado actual y última incidencia (para los
-// reportes % CD4/CD5).
+// El histórico necesita waybill/fecha/cp/driver/dirección/estado/incidencia/
+// mercado/vendedor: T0, Cliente Local, categoría, estado actual, dirección e
+// incidencias (para los reportes % CD4/CD5 y su lista de trabajo "Rompiendo").
 const HISTORICO_ALIASES = {
   waybill: ["Número de Waybill", "Waybill Number"],
   fecha: ["Fecha de la tarea", "Task Date"],
   cp: ["Código postal", "Zip Code"],
   driver: ["Nombre del Repartidor", "Courier Name"],
+  direccion: ["Dirección detallada", "Detailed address"],
   estado: ["Estado de la Tarea", "Task Status"],
   incidencia: ["Detalles de la Excepción", "Exception Detail"],
   mercado: ["Nombre del mercado", "Market Place Name"],
@@ -329,8 +330,11 @@ type CloseLoopEntry = {
   cliente: string; // ya con el alias aplicado (p.ej. "SHEIN")
   cp: string;
   driver: string;
+  direccion: string;
   t0Ts: number;
   ultimaIncidencia: string;
+  ultimaIncidenciaFecha: string;
+  incidenciasCount: number;
   estadoActual: EstadoActual;
 };
 
@@ -344,11 +348,16 @@ type CloseLoopBreakdownRow = {
 
 type CloseLoopDetalleRow = {
   waybill: string;
+  cliente: string;
   cp: string;
+  direccion: string;
   driver: string;
+  t0Ts: number;
   dias: number;
+  incidenciasCount: number;
   estadoActual: EstadoActual;
   ultimaIncidencia: string;
+  ultimaIncidenciaFecha: string;
 };
 
 type CloseLoopReport = {
@@ -408,11 +417,16 @@ function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: nu
   const detalleRompiendo: CloseLoopDetalleRow[] = rompiendoPop
     .map((e) => ({
       waybill: e.waybill,
+      cliente: e.cliente || "—",
       cp: e.cp || "—",
+      direccion: e.direccion || "—",
       driver: e.driver || "— Sin asignar —",
+      t0Ts: e.t0Ts,
       dias: diasDesdeT0(e),
+      incidenciasCount: e.incidenciasCount,
       estadoActual: e.estadoActual,
       ultimaIncidencia: e.ultimaIncidencia || "Sin incidencias",
+      ultimaIncidenciaFecha: e.ultimaIncidenciaFecha,
     }))
     .sort((a, b) => b.dias - a.dias);
 
@@ -455,8 +469,11 @@ function buildCategoryCloseLoop(
         cliente: h.cliente,
         cp: h.cp,
         driver: h.driver,
+        direccion: h.direccion,
         t0Ts: dayStart(new Date(h.t0)),
         ultimaIncidencia: h.ultimaIncidencia,
+        ultimaIncidenciaFecha: h.ultimaIncidenciaFecha,
+        incidenciasCount: h.incidenciasCount,
         estadoActual: h.estadoActual,
       });
     }
@@ -478,20 +495,29 @@ function buildCategoryCloseLoop(
     if (existing) {
       existing.cp = r.cp;
       existing.driver = r.driver;
+      existing.direccion = r.direccion;
       existing.estadoActual = estadoActual;
-      if (r.incidencia.trim() !== "") existing.ultimaIncidencia = r.incidencia;
+      if (r.incidencia.trim() !== "") {
+        existing.ultimaIncidencia = r.incidencia;
+        existing.ultimaIncidenciaFecha = r.fecha ? r.fecha.toISOString() : existing.ultimaIncidenciaFecha;
+        existing.incidenciasCount += 1;
+      }
     } else {
       const datesForWaybill = rows
         .filter((x) => x.waybill === waybill && x.categoria === targetCategoria && x.fecha)
         .map((x) => dayStart(x.fecha!));
       const t0Ts = datesForWaybill.length > 0 ? Math.min(...datesForWaybill) : nowTs;
+      const tieneIncidencia = r.incidencia.trim() !== "";
       map.set(waybill, {
         waybill,
         cliente: r.cliente,
         cp: r.cp,
         driver: r.driver,
+        direccion: r.direccion,
         t0Ts,
         ultimaIncidencia: r.incidencia,
+        ultimaIncidenciaFecha: tieneIncidencia && r.fecha ? r.fecha.toISOString() : "",
+        incidenciasCount: tieneIncidencia ? 1 : 0,
         estadoActual,
       });
     }
@@ -624,8 +650,11 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
         cliente: h.cliente,
         cp: h.cp,
         driver: h.driver,
+        direccion: h.direccion,
         t0Ts: dayStart(new Date(h.t0)),
         ultimaIncidencia: h.ultimaIncidencia,
+        ultimaIncidenciaFecha: h.ultimaIncidenciaFecha,
+        incidenciasCount: h.incidenciasCount,
         estadoActual: h.estadoActual,
       });
     }
@@ -635,18 +664,27 @@ function analyze(rows: RawRow[], cpMapping: CpLocalidad[], historico: HistoricoS
     if (existing) {
       existing.cp = r.cp;
       existing.driver = r.driver;
+      existing.direccion = r.direccion;
       existing.estadoActual = estadoActual; // hoy (o Entregado forzado) siempre manda
-      if (r.incidencia.trim() !== "") existing.ultimaIncidencia = r.incidencia;
+      if (r.incidencia.trim() !== "") {
+        existing.ultimaIncidencia = r.incidencia;
+        existing.ultimaIncidenciaFecha = r.fecha ? r.fecha.toISOString() : existing.ultimaIncidenciaFecha;
+        existing.incidenciasCount += 1;
+      }
     } else {
       const datesForWaybill = localRows.filter((x) => x.waybill === waybill).map((x) => dayStart(x.fecha!));
       const t0Ts = datesForWaybill.length > 0 ? Math.min(...datesForWaybill) : maxTs;
+      const tieneIncidencia = r.incidencia.trim() !== "";
       closeLoopMap.set(waybill, {
         waybill,
         cliente: r.cliente,
         cp: r.cp,
         driver: r.driver,
+        direccion: r.direccion,
         t0Ts,
         ultimaIncidencia: r.incidencia,
+        ultimaIncidenciaFecha: tieneIncidencia && r.fecha ? r.fecha.toISOString() : "",
+        incidenciasCount: tieneIncidencia ? 1 : 0,
         estadoActual,
       });
     }
@@ -854,8 +892,8 @@ function CloseLoopSection({
           Rompiendo es una lista de seguimiento aparte (arrastrados de días anteriores + cohorte de hoy en riesgo),
           no altera el % · excluye Dirección Incorrecta
         </p>
-        <Button onClick={onExport} disabled={report.total === 0 && report.rompiendo === 0} size="sm" className="gap-2">
-          <Download className="size-3.5" /> Exportar a Excel
+        <Button onClick={onExport} disabled={report.rompiendo === 0} size="sm" className="gap-2">
+          <Download className="size-3.5" /> Exportar a Excel (lista de trabajo Rompiendo)
         </Button>
       </div>
 
@@ -1071,6 +1109,7 @@ function ClientesLocalesPage() {
         fecha: Date | null;
         cp: string;
         driver: string;
+        direccion: string;
         estado: string;
         incidencia: string;
         cliente: string;
@@ -1086,6 +1125,7 @@ function ClientesLocalesPage() {
           fecha: parseFecha(r[cols.fecha]),
           cp: String(r[cols.cp] ?? "").trim(),
           driver: String(r[cols.driver] ?? "").trim(),
+          direccion: String(r[cols.direccion] ?? "").trim(),
           estado: String(r[cols.estado] ?? "").trim(),
           incidencia: String(r[cols.incidencia] ?? "").trim(),
           cliente,
@@ -1109,16 +1149,20 @@ function ClientesLocalesPage() {
         const t0 = sorted[0].fecha!;
         const last = sorted[sorted.length - 1];
         const withInc = sorted.filter((r) => r.incidencia.trim() !== "");
+        const lastInc = withInc.length > 0 ? withInc[withInc.length - 1] : null;
         entries.push({
           waybill,
           t0: t0.toISOString(),
           cp: last.cp,
           cliente: last.cliente,
           driver: last.driver,
+          direccion: last.direccion,
           clienteLocal: last.clienteLocal,
           categoria: last.categoria,
           estadoActual: classifyEstadoActual(last.estado),
-          ultimaIncidencia: withInc.length > 0 ? withInc[withInc.length - 1].incidencia : "",
+          ultimaIncidencia: lastInc?.incidencia ?? "",
+          ultimaIncidenciaFecha: lastInc?.fecha ? lastInc.fecha.toISOString() : "",
+          incidenciasCount: withInc.length,
         });
       }
       saveHistorico(entries);
@@ -1224,91 +1268,62 @@ function ClientesLocalesPage() {
   };
 
   // Un solo export genérico para los 4 reportes % CD4/CD5 (SHEIN/Resto
-  // Locales/TEMU/ALIEXPRESS): mismas columnas, mismo semáforo, y ahora
-  // también el detalle de los que rompen el umbral en el mismo archivo.
-  const exportCloseLoop = (report: CloseLoopReport, title: string, filenamePrefix: string) => {
-    if (!analysis || (report.total === 0 && report.rompiendo === 0)) return;
-    const rows: (string | number)[][] = [
-      [
-        "General",
-        "-",
-        report.total,
-        report.entregado,
-        Number(report.pctEntregado.toFixed(1)),
-        report.rompiendo,
-        "",
-        "",
-        "",
-        "",
-        "",
-      ],
-    ];
-    for (const c of report.porCp) {
-      rows.push([
-        "CP",
-        c.key,
-        c.total,
-        c.entregado,
-        Number(c.pctEntregado.toFixed(1)),
-        c.rompiendo,
-        "",
-        "",
-        "",
-        "",
-        "",
-      ]);
-    }
-    for (const d of report.porDriver) {
-      rows.push([
-        "Driver",
-        d.key,
-        d.total,
-        d.entregado,
-        Number(d.pctEntregado.toFixed(1)),
-        d.rompiendo,
-        "",
-        "",
-        "",
-        "",
-        "",
-      ]);
-    }
-    for (const n of report.detalleRompiendo) {
-      rows.push(["Detalle", n.waybill, "", "", "", "", n.cp, n.driver, n.dias, ESTADO_LABEL[n.estadoActual], n.ultimaIncidencia]);
-    }
+  // Locales/TEMU/ALIEXPRESS): las tablas Por CP/Por Driver quedan solo en
+  // pantalla — el Excel es una lista de trabajo accionable con únicamente
+  // los paquetes Rompiendo (arrastrados + cohorte de hoy en riesgo).
+  const exportCloseLoop = (report: CloseLoopReport, title: string, filenamePrefix: string, windowDays: number) => {
+    if (!analysis || report.detalleRompiendo.length === 0) return;
+    const cpMapping = getClientesLocalesConfig().cpMapping;
+    const rows: (string | number)[][] = report.detalleRompiendo.map((n) => [
+      n.waybill,
+      n.cliente,
+      n.cp,
+      localidadForCp(n.cp, cpMapping),
+      n.direccion,
+      n.driver,
+      formatDate(new Date(n.t0Ts)),
+      n.dias,
+      n.incidenciasCount,
+      n.ultimaIncidencia,
+      n.ultimaIncidenciaFecha ? formatDate(new Date(n.ultimaIncidenciaFecha)) : "—",
+      ESTADO_LABEL[n.estadoActual],
+    ]);
     exportStyledExcel({
-      title,
+      title: `${title} — Rompiendo (a atacar)`,
       date: analysis.epodDateStr,
       headers: [
-        "Nivel",
-        "Clave",
-        "Total (cohorte hoy)",
-        "Entregado",
-        "% Entregado",
-        "Rompiendo",
+        "Waybill",
+        "Cliente",
         "CP",
+        "Localidad",
+        "Dirección",
         "Driver",
+        "Fecha de Inbound (T0)",
         "Días desde Inbound",
-        "Estado Actual",
+        "N° Incidencias",
         "Última Incidencia",
+        "Fecha Última Incidencia",
+        "Estado Actual",
       ],
       rows,
-      filename: `${filenamePrefix}_${analysis.epodDateStr}.xlsx`,
-      colWidths: [10, 22, 14, 10, 12, 10, 8, 20, 10, 14, 28],
-      rowFill: (row) => {
-        if (row[0] === "Detalle") return "FADBD8";
-        const pct = Number(row[4]);
-        if (pct >= 99.5) return undefined;
-        if (pct >= 95) return "FEF3C7";
-        return "FADBD8";
+      filename: `${filenamePrefix}_rompiendo_${analysis.epodDateStr}.xlsx`,
+      colWidths: [22, 20, 8, 18, 40, 22, 16, 10, 10, 28, 16, 14],
+      // "Días desde Inbound": amarillo justo en el umbral, rojo/rosa cerca
+      // (umbral+1 a +4), rojo oscuro con texto blanco de umbral+5 en adelante.
+      cellFill: (row, colIndex) => {
+        if (colIndex !== 7) return undefined;
+        const dias = Number(row[7]);
+        if (dias >= windowDays + 5) return { bg: "7F1D1D", fg: "FFFFFF" };
+        if (dias > windowDays) return { bg: "FADBD8" };
+        return { bg: "FEF3C7" };
       },
     });
   };
 
-  const exportSheinCloseLoop = () => analysis && exportCloseLoop(analysis.sheinCloseLoop, "SHEIN — % CD4", "shein_cd4");
-  const exportLocalCloseLoop = () => analysis && exportCloseLoop(analysis.localCloseLoop, "Resto de Clientes Locales — % CD5", "resto_locales_cd5");
-  const exportTemuCloseLoop = () => analysis && exportCloseLoop(analysis.temuCloseLoop, "TEMU — % CD5", "temu_cd5");
-  const exportAliexpressCloseLoop = () => analysis && exportCloseLoop(analysis.aliexpressCloseLoop, "ALIEXPRESS/Dropshipper China — % CD5", "aliexpress_cd5");
+  const exportSheinCloseLoop = () => analysis && exportCloseLoop(analysis.sheinCloseLoop, "SHEIN — % CD4", "shein_cd4", 4);
+  const exportLocalCloseLoop = () => analysis && exportCloseLoop(analysis.localCloseLoop, "Resto de Clientes Locales — % CD5", "resto_locales_cd5", 5);
+  const exportTemuCloseLoop = () => analysis && exportCloseLoop(analysis.temuCloseLoop, "TEMU — % CD5", "temu_cd5", 5);
+  const exportAliexpressCloseLoop = () => analysis && exportCloseLoop(analysis.aliexpressCloseLoop, "ALIEXPRESS/Dropshipper China — % CD5", "aliexpress_cd5", 5);
 
   return (
     <div className="flex flex-col gap-6">

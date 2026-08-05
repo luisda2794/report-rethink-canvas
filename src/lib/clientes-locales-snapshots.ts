@@ -22,6 +22,7 @@ export type HistoricoEntry = {
   cp: string;
   cliente: string;
   driver: string;
+  direccion: string;
   clienteLocal: boolean;
   // Clasificación LOCAL/TEMU/ALIEXPRESS/SHEIN — se calcula para TODAS las
   // filas (no solo las de clienteLocal=true), para poder armar los % CD4/CD5
@@ -34,8 +35,12 @@ export type HistoricoEntry = {
   // si el waybill tiene fila hoy, se usa esa; si no, se asume Entregado.
   estadoActual: EstadoActual;
   // Última incidencia no vacía vista para el waybill (para excluir Dirección
-  // Incorrecta de los reportes % CD4/CD5).
+  // Incorrecta de los reportes % CD4/CD5) y la fecha en que se registró.
   ultimaIncidencia: string;
+  ultimaIncidenciaFecha: string; // ISO date, "" si nunca tuvo incidencia
+  // Cantidad total de filas con incidencia no vacía vistas para el waybill
+  // (para la lista de trabajo "Rompiendo" exportada a Excel).
+  incidenciasCount: number;
 };
 
 export type HistoricoStore = {
