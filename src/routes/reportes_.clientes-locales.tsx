@@ -304,19 +304,24 @@ type FlowRow = {
 // ---------------------------------------------------------------------------
 // % CD4 (SHEIN) / % CD5 (Resto Locales, TEMU, ALIEXPRESS)
 //
-// Dos métricas sobre el MISMO denominador: waybills ya "maduros" (T0 hace
-// `windowDays` días o más — SIN importar su estado actual al momento de
-// calcular el denominador).
-// - % Entregado: de esos, cuántos ya llegaron a Entregado/Delivered (éxito —
-//   más alto es mejor, target 99.5%).
-// - % Rompiendo: de esos, cuántos siguen HOY sin resolverse, todavía en
-//   Driver_received/Driver_received_incidencias (problema — más bajo es
-//   mejor, target ≤0.5%).
-// Se excluyen de ambos (y del denominador) los waybills cuya última
-// incidencia sea Dirección Incorrecta. Fuente: el EPOD Histórico es la única
-// fuente con el rastro de T0 a lo largo de varios días; el EPOD del Día
-// complementa cp/driver/incidencia/estado actual (o sirve de único origen,
-// con alcance más limitado, si no hay histórico cargado).
+// Reporte diario por COHORTE, no acumulado: el denominador (Total) es SOLO
+// el cohorte de hoy — waybills cuyo T0 (inbound) fue hace EXACTAMENTE
+// `windowDays` días (dias === windowDays), no "windowDays o más". Es el
+// grupo específico que "cumple años" hoy y hay que evaluar.
+// - % Entregado: de ESE cohorte (y solo de ese), cuántos ya llegaron a
+//   Entregado/Delivered. KPI principal, target 99.5%, más alto es mejor.
+// - Rompiendo: lista de SEGUIMIENTO aparte, que NO entra en el denominador
+//   ni altera el % Entregado del día. Incluye todo waybill (de cualquier
+//   cohorte, dias >= windowDays) que sigue HOY en
+//   Driver_received/Driver_received_incidencias sin resolver — tanto los
+//   arrastrados de días anteriores (dias > windowDays) como los del propio
+//   cohorte de hoy que ya están en riesgo (dias === windowDays). Se muestra
+//   como conteo absoluto + detalle, no como %.
+// Se excluyen de ambas poblaciones los waybills cuya última incidencia sea
+// Dirección Incorrecta. Fuente: el EPOD Histórico es la única fuente con el
+// rastro de T0 a lo largo de varios días; el EPOD del Día complementa
+// cp/driver/incidencia/estado actual (o sirve de único origen, con alcance
+// más limitado, si no hay histórico cargado).
 // ---------------------------------------------------------------------------
 
 type CloseLoopEntry = {
@@ -335,7 +340,6 @@ type CloseLoopBreakdownRow = {
   entregado: number;
   pctEntregado: number;
   rompiendo: number;
-  pctRompiendo: number;
 };
 
 type CloseLoopDetalleRow = {
@@ -352,32 +356,42 @@ type CloseLoopReport = {
   entregado: number;
   pctEntregado: number;
   rompiendo: number;
-  pctRompiendo: number;
   porCp: CloseLoopBreakdownRow[];
   porDriver: CloseLoopBreakdownRow[];
-  // Los que forman el numerador de % Rompiendo: T0 vencido y todavía en
-  // reparto hoy — los que hay que atacar. Ordenado por días desde inbound desc.
+  // Rompiendo: arrastrados de días anteriores + cohorte de hoy en riesgo.
+  // Ordenado por días desde inbound desc.
   detalleRompiendo: CloseLoopDetalleRow[];
 };
 
 function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: number): CloseLoopReport {
-  const isRompiendo = (e: CloseLoopEntry) => e.estadoActual === "EN_REPARTO";
+  const diasDesdeT0 = (e: CloseLoopEntry) => Math.floor((nowTs - e.t0Ts) / 86400000);
+  const isEnReparto = (e: CloseLoopEntry) => e.estadoActual === "EN_REPARTO";
   const isEntregado = (e: CloseLoopEntry) => e.estadoActual === "ENTREGADO";
-  const evaluable = entries.filter((e) => Math.floor((nowTs - e.t0Ts) / 86400000) >= windowDays);
-  const total = evaluable.length;
-  const rompiendo = evaluable.filter(isRompiendo).length;
-  const entregado = evaluable.filter(isEntregado).length;
-  const pctRompiendo = total > 0 ? (rompiendo / total) * 100 : 0;
+
+  // Denominador: SOLO el cohorte de hoy (dias === windowDays).
+  const cohorteHoy = entries.filter((e) => diasDesdeT0(e) === windowDays);
+  // Rompiendo: cualquier cohorte ya vencida (dias >= windowDays) que sigue
+  // en reparto hoy — no se usa como denominador de ningún %.
+  const rompiendoPop = entries.filter((e) => diasDesdeT0(e) >= windowDays && isEnReparto(e));
+
+  const total = cohorteHoy.length;
+  const entregado = cohorteHoy.filter(isEntregado).length;
   const pctEntregado = total > 0 ? (entregado / total) * 100 : 0;
+  const rompiendo = rompiendoPop.length;
 
   const buildBreakdown = (keyFn: (e: CloseLoopEntry) => string): CloseLoopBreakdownRow[] => {
     const map = new Map<string, { total: number; entregado: number; rompiendo: number }>();
-    for (const e of evaluable) {
+    for (const e of cohorteHoy) {
       const key = keyFn(e) || "—";
       const b = map.get(key) ?? { total: 0, entregado: 0, rompiendo: 0 };
       b.total++;
       if (isEntregado(e)) b.entregado++;
-      if (isRompiendo(e)) b.rompiendo++;
+      map.set(key, b);
+    }
+    for (const e of rompiendoPop) {
+      const key = keyFn(e) || "—";
+      const b = map.get(key) ?? { total: 0, entregado: 0, rompiendo: 0 };
+      b.rompiendo++;
       map.set(key, b);
     }
     return Array.from(map.entries())
@@ -387,18 +401,16 @@ function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: nu
         entregado: b.entregado,
         pctEntregado: b.total > 0 ? (b.entregado / b.total) * 100 : 0,
         rompiendo: b.rompiendo,
-        pctRompiendo: b.total > 0 ? (b.rompiendo / b.total) * 100 : 0,
       }))
-      .sort((a, b) => b.total - a.total);
+      .sort((a, b) => b.total - a.total || b.rompiendo - a.rompiendo);
   };
 
-  const detalleRompiendo: CloseLoopDetalleRow[] = evaluable
-    .filter(isRompiendo)
+  const detalleRompiendo: CloseLoopDetalleRow[] = rompiendoPop
     .map((e) => ({
       waybill: e.waybill,
       cp: e.cp || "—",
       driver: e.driver || "— Sin asignar —",
-      dias: Math.floor((nowTs - e.t0Ts) / 86400000),
+      dias: diasDesdeT0(e),
       estadoActual: e.estadoActual,
       ultimaIncidencia: e.ultimaIncidencia || "Sin incidencias",
     }))
@@ -409,7 +421,6 @@ function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: nu
     entregado,
     pctEntregado,
     rompiendo,
-    pctRompiendo,
     porCp: buildBreakdown((e) => e.cp),
     porDriver: buildBreakdown((e) => e.driver || "— Sin asignar —"),
     detalleRompiendo,
@@ -420,14 +431,6 @@ function buildCloseLoop(entries: CloseLoopEntry[], windowDays: number, nowTs: nu
 function entregadoColor(pct: number): string {
   if (pct >= 99.5) return "var(--success)";
   if (pct >= 95) return "var(--warn)";
-  return "var(--danger)";
-}
-
-// % Rompiendo: semáforo invertido — mide el % que ROMPE el umbral, no el %
-// de éxito, así que más bajo es mejor.
-function closeLoopColor(pct: number): string {
-  if (pct <= 0.5) return "var(--success)";
-  if (pct <= 5) return "var(--warn)";
   return "var(--danger)";
 }
 
@@ -840,38 +843,37 @@ function CloseLoopSection({
         <p className="text-xs text-muted-foreground flex items-start gap-1.5 p-3 rounded-md border bg-muted">
           <Info className="size-3.5 mt-0.5 shrink-0" />
           <span>
-            Sube un EPOD Histórico para un cálculo completo. Sin él, este % solo considera los waybills vistos en el
-            EPOD del día de hoy.
+            Sube un EPOD Histórico para un cálculo completo. Sin él, el cohorte de hoy solo puede formarse con
+            waybills vistos en el EPOD del día de hoy.
           </span>
         </p>
       )}
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Sobre waybills con {windowDays}+ días desde inbound: % ya Entregado (target 99.5%, más alto = mejor) y %
-          que sigue Rompiendo el umbral sin resolverse (target ≤0.5%, más bajo = mejor) · excluye Dirección Incorrecta
+          Cohorte de hoy (T0 hace exactamente {windowDays} días): % Entregado (target 99.5%, más alto = mejor) ·
+          Rompiendo es una lista de seguimiento aparte (arrastrados de días anteriores + cohorte de hoy en riesgo),
+          no altera el % · excluye Dirección Incorrecta
         </p>
-        <Button onClick={onExport} disabled={report.total === 0} size="sm" className="gap-2">
+        <Button onClick={onExport} disabled={report.total === 0 && report.rompiendo === 0} size="sm" className="gap-2">
           <Download className="size-3.5" /> Exportar a Excel
         </Button>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
         <div className="p-4 rounded-lg border bg-card">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Entregado (target 99.5%)</div>
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Entregado — Cohorte de hoy (target 99.5%)</div>
           <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: entregadoColor(report.pctEntregado) }}>
             {report.total > 0 ? `${report.pctEntregado.toFixed(1)}%` : "—"}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {report.entregado} de {report.total} entregados
+            {report.entregado} de {report.total} del cohorte de hoy (T0 hace {windowDays}d)
           </div>
         </div>
         <div className="p-4 rounded-lg border bg-card">
-          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">% Rompiendo CD{windowDays} (target ≤0.5%)</div>
-          <div className="mt-1 text-3xl font-semibold tabular-nums" style={{ color: closeLoopColor(report.pctRompiendo) }}>
-            {report.total > 0 ? `${report.pctRompiendo.toFixed(1)}%` : "—"}
-          </div>
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Rompiendo (seguimiento, no es %)</div>
+          <div className="mt-1 text-3xl font-semibold tabular-nums text-foreground">{report.rompiendo}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {report.rompiendo} de {report.total} aún en reparto
+            en Driver_received sin resolver — arrastrados + cohorte de hoy
           </div>
         </div>
       </div>
@@ -879,7 +881,7 @@ function CloseLoopSection({
       {report.total === 0 ? (
         <Card className="shadow-none">
           <CardContent className="pt-6 text-sm text-muted-foreground">
-            Todavía no hay paquetes con {windowDays}+ días desde inbound.
+            Todavía no hay paquetes cuyo T0 sea hace exactamente {windowDays} días (cohorte de hoy).
           </CardContent>
         </Card>
       ) : (
@@ -895,7 +897,6 @@ function CloseLoopSection({
                     <Th right>Entregado</Th>
                     <Th right>% Entregado</Th>
                     <Th right>Rompiendo</Th>
-                    <Th right>% Rompiendo</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -908,9 +909,6 @@ function CloseLoopSection({
                         <span style={{ color: entregadoColor(r.pctEntregado) }}>{r.pctEntregado.toFixed(1)}%</span>
                       </Td>
                       <Td right className="tabular-nums">{r.rompiendo}</Td>
-                      <Td right className="tabular-nums font-semibold">
-                        <span style={{ color: closeLoopColor(r.pctRompiendo) }}>{r.pctRompiendo.toFixed(1)}%</span>
-                      </Td>
                     </tr>
                   ))}
                 </tbody>
@@ -928,7 +926,6 @@ function CloseLoopSection({
                     <Th right>Entregado</Th>
                     <Th right>% Entregado</Th>
                     <Th right>Rompiendo</Th>
-                    <Th right>% Rompiendo</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -941,9 +938,6 @@ function CloseLoopSection({
                         <span style={{ color: entregadoColor(r.pctEntregado) }}>{r.pctEntregado.toFixed(1)}%</span>
                       </Td>
                       <Td right className="tabular-nums">{r.rompiendo}</Td>
-                      <Td right className="tabular-nums font-semibold">
-                        <span style={{ color: closeLoopColor(r.pctRompiendo) }}>{r.pctRompiendo.toFixed(1)}%</span>
-                      </Td>
                     </tr>
                   ))}
                 </tbody>
@@ -953,18 +947,18 @@ function CloseLoopSection({
         </div>
       )}
 
-      {report.total > 0 && (
+      {report.rompiendo > 0 && (
         <div>
           <h4 className="text-sm font-semibold text-foreground mb-2">
-            Detalle — Paquetes Rompiendo (a atacar)
+            Rompiendo — Arrastrados y Cohorte de Hoy en Riesgo (a atacar)
             <span className="ml-2 text-[11px] text-muted-foreground font-normal">
-              ({report.detalleRompiendo.length}) · {windowDays}+ días desde inbound y todavía en Driver_received hoy
+              ({report.detalleRompiendo.length}) · T0 hace {windowDays}+ días y todavía en Driver_received hoy
             </span>
           </h4>
           {report.detalleRompiendo.length === 0 ? (
             <Card className="shadow-none">
               <CardContent className="pt-6 text-sm text-muted-foreground">
-                ✓ Ningún paquete con {windowDays}+ días sigue en reparto sin resolverse.
+                ✓ Ningún paquete con T0 vencido sigue en reparto sin resolverse.
               </CardContent>
             </Card>
           ) : (
@@ -1013,15 +1007,13 @@ function DashboardCard({ title, report, onClick }: { title: string; report: Clos
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         {report.total > 0
-          ? `${report.entregado} de ${report.total} entregados`
-          : "Sin paquetes con ventana vencida"}
+          ? `${report.entregado} de ${report.total} del cohorte de hoy`
+          : "Sin cohorte con T0 hoy"}
       </div>
-      {report.total > 0 && (
+      {report.rompiendo > 0 && (
         <div className="mt-2 pt-2 border-t border-border flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Rompiendo</span>
-          <span className="font-semibold tabular-nums" style={{ color: closeLoopColor(report.pctRompiendo) }}>
-            {report.pctRompiendo.toFixed(1)}% ({report.rompiendo})
-          </span>
+          <span className="text-muted-foreground">Rompiendo (seguimiento)</span>
+          <span className="font-semibold tabular-nums text-foreground">{report.rompiendo}</span>
         </div>
       )}
     </button>
@@ -1235,7 +1227,7 @@ function ClientesLocalesPage() {
   // Locales/TEMU/ALIEXPRESS): mismas columnas, mismo semáforo, y ahora
   // también el detalle de los que rompen el umbral en el mismo archivo.
   const exportCloseLoop = (report: CloseLoopReport, title: string, filenamePrefix: string) => {
-    if (!analysis || report.total === 0) return;
+    if (!analysis || (report.total === 0 && report.rompiendo === 0)) return;
     const rows: (string | number)[][] = [
       [
         "General",
@@ -1244,7 +1236,6 @@ function ClientesLocalesPage() {
         report.entregado,
         Number(report.pctEntregado.toFixed(1)),
         report.rompiendo,
-        Number(report.pctRompiendo.toFixed(1)),
         "",
         "",
         "",
@@ -1260,7 +1251,6 @@ function ClientesLocalesPage() {
         c.entregado,
         Number(c.pctEntregado.toFixed(1)),
         c.rompiendo,
-        Number(c.pctRompiendo.toFixed(1)),
         "",
         "",
         "",
@@ -1276,7 +1266,6 @@ function ClientesLocalesPage() {
         d.entregado,
         Number(d.pctEntregado.toFixed(1)),
         d.rompiendo,
-        Number(d.pctRompiendo.toFixed(1)),
         "",
         "",
         "",
@@ -1285,7 +1274,7 @@ function ClientesLocalesPage() {
       ]);
     }
     for (const n of report.detalleRompiendo) {
-      rows.push(["Detalle", n.waybill, "", "", "", "", "", n.cp, n.driver, n.dias, ESTADO_LABEL[n.estadoActual], n.ultimaIncidencia]);
+      rows.push(["Detalle", n.waybill, "", "", "", "", n.cp, n.driver, n.dias, ESTADO_LABEL[n.estadoActual], n.ultimaIncidencia]);
     }
     exportStyledExcel({
       title,
@@ -1293,11 +1282,10 @@ function ClientesLocalesPage() {
       headers: [
         "Nivel",
         "Clave",
-        "Total",
+        "Total (cohorte hoy)",
         "Entregado",
         "% Entregado",
         "Rompiendo",
-        "% Rompiendo",
         "CP",
         "Driver",
         "Días desde Inbound",
@@ -1306,12 +1294,12 @@ function ClientesLocalesPage() {
       ],
       rows,
       filename: `${filenamePrefix}_${analysis.epodDateStr}.xlsx`,
-      colWidths: [10, 22, 8, 10, 12, 10, 12, 8, 20, 10, 14, 28],
+      colWidths: [10, 22, 14, 10, 12, 10, 8, 20, 10, 14, 28],
       rowFill: (row) => {
         if (row[0] === "Detalle") return "FADBD8";
-        const pct = Number(row[6]);
-        if (pct <= 0.5) return undefined;
-        if (pct <= 5) return "FEF3C7";
+        const pct = Number(row[4]);
+        if (pct >= 99.5) return undefined;
+        if (pct >= 95) return "FEF3C7";
         return "FADBD8";
       },
     });
