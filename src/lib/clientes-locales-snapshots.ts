@@ -1,5 +1,3 @@
-import type { Categoria } from "@/lib/client-category";
-
 /**
  * Snapshots del módulo "Clientes Locales" persistidos en localStorage (sin
  * backend). Solo se guardan los campos esenciales por waybill, nunca el
@@ -9,66 +7,12 @@ import type { Categoria } from "@/lib/client-category";
 const MAX_AGE_DAYS = 30;
 const MAX_AGE_MS = MAX_AGE_DAYS * 86400000;
 
-const HISTORICO_KEY = "epod_historico";
 const DIA_SNAPSHOT_PREFIX = "epod_dia_snapshot_";
 
 // ---------------------------------------------------------------------------
-// EPOD Histórico -> T0 por waybill
-// ---------------------------------------------------------------------------
-
-export type HistoricoEntry = {
-  waybill: string;
-  t0: string; // ISO date/time de la fecha mínima encontrada para ese waybill
-  cp: string;
-  cliente: string;
-  driver: string;
-  direccion: string;
-  clienteLocal: boolean;
-  // Clasificación LOCAL/TEMU/ALIEXPRESS/SHEIN — se calcula para TODAS las
-  // filas (no solo las de clienteLocal=true), para poder armar los % CD4/CD5
-  // de TEMU y ALIEXPRESS además de SHEIN/Resto Locales.
-  categoria: Categoria;
-  // Estado actual (clasificado) de la última fila vista para el waybill
-  // dentro del histórico, al momento de subir ese archivo. Es solo un valor
-  // de partida: en tiempo de análisis siempre se recalcula el "estado de
-  // hoy" real (ver resolveWaybillToday en reportes_.clientes-locales.tsx) —
-  // si el waybill tiene fila hoy, se usa esa; si no, se asume Entregado.
-  estadoActual: EstadoActual;
-  // Última incidencia no vacía vista para el waybill (para excluir Dirección
-  // Incorrecta de los reportes % CD4/CD5) y la fecha en que se registró.
-  ultimaIncidencia: string;
-  ultimaIncidenciaFecha: string; // ISO date, "" si nunca tuvo incidencia
-  // Cantidad total de filas con incidencia no vacía vistas para el waybill
-  // (para la lista de trabajo "Rompiendo" exportada a Excel).
-  incidenciasCount: number;
-};
-
-export type HistoricoStore = {
-  updatedAt: string;
-  entries: HistoricoEntry[];
-};
-
-export function getHistorico(): HistoricoStore | null {
-  try {
-    const raw = localStorage.getItem(HISTORICO_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as HistoricoStore;
-  } catch {
-    return null;
-  }
-}
-
-export function saveHistorico(entries: HistoricoEntry[]): void {
-  try {
-    const store: HistoricoStore = { updatedAt: new Date().toISOString(), entries };
-    localStorage.setItem(HISTORICO_KEY, JSON.stringify(store));
-  } catch {
-    /* ignore */
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Snapshot del EPOD del Día (uno por fecha, se reemplaza en cada resubida)
+// Snapshot del EPOD (uno por fecha, se reemplaza en cada resubida) — un solo
+// archivo por análisis, sin histórico persistido aparte: T0 se calcula con
+// la fecha más antigua de cada waybill dentro del propio archivo.
 // ---------------------------------------------------------------------------
 
 export type EstadoActual = "ENTREGADO" | "EN_REPARTO" | "FALLO" | "CANCELADO" | "ASIGNADO" | "OTRO";
