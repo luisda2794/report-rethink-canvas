@@ -19,6 +19,7 @@ export type NavItem = { to: string; label: string };
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/mapa-entregas", label: "Mapa de Entregas" },
   { to: "/reportes", label: "Reportes" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/admin", label: "Admin" },
@@ -28,6 +29,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
   admin: [
     "/epod",
     "/dashboard",
+    "/mapa-entregas",
     "/reportes",
     "/duplicados",
     "/reclamaciones",
@@ -35,8 +37,25 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/mapas-admin",
     "/admin",
   ],
-  manager: ["/epod", "/dashboard", "/reportes", "/duplicados", "/reclamaciones", "/mapas-provincia", "/mapas-admin"],
-  jefe_flota: ["/epod", "/dashboard", "/reportes", "/duplicados", "/reclamaciones", "/mapas-provincia"],
+  manager: [
+    "/epod",
+    "/dashboard",
+    "/mapa-entregas",
+    "/reportes",
+    "/duplicados",
+    "/reclamaciones",
+    "/mapas-provincia",
+    "/mapas-admin",
+  ],
+  jefe_flota: [
+    "/epod",
+    "/dashboard",
+    "/mapa-entregas",
+    "/reportes",
+    "/duplicados",
+    "/reclamaciones",
+    "/mapas-provincia",
+  ],
   contable: [],
   customer: ["/reclamaciones"],
 };

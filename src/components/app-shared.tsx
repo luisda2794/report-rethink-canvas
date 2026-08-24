@@ -7,6 +7,7 @@ import {
   ReceiptIcon,
   AlertOctagonIcon,
   MapIcon,
+  MapPinIcon,
   FlameIcon,
   SettingsIcon,
   ShieldIcon,
@@ -32,6 +33,7 @@ export type SidebarNavGroup = {
 const ICONS: Record<string, ReactNode> = {
   "/dashboard": <LayoutGridIcon />,
   "/epod": <FileSpreadsheetIcon />,
+  "/mapa-entregas": <MapPinIcon />,
   "/reportes": <FileTextIcon />,
   "/duplicados": <CopyIcon />,
   "/reclamaciones": <AlertOctagonIcon />,
@@ -44,6 +46,7 @@ const ICONS: Record<string, ReactNode> = {
 const GROUP_OF: Record<string, string> = {
   "/dashboard": "Operación",
   "/epod": "Operación",
+  "/mapa-entregas": "Operación",
   "/reportes": "Operación",
   "/duplicados": "Operación",
   "/reclamaciones": "Soporte",

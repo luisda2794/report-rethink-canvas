@@ -319,3 +319,57 @@
   border-color: color-mix(in srgb, var(--destructive) 40%, var(--border));
   background: color-mix(in srgb, var(--destructive) 5%, var(--card));
 }
+
+/* ----- Mapa de Entregas ----------------------------------------------------- */
+
+.mapa-entregas-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.mapa-entregas-stat {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-top: 3px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0.9rem 1.1rem;
+}
+
+.mapa-entregas-stat__value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.mapa-entregas-stat__pct {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  margin-top: 0.15rem;
+}
+
+.mapa-entregas-stat__label {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 0.35rem;
+}
+
+.mapa-entregas__map {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.mapa-entregas__footnote {
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .mapa-entregas-stats {
+    grid-template-columns: 1fr;
+  }
+}
