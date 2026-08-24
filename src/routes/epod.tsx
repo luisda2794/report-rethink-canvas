@@ -53,6 +53,18 @@ const COL = {
   direccion: ["Dirección detallada", "Detailed address", "Address"],
   contacto: ["Contacto", "Contact"],
   popStationId: ["popStationId", "Pop Station Id", "PopStationId"],
+  // Columnas opcionales: no todos los ePOD las traen, y no bloquean el
+  // procesamiento si faltan — solo alimentan Reportes (clasificación
+  // SHEIN/TEMU/Aliexpress e incidencias) y la futura sección de Rutas
+  // (lat/long) sin necesitar una carga aparte.
+  mercado: ["Nombre del mercado", "Market Place Name"],
+  vendedor: ["Nombre del vendedor", "Seller Name"],
+  // El header real trae doble espacio ("Receptor a  latitud"/"...longitud"),
+  // pero normalizeKey() ya colapsa cualquier corrida de espacios a nada, así
+  // que no hace falta copiar el espacio raro tal cual para que matchee.
+  latitud: ["Receptor a latitud", "Receiver to Latitude", "Latitud", "Latitude"],
+  longitud: ["Receptor a longitud", "Receiver to Longitude", "Longitud", "Longitude"],
+  excepcion: ["Detalles de la Excepción", "Exception Detail"],
 };
 
 function normalizeKey(k: string) {
@@ -69,6 +81,12 @@ function pickField(row: Record<string, unknown>, candidates: string[]): string {
     }
   }
   return "";
+}
+function pickNumber(row: Record<string, unknown>, candidates: string[]): number | null {
+  const v = pickField(row, candidates);
+  if (!v) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 function parseDate(v: unknown): string | null {
@@ -124,6 +142,11 @@ type ParsedRow = {
   direccion: string | null;
   contacto: string | null;
   pop_station_id: string | null;
+  market_place_name: string | null;
+  seller_name: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  exception_detail: string | null;
 };
 
 function rawField(row: Record<string, unknown>, candidates: string[]): unknown {
@@ -157,6 +180,11 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
       direccion: pickField(r, COL.direccion) || null,
       contacto: pickField(r, COL.contacto) || null,
       pop_station_id: pickField(r, COL.popStationId) || null,
+      market_place_name: pickField(r, COL.mercado) || null,
+      seller_name: pickField(r, COL.vendedor) || null,
+      latitude: pickNumber(r, COL.latitud),
+      longitude: pickNumber(r, COL.longitud),
+      exception_detail: pickField(r, COL.excepcion) || null,
     });
   }
 
@@ -366,6 +394,11 @@ function EpodPage() {
         contacto: r.contacto,
         pop_station_id: r.pop_station_id,
         source: "epod",
+        market_place_name: r.market_place_name,
+        seller_name: r.seller_name,
+        latitude: r.latitude,
+        longitude: r.longitude,
+        exception_detail: r.exception_detail,
       }));
 
       // Upsert in parallel batches; ignore-duplicates returns only inserted rows

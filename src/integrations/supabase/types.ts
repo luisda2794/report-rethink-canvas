@@ -322,14 +322,19 @@ export type Database = {
           driver: string | null
           epod_upload_id: string | null
           estado: string
+          exception_detail: string | null
           fecha: string | null
           fecha_inbound: string | null
           hub_id: string
           id: string
+          latitude: number | null
+          longitude: number | null
           lp_no: string
+          market_place_name: string | null
           motivo: string | null
           pop_station_id: string | null
           row_index: number
+          seller_name: string | null
           source: string | null
           tipo: string | null
           tipo_norm: string | null
@@ -343,14 +348,19 @@ export type Database = {
           driver?: string | null
           epod_upload_id?: string | null
           estado?: string
+          exception_detail?: string | null
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           lp_no: string
+          market_place_name?: string | null
           motivo?: string | null
           pop_station_id?: string | null
           row_index: number
+          seller_name?: string | null
           source?: string | null
           tipo?: string | null
           tipo_norm?: string | null
@@ -364,14 +374,19 @@ export type Database = {
           driver?: string | null
           epod_upload_id?: string | null
           estado?: string
+          exception_detail?: string | null
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           lp_no?: string
+          market_place_name?: string | null
           motivo?: string | null
           pop_station_id?: string | null
           row_index?: number
+          seller_name?: string | null
           source?: string | null
           tipo?: string | null
           tipo_norm?: string | null
