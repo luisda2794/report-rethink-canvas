@@ -124,6 +124,26 @@ function normalizeTipo(t: string): "PUDO" | "TO_DOOR" {
   return "TO_DOOR";
 }
 
+// Los errores de Supabase (PostgrestError) son objetos planos con
+// message/details/hint/code — NO son instancias de Error, así que un simple
+// `e instanceof Error ? e.message : "..."` los descarta y siempre cae al
+// mensaje genérico. Esto extrae el mensaje real de cualquiera de los dos
+// casos (Error real o error de Supabase) y arma un mensaje legible con el
+// hint/detalle si Supabase lo trae.
+function describeError(e: unknown): { uiMessage: string; details?: string; hint?: string; code?: string } {
+  if (e && typeof e === "object") {
+    const anyE = e as Record<string, unknown>;
+    if (typeof anyE.message === "string" && anyE.message) {
+      const details = typeof anyE.details === "string" && anyE.details ? anyE.details : undefined;
+      const hint = typeof anyE.hint === "string" && anyE.hint ? anyE.hint : undefined;
+      const code = typeof anyE.code === "string" && anyE.code ? anyE.code : undefined;
+      const uiMessage = [anyE.message, details, hint && `(sugerencia: ${hint})`].filter(Boolean).join(" — ");
+      return { uiMessage, details, hint, code };
+    }
+  }
+  return { uiMessage: "Error procesando el ePOD (sin mensaje — revisa la consola del navegador)" };
+}
+
 // ============================================================
 // PARSED ROW
 // ============================================================
@@ -284,7 +304,8 @@ function EpodPage() {
       toast.success("ePOD eliminado");
       await loadHistory();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "No se pudo eliminar");
+      console.error("[ePOD] Error eliminando el upload:", e);
+      toast.error(describeError(e).uiMessage);
     } finally {
       setDeletingId(null);
     }
@@ -313,6 +334,11 @@ function EpodPage() {
     setError(null);
     setResult(null);
     setProgress(null);
+    // Si el upload se registra pero el resto del proceso falla (p.ej. un
+    // batch de epod_lineas o entregas), lo limpiamos en el catch para no
+    // dejar un registro "fantasma" en el historial (procesado, con
+    // total_paquetes>0, pero sin ninguna fila real asociada).
+    let uploadId: string | null = null;
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
@@ -349,8 +375,13 @@ function EpodPage() {
         .select("id")
         .single();
       if (uErr || !upload) throw uErr ?? new Error("No se pudo registrar el upload");
+      uploadId = upload.id;
 
-      // De-duplicate within this file (keep first occurrence per lp_no)
+      // De-duplicate within this file (keep first occurrence per lp_no).
+      // Waybills repetidos (varias filas, mismo lp_no) son normales en un
+      // ePOD histórico multi-día y NO rompen nada: acá se filtran a la
+      // primera ocurrencia, y el upsert de abajo además ignora conflictos
+      // por el UNIQUE (hub_id, lp_no) que ya tiene entregas.
       const seen = new Set<string>();
       const unique = parsed.filter((r) => {
         if (seen.has(r.lp_no)) return false;
@@ -401,7 +432,12 @@ function EpodPage() {
         exception_detail: r.exception_detail,
       }));
 
-      // Upsert in parallel batches; ignore-duplicates returns only inserted rows
+      // Lotes de 1000 filas (no un solo insert gigante). epod_lineas no tiene
+      // ningún UNIQUE constraint (a diferencia de entregas), así que los
+      // waybills repetidos entre varios días del mismo archivo no chocan acá
+      // — se insertan todos tal cual. Si un lote falla, el error real de
+      // Supabase (PostgrestError, no una instancia de Error) se relanza y
+      // llega al catch de abajo vía describeError().
       const chunk = 1000;
       const concurrency = 4;
       for (let i = 0; i < linePayload.length; i += chunk) {
@@ -453,9 +489,28 @@ function EpodPage() {
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error procesando el ePOD";
-      setError(msg);
-      toast.error(msg);
+      console.error("[ePOD] Error procesando el archivo:", e);
+      if (e instanceof Error && e.stack) console.error("[ePOD] Stack:", e.stack);
+      const { uiMessage, details, hint, code } = describeError(e);
+      if (details) console.error("[ePOD] details:", details);
+      if (hint) console.error("[ePOD] hint:", hint);
+      if (code) console.error("[ePOD] code:", code);
+      setError(uiMessage);
+      toast.error(uiMessage);
+      if (uploadId) {
+        const failedUploadId = uploadId;
+        const { error: cleanupEntregasErr } = await supabase
+          .from("entregas")
+          .delete()
+          .eq("hub_id", selectedHub.id)
+          .eq("epod_upload_id", failedUploadId);
+        if (cleanupEntregasErr) console.error("[ePOD] No se pudo limpiar entregas parciales:", cleanupEntregasErr);
+        const { error: cleanupUploadErr } = await supabase
+          .from("epod_uploads")
+          .delete()
+          .eq("id", failedUploadId);
+        if (cleanupUploadErr) console.error("[ePOD] No se pudo limpiar el registro de upload fallido:", cleanupUploadErr);
+      }
     } finally {
       setProcessing(false);
     }
