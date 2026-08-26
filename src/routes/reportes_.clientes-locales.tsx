@@ -640,7 +640,7 @@ function Th({ children, right, className = "" }: { children: React.ReactNode; ri
 }
 function Td({ children, right, className = "", title }: { children: React.ReactNode; right?: boolean; className?: string; title?: string }) {
   return (
-    <td className={`px-3 py-1.5 ${right ? "text-right" : "text-left"} ${className}`}>
+    <td title={title} className={`px-3 py-1.5 ${right ? "text-right" : "text-left"} ${className}`}>
       {children}
     </td>
   );
