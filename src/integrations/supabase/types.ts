@@ -787,6 +787,14 @@ export type Database = {
         }
         Returns: Json
       }
+      dashboard_incidencias_stats: {
+        Args: { _from: string; _hub_ids: string[]; _to: string }
+        Returns: Json
+      }
+      dashboard_last_upload: {
+        Args: { _hub_ids: string[] }
+        Returns: Json
+      }
       dashboard_stats: {
         Args: { _from: string; _hub_ids: string[]; _to: string }
         Returns: Json

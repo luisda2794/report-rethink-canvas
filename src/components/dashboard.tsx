@@ -26,6 +26,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Delta, DeltaIcon, DeltaValue } from "@/components/delta";
 import { DashboardDsrWidgets } from "@/components/dashboard-dsr-widgets";
+import { DashboardIncidencias } from "@/components/dashboard-incidencias";
+import { DashboardActivityAlert } from "@/components/dashboard-activity-alert";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -441,6 +443,7 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-4">
+      <DashboardActivityAlert hubIds={activeHubIds} />
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Popover>
           <PopoverTrigger asChild>
@@ -525,6 +528,7 @@ export function Dashboard() {
         <TipoEntrega byTipo={current.by_tipo} />
       </div>
       <DashboardDsrWidgets hubIds={activeHubIds} />
+      <DashboardIncidencias hubIds={activeHubIds} />
     </div>
   );
 }
