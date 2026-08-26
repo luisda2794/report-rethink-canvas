@@ -1,13 +1,15 @@
--- Fase 4 (Paso 0, prerequisito): "manager" debía tener el mismo alcance que
--- "admin" sobre los datos de todos los hubs (entregas/epod_lineas/
--- epod_uploads), pero is_admin() solo reconocía role = 'admin' — tanto en el
--- selector de hub (AuthContext) como en RLS. Un manager quedaba con el mismo
--- alcance que un jefe de flota (solo sus hubs de usuario_hubs).
+-- NOTA (corregido): la primera versión de esta migración le daba a
+-- "manager" el mismo alcance que "admin" (acceso a todos los hubs). Eso era
+-- incorrecto — la regla de negocio real es que "manager" se comporta
+-- exactamente igual que un jefe de flota: solo ve los hubs que tenga
+-- asignados en usuario_hubs. Únicamente "admin" tiene acceso automático a
+-- todos los hubs. has_all_hub_access() quedó igual de funcional a is_admin()
+-- (solo role = 'admin') — se conserva como función separada, en vez de volver
+-- a usar is_admin() directamente en las políticas, para no tener que volver a
+-- tocar entregas/epod_uploads/epod_lineas si esto cambia de nuevo más adelante.
 --
 -- No se toca is_admin() en sí: sigue usándose tal cual para las políticas de
--- administración real (gestionar hubs, roles, perfiles), que deben seguir
--- siendo exclusivas de admin. Esta nueva función solo cubre visibilidad de
--- datos (entregas/epod_lineas/epod_uploads) para admin Y manager.
+-- administración real (gestionar hubs, roles, perfiles), exclusivas de admin.
 CREATE OR REPLACE FUNCTION public.has_all_hub_access(_user_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -17,7 +19,7 @@ SET search_path = public
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = _user_id AND role IN ('admin', 'manager')
+    WHERE id = _user_id AND role = 'admin'
   )
 $$;
 
