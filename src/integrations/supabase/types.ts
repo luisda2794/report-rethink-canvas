@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -794,15 +794,13 @@ export type Database = {
         Args: { _from: string; _hub_ids: string[]; _to: string }
         Returns: Json
       }
-      dashboard_last_upload: {
-        Args: { _hub_ids: string[] }
-        Returns: Json
-      }
+      dashboard_last_upload: { Args: { _hub_ids: string[] }; Returns: Json }
       dashboard_stats: {
         Args: { _from: string; _hub_ids: string[]; _to: string }
         Returns: Json
       }
       get_user_role: { Args: { _user_id: string }; Returns: string }
+      has_all_hub_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       paquetes_en_riesgo_stats: {
         Args: { _fecha: string; _hub_id: string; _umbral_dias?: number }
