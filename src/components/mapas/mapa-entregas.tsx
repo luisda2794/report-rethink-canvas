@@ -40,7 +40,7 @@ export function MapaEntregas() {
 
   const pct = (n: number) => (stats.total > 0 ? ((n / stats.total) * 100).toFixed(1) : "0.0");
 
-  if (!hubId) {
+  if (!hubId || !selectedHub) {
     return (
       <div className="mapa-loading">
         <AlertCircle className="size-5 text-muted-foreground" />
