@@ -315,6 +315,7 @@ export type Database = {
       }
       epod_lineas: {
         Row: {
+          ciudad: string | null
           contacto: string | null
           cp: string | null
           created_at: string
@@ -343,6 +344,7 @@ export type Database = {
           waybill: string | null
         }
         Insert: {
+          ciudad?: string | null
           contacto?: string | null
           cp?: string | null
           created_at?: string
@@ -371,6 +373,7 @@ export type Database = {
           waybill?: string | null
         }
         Update: {
+          ciudad?: string | null
           contacto?: string | null
           cp?: string | null
           created_at?: string
@@ -799,6 +802,10 @@ export type Database = {
       get_user_role: { Args: { _user_id: string }; Returns: string }
       has_all_hub_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      paquetes_en_riesgo_stats: {
+        Args: { _fecha: string; _hub_id: string; _umbral_dias?: number }
+        Returns: Json
+      }
       refresh_cd5_snapshots: { Args: never; Returns: undefined }
     }
     Enums: {
