@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import XLSXStyle from "xlsx-js-style";
 import {
@@ -11,10 +11,16 @@ import {
   Download,
   ArrowLeft,
   ChevronDown,
+  Database,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RequireAuth } from "@/components/RequireAuth";
 import { resolveEventDate } from "@/lib/resolve-event-date";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useEpodDates } from "@/lib/use-epod-dates";
 
 export const Route = createFileRoute("/reportes_/paquetes-en-riesgo")({
   component: () => (
@@ -206,20 +212,100 @@ function riskColors(level: "critico" | "alto" | "medio") {
   return { cell: "bg-warn text-foreground", hex: "F59E0B", fontHex: "FFFFFF" };
 }
 
+type RiskAnalysis = { maxDate: Date | null; risk: RiskRow[] };
+
+// Fila cruda que devuelve paquetes_en_riesgo_stats() — ya viene calculada en
+// SQL (T0, días, incidencias), no hace falta pasar por analyze().
+type DbRiskRow = {
+  waybill: string;
+  dias: number;
+  num_incidencias: number;
+  ultima_incidencia: string;
+  cp: string | null;
+  ciudad: string | null;
+  direccion: string | null;
+  driver: string | null;
+};
+
 function PaquetesEnRiesgoPage() {
+  const { selectedHub } = useAuth();
   const [hub, setHub] = useState<HubKey | "">("");
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<RawRow[] | null>(null);
+  const [analysis, setAnalysis] = useState<RiskAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadedFrom, setLoadedFrom] = useState<{ label: string; via: "archivo" | "base de datos" } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const analysis = useMemo(() => (rows ? analyze(rows) : null), [rows]);
+  // ---- Carga desde la base (hub global + selector de día) ----
+  const { data: dbDates, isLoading: dbDatesLoading } = useEpodDates(selectedHub?.id ?? null);
+  const [dbDate, setDbDate] = useState<string | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDbDate(dbDates && dbDates.length > 0 ? dbDates[0] : null);
+  }, [dbDates]);
+
+  const persistSummary = (hubLabel: string, a: RiskAnalysis) => {
+    if (!hubLabel) return;
+    try {
+      const key = "paquetes_en_riesgo_v1";
+      const store = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<
+        string,
+        { fecha: string; total: number; updatedAt: string }
+      >;
+      store[hubLabel] = {
+        fecha: formatDate(a.maxDate),
+        total: a.risk.length,
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(key, JSON.stringify(store));
+    } catch { /* ignore */ }
+  };
+
+  const handleLoadFromDb = async () => {
+    if (!selectedHub || !dbDate) return;
+    setDbLoading(true);
+    setDbError(null);
+    setFile(null);
+    setRows(null);
+    try {
+      const { data, error } = await supabase.rpc("paquetes_en_riesgo_stats", {
+        _hub_id: selectedHub.id,
+        _fecha: dbDate,
+        _umbral_dias: 5,
+      });
+      if (error) throw error;
+      const risk: RiskRow[] = ((data ?? []) as DbRiskRow[]).map((r) => ({
+        waybill: r.waybill,
+        diasDesdeInbound: r.dias,
+        numIncidencias: r.num_incidencias,
+        ultimaIncidencia: r.ultima_incidencia,
+        cp: r.cp ?? "",
+        ciudad: r.ciudad ?? "",
+        direccion: r.direccion ?? "",
+        repartidor: r.driver ?? "",
+      }));
+      const a: RiskAnalysis = { maxDate: new Date(`${dbDate}T00:00:00`), risk };
+      setAnalysis(a);
+      const hubLabel = `${selectedHub.marca} · ${selectedHub.nombre}`;
+      setLoadedFrom({ label: hubLabel, via: "base de datos" });
+      persistSummary(hubLabel, a);
+    } catch (e) {
+      console.error("[Paquetes en Riesgo] Error cargando desde la base:", e);
+      setDbError(e instanceof Error ? e.message : "Error cargando desde la base de datos.");
+    } finally {
+      setDbLoading(false);
+    }
+  };
 
   const handleFile = async (f: File | null) => {
     setFile(f);
     setRows(null);
+    setAnalysis(null);
     setError(null);
     if (!f) return;
     if (!hub) {
@@ -270,23 +356,10 @@ function PaquetesEnRiesgoPage() {
         };
       });
       setRows(parsed);
-      // Persist summary per hub
       const analysisNow = analyze(parsed);
-      if (hub) {
-        try {
-          const key = "paquetes_en_riesgo_v1";
-          const store = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<
-            string,
-            { fecha: string; total: number; updatedAt: string }
-          >;
-          store[hub] = {
-            fecha: formatDate(analysisNow.maxDate),
-            total: analysisNow.risk.length,
-            updatedAt: new Date().toISOString(),
-          };
-          localStorage.setItem(key, JSON.stringify(store));
-        } catch { /* ignore */ }
-      }
+      setAnalysis(analysisNow);
+      setLoadedFrom({ label: hub, via: "archivo" });
+      persistSummary(hub, analysisNow);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error leyendo el archivo.");
       setFile(null);
@@ -359,7 +432,7 @@ function PaquetesEnRiesgoPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `paquetes_en_riesgo_${hub}_${formatDate(analysis.maxDate)}.xlsx`;
+    a.download = `paquetes_en_riesgo_${loadedFrom?.label || hub}_${formatDate(analysis.maxDate)}.xlsx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -386,7 +459,56 @@ function PaquetesEnRiesgoPage() {
         </p>
       </header>
 
-          {/* Hub selector */}
+          {/* Cargar desde la base de datos */}
+          <section className="mb-6 p-4 rounded-lg border bg-card">
+            <div className="flex items-center gap-2 mb-3">
+              <Database className="size-4 text-electric" />
+              <h3 className="text-sm font-semibold text-foreground">Cargar desde la base de datos</h3>
+            </div>
+            {!selectedHub ? (
+              <p className="text-[12px] text-muted-foreground">
+                Selecciona un hub en la barra superior para cargar el día más reciente con datos.
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="text-[11px] uppercase text-muted-foreground tracking-wide">Hub</label>
+                  <div className="mt-1 text-sm font-medium text-foreground">
+                    {selectedHub.marca} · {selectedHub.nombre}
+                  </div>
+                </div>
+                <div className="min-w-[180px]">
+                  <label className="text-[11px] uppercase text-muted-foreground tracking-wide">Día</label>
+                  <Select
+                    value={dbDate ?? undefined}
+                    onValueChange={setDbDate}
+                    disabled={dbDatesLoading || !dbDates || dbDates.length === 0}
+                  >
+                    <SelectTrigger className="mt-1 w-full">
+                      <SelectValue placeholder={dbDatesLoading ? "Cargando…" : "Sin ePOD para este hub"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(dbDates ?? []).map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button onClick={() => void handleLoadFromDb()} disabled={!dbDate || dbLoading} size="sm" className="gap-2">
+                  {dbLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}
+                  {dbLoading ? "Cargando…" : "Cargar desde la base"}
+                </Button>
+              </div>
+            )}
+            {dbError && (
+              <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
+                <AlertCircle className="size-3 mt-0.5 shrink-0" />
+                <span>{dbError}</span>
+              </p>
+            )}
+          </section>
+
+          {/* Hub selector: análisis ad-hoc subiendo un Excel puntual */}
           <section className="mb-4">
             <label className="text-[11px] uppercase text-muted-foreground tracking-wide">
               Hub
@@ -512,7 +634,12 @@ function PaquetesEnRiesgoPage() {
                 <div className="p-4 rounded-lg border bg-card text-foreground flex flex-col justify-between">
                   <div>
                     <div className="text-[11px] uppercase tracking-wide opacity-70">Hub</div>
-                    <div className="mt-1 text-2xl font-semibold">{hub}</div>
+                    <div className="mt-1 text-lg font-semibold truncate" title={loadedFrom?.label}>
+                      {loadedFrom?.label || hub}
+                    </div>
+                    {loadedFrom && (
+                      <div className="mt-0.5 text-[11px] text-muted-foreground">({loadedFrom.via})</div>
+                    )}
                   </div>
                   <Button onClick={exportXlsx} disabled={analysis.risk.length === 0} size="sm" className="mt-2 self-start gap-2">
                     <Download className="size-3.5" /> Exportar Excel

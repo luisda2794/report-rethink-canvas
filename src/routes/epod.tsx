@@ -71,6 +71,7 @@ const COL = {
   // de DSR cae de vuelta a "fecha" (mismo fallback que resolveEventDate()).
   tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
   tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
+  ciudad: ["La ciudad de destino", "The destination city"],
 };
 
 function normalizeKey(k: string) {
@@ -175,6 +176,7 @@ type ParsedRow = {
   exception_detail: string | null;
   tiempo_entrega: string | null;
   tiempo_fracaso: string | null;
+  ciudad: string | null;
 };
 
 function rawField(row: Record<string, unknown>, candidates: string[]): unknown {
@@ -215,6 +217,7 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
       exception_detail: pickField(r, COL.excepcion) || null,
       tiempo_entrega: parseDate(rawField(r, COL.tiempoEntrega)),
       tiempo_fracaso: parseDate(rawField(r, COL.tiempoFracaso)),
+      ciudad: pickField(r, COL.ciudad) || null,
     });
   }
 
@@ -442,6 +445,7 @@ function EpodPage() {
         exception_detail: r.exception_detail,
         tiempo_entrega: r.tiempo_entrega,
         tiempo_fracaso: r.tiempo_fracaso,
+        ciudad: r.ciudad,
       }));
 
       // Lotes de 1000 filas (no un solo insert gigante). epod_lineas no tiene
