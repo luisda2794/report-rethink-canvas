@@ -524,7 +524,7 @@ export function Dashboard() {
         <EntregasPorDia byDay={current.by_day} from={from} to={to} />
         <TipoEntrega byTipo={current.by_tipo} />
       </div>
-      <DashboardDsrWidgets />
+      <DashboardDsrWidgets hubIds={activeHubIds} />
     </div>
   );
 }

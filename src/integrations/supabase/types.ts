@@ -336,6 +336,8 @@ export type Database = {
           row_index: number
           seller_name: string | null
           source: string | null
+          tiempo_entrega: string | null
+          tiempo_fracaso: string | null
           tipo: string | null
           tipo_norm: string | null
           waybill: string | null
@@ -362,6 +364,8 @@ export type Database = {
           row_index: number
           seller_name?: string | null
           source?: string | null
+          tiempo_entrega?: string | null
+          tiempo_fracaso?: string | null
           tipo?: string | null
           tipo_norm?: string | null
           waybill?: string | null
@@ -388,6 +392,8 @@ export type Database = {
           row_index?: number
           seller_name?: string | null
           source?: string | null
+          tiempo_entrega?: string | null
+          tiempo_fracaso?: string | null
           tipo?: string | null
           tipo_norm?: string | null
           waybill?: string | null
@@ -772,6 +778,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      dashboard_dsr_stats: {
+        Args: {
+          _hub_ids: string[]
+          _include_weekends?: boolean
+          _to?: string
+          _window_days?: number
+        }
+        Returns: Json
+      }
       dashboard_stats: {
         Args: { _from: string; _hub_ids: string[]; _to: string }
         Returns: Json

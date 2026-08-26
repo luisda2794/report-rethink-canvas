@@ -65,6 +65,12 @@ const COL = {
   latitud: ["Receptor a latitud", "Receiver to Latitude", "Latitud", "Latitude"],
   longitud: ["Receptor a longitud", "Receiver to Longitude", "Longitud", "Longitude"],
   excepcion: ["Detalles de la Excepción", "Exception Detail"],
+  // Fecha REAL del evento (entrega/fallo) — distinta de "Fecha de la tarea".
+  // El Dashboard (DSR) las necesita para no medir contra la fecha de
+  // asignación. Opcionales: si el ePOD no las trae, quedan null y el cálculo
+  // de DSR cae de vuelta a "fecha" (mismo fallback que resolveEventDate()).
+  tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
+  tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
 };
 
 function normalizeKey(k: string) {
@@ -167,6 +173,8 @@ type ParsedRow = {
   latitude: number | null;
   longitude: number | null;
   exception_detail: string | null;
+  tiempo_entrega: string | null;
+  tiempo_fracaso: string | null;
 };
 
 function rawField(row: Record<string, unknown>, candidates: string[]): unknown {
@@ -205,6 +213,8 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
       latitude: pickNumber(r, COL.latitud),
       longitude: pickNumber(r, COL.longitud),
       exception_detail: pickField(r, COL.excepcion) || null,
+      tiempo_entrega: parseDate(rawField(r, COL.tiempoEntrega)),
+      tiempo_fracaso: parseDate(rawField(r, COL.tiempoFracaso)),
     });
   }
 
@@ -430,6 +440,8 @@ function EpodPage() {
         latitude: r.latitude,
         longitude: r.longitude,
         exception_detail: r.exception_detail,
+        tiempo_entrega: r.tiempo_entrega,
+        tiempo_fracaso: r.tiempo_fracaso,
       }));
 
       // Lotes de 1000 filas (no un solo insert gigante). epod_lineas no tiene
