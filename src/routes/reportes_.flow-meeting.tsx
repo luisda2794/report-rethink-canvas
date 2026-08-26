@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   Upload,
@@ -10,12 +10,18 @@ import {
   ChevronDown,
   Printer,
   Package,
+  Database,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RequireAuth } from "@/components/RequireAuth";
 import { resolveEventDate } from "@/lib/resolve-event-date";
 import { getClientesLocalesConfig, isClienteLocal, isSheinClient } from "@/lib/clientes-locales-config";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useEpodDates } from "@/lib/use-epod-dates";
 
 export const Route = createFileRoute("/reportes_/flow-meeting")({
   component: () => (
@@ -319,7 +325,71 @@ function IncBar({ count, max }: { count: number; max: number }) {
 
 type ClienteTab = "todos" | "shein" | "locales";
 
+// Estado normalizado (epod_lineas.estado ya viene normalizado por
+// normalizeEstado() al subir el ePOD en /epod) — categorizar() ya compara en
+// minúsculas, así que "Driver_received"/"Entregado"/etc. matchean igual que
+// si vinieran de un Excel recién subido.
+type EpodLineaFlowRow = {
+  waybill: string | null;
+  fecha: string | null;
+  estado: string | null;
+  cp: string | null;
+  driver: string | null;
+  tipo: string | null;
+  market_place_name: string | null;
+  seller_name: string | null;
+  exception_detail: string | null;
+  row_index: number;
+};
+
+// Carga paginada (1000 filas por página, igual que ya hace reportes.tsx en
+// generarDesdeBase) — epod_lineas primero (histórico crudo); si un hub no
+// tiene nada ahí para esa fecha (uploads viejos previos a epod_lineas), cae a
+// entregas, que no tiene mercado/vendedor/incidencia (quedan vacíos).
+async function fetchDbRowsForHubDate(hubId: string, fecha: string): Promise<EpodLineaFlowRow[]> {
+  const pageSize = 1000;
+  const fromLineas: EpodLineaFlowRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("epod_lineas")
+      .select("waybill, fecha, estado, cp, driver, tipo, market_place_name, seller_name, exception_detail, row_index")
+      .eq("hub_id", hubId)
+      .eq("fecha", fecha)
+      .order("row_index", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    fromLineas.push(...page);
+    if (page.length < pageSize) break;
+  }
+  if (fromLineas.length > 0) return fromLineas;
+
+  const fromEntregas: EpodLineaFlowRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("entregas")
+      .select("waybill, fecha, estado, cp, driver, tipo")
+      .eq("hub_id", hubId)
+      .eq("fecha", fecha)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    fromEntregas.push(
+      ...page.map((r, i) => ({
+        ...r,
+        market_place_name: null,
+        seller_name: null,
+        exception_detail: null,
+        row_index: from + i,
+      })),
+    );
+    if (page.length < pageSize) break;
+  }
+  return fromEntregas;
+}
+
 function FlowMeetingPage() {
+  const { selectedHub } = useAuth();
   const [hub, setHub] = useState<HubKey | "">("");
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<RawRow[] | null>(null);
@@ -327,7 +397,18 @@ function FlowMeetingPage() {
   const [dragOver, setDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clienteTab, setClienteTab] = useState<ClienteTab>("todos");
+  const [loadedFrom, setLoadedFrom] = useState<{ label: string; via: "archivo" | "base de datos" } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ---- Carga desde la base (hub global + selector de día) ----
+  const { data: dbDates, isLoading: dbDatesLoading } = useEpodDates(selectedHub?.id ?? null);
+  const [dbDate, setDbDate] = useState<string | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDbDate(dbDates && dbDates.length > 0 ? dbDates[0] : null);
+  }, [dbDates]);
 
   const filteredRows = useMemo(() => {
     if (!rows) return null;
@@ -341,6 +422,65 @@ function FlowMeetingPage() {
   }, [rows, clienteTab]);
 
   const analysis = useMemo(() => (filteredRows ? analyze(filteredRows) : null), [filteredRows]);
+
+  // Común a ambas vías (archivo o base de datos): guarda las filas parseadas
+  // y el resumen en localStorage — la lógica de análisis/render no distingue
+  // el origen de los datos.
+  const applyParsedRows = (parsed: RawRow[], hubLabel: string, via: "archivo" | "base de datos") => {
+    setRows(parsed);
+    setLoadedFrom({ label: hubLabel, via });
+    const a = analyze(parsed);
+    if (hubLabel && a.maxDate) {
+      try {
+        const key = "flow_meeting_v1";
+        const store = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<
+          string,
+          { fecha: string; total: number; pctCompletado: number; pendientes: number; updatedAt: string }
+        >;
+        store[hubLabel] = {
+          fecha: formatDate(a.maxDate),
+          total: a.totalDia,
+          pctCompletado: Number(a.pctCompletado.toFixed(2)),
+          pendientes: a.enReparto,
+          updatedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(key, JSON.stringify(store));
+      } catch { /* ignore */ }
+    }
+  };
+
+  const handleLoadFromDb = async () => {
+    if (!selectedHub || !dbDate) return;
+    setDbLoading(true);
+    setDbError(null);
+    setFile(null);
+    try {
+      const dbRows = await fetchDbRowsForHubDate(selectedHub.id, dbDate);
+      if (dbRows.length === 0) throw new Error("No hay filas para ese hub y fecha en la base de datos.");
+      const parsed: RawRow[] = dbRows.map((r) => {
+        const estado = r.estado ?? "";
+        return {
+          waybill: r.waybill ?? "",
+          fecha: r.fecha ? new Date(`${r.fecha}T00:00:00`) : null,
+          estado,
+          categoria: categorizar(estado),
+          incidencia: r.exception_detail ?? "",
+          cp: r.cp ?? "",
+          driver: r.driver ?? "",
+          tipoEntrega: r.tipo ?? "",
+          mercado: r.market_place_name ?? "",
+          vendedor: r.seller_name ?? "",
+          rowIndex: r.row_index,
+        };
+      });
+      applyParsedRows(parsed, `${selectedHub.marca} · ${selectedHub.nombre}`, "base de datos");
+    } catch (e) {
+      console.error("[Flow Meeting] Error cargando desde la base:", e);
+      setDbError(e instanceof Error ? e.message : "Error cargando desde la base de datos.");
+    } finally {
+      setDbLoading(false);
+    }
+  };
 
   const handleFile = async (f: File | null) => {
     setFile(f);
@@ -394,25 +534,7 @@ function FlowMeetingPage() {
           rowIndex: i,
         };
       });
-      setRows(parsed);
-      const a = analyze(parsed);
-      if (hub && a.maxDate) {
-        try {
-          const key = "flow_meeting_v1";
-          const store = JSON.parse(localStorage.getItem(key) ?? "{}") as Record<
-            string,
-            { fecha: string; total: number; pctCompletado: number; pendientes: number; updatedAt: string }
-          >;
-          store[hub] = {
-            fecha: formatDate(a.maxDate),
-            total: a.totalDia,
-            pctCompletado: Number(a.pctCompletado.toFixed(2)),
-            pendientes: a.enReparto,
-            updatedAt: new Date().toISOString(),
-          };
-          localStorage.setItem(key, JSON.stringify(store));
-        } catch { /* ignore */ }
-      }
+      applyParsedRows(parsed, hub, "archivo");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error leyendo el archivo.");
       setFile(null);
@@ -447,9 +569,10 @@ function FlowMeetingPage() {
             </h1>
             <p className="mt-1 text-sm text-muted-foreground print:text-xs">
               Dashboard de la reunión de flujo — foto del día operativo.
-              {analysis && (
+              {analysis && loadedFrom && (
                 <>
-                  {" "}Hub <strong>{hub}</strong> · Fecha <strong>{formatDate(analysis.maxDate)}</strong>
+                  {" "}Hub <strong>{loadedFrom.label}</strong> · Fecha <strong>{formatDate(analysis.maxDate)}</strong>
+                  {" "}({loadedFrom.via})
                 </>
               )}
             </p>
@@ -461,7 +584,58 @@ function FlowMeetingPage() {
           )}
         </header>
 
-          {/* Hub selector + Dropzone (hidden in print) */}
+          {/* Cargar desde la base de datos (hidden in print) */}
+          <div className="print:hidden">
+            <section className="mb-6 p-4 rounded-lg border bg-card">
+              <div className="flex items-center gap-2 mb-3">
+                <Database className="size-4 text-electric" />
+                <h3 className="text-sm font-semibold text-foreground">Cargar desde la base de datos</h3>
+              </div>
+              {!selectedHub ? (
+                <p className="text-[12px] text-muted-foreground">
+                  Selecciona un hub en la barra superior para cargar el día más reciente con datos.
+                </p>
+              ) : (
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="text-[11px] uppercase text-muted-foreground tracking-wide">Hub</label>
+                    <div className="mt-1 text-sm font-medium text-foreground">
+                      {selectedHub.marca} · {selectedHub.nombre}
+                    </div>
+                  </div>
+                  <div className="min-w-[180px]">
+                    <label className="text-[11px] uppercase text-muted-foreground tracking-wide">Día</label>
+                    <Select
+                      value={dbDate ?? undefined}
+                      onValueChange={setDbDate}
+                      disabled={dbDatesLoading || !dbDates || dbDates.length === 0}
+                    >
+                      <SelectTrigger className="mt-1 w-full">
+                        <SelectValue placeholder={dbDatesLoading ? "Cargando…" : "Sin ePOD para este hub"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(dbDates ?? []).map((d) => (
+                          <SelectItem key={d} value={d}>{d}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={() => void handleLoadFromDb()} disabled={!dbDate || dbLoading} size="sm" className="gap-2">
+                    {dbLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}
+                    {dbLoading ? "Cargando…" : "Cargar desde la base"}
+                  </Button>
+                </div>
+              )}
+              {dbError && (
+                <p className="mt-2 text-destructive text-[12px] flex items-start gap-1.5">
+                  <AlertCircle className="size-3 mt-0.5 shrink-0" />
+                  <span>{dbError}</span>
+                </p>
+              )}
+            </section>
+          </div>
+
+          {/* Hub selector + Dropzone: análisis ad-hoc subiendo un Excel puntual (hidden in print) */}
           <div className="print:hidden">
             <section className="mb-4">
               <label className="text-[11px] uppercase text-muted-foreground tracking-wide">Hub</label>

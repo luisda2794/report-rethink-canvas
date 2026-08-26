@@ -1,35 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-// Fechas distintas con ePOD subido para un hub — se usan para el selector de
-// Día. Se leen de epod_uploads.fecha_epod (una fila por subida) en vez de
-// SELECT DISTINCT sobre epod_lineas, que sería mucho más caro.
-export function useEpodDates(hubId: string | null) {
-  return useQuery({
-    queryKey: ["mapa-entregas-dates", hubId],
-    queryFn: async () => {
-      if (!hubId) return [] as string[];
-      const { data, error } = await supabase
-        .from("epod_uploads")
-        .select("fecha_epod")
-        .eq("hub_id", hubId)
-        .not("fecha_epod", "is", null)
-        .order("fecha_epod", { ascending: false });
-      if (error) throw error;
-      const seen = new Set<string>();
-      const dates: string[] = [];
-      for (const row of data ?? []) {
-        const fecha = row.fecha_epod;
-        if (fecha && !seen.has(fecha)) {
-          seen.add(fecha);
-          dates.push(fecha);
-        }
-      }
-      return dates;
-    },
-    enabled: !!hubId,
-  });
-}
+// useEpodDates ahora vive en @/lib/use-epod-dates (compartido entre Mapa de
+// Entregas, Flow Meeting y el resto de reportes de la Fase 4) — se re-exporta
+// acá para no romper el import existente.
+export { useEpodDates } from "@/lib/use-epod-dates";
 
 export type EpodLineaRow = {
   id: string;

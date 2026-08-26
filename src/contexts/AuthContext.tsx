@@ -54,8 +54,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const prof = (profRes.data ?? null) as Profile | null;
     setProfile(prof);
 
-    // Admins see all hubs; everyone else sees their assigned hubs only
-    if (prof?.role === "admin") {
+    // Admins y managers ven todos los hubs; el resto (jefe_flota, etc.) solo
+    // los que tenga asignados en usuario_hubs. Coincide con has_all_hub_access()
+    // en RLS (ver migración manager_full_hub_access).
+    const hasAllHubAccess = prof?.role === "admin" || prof?.role === "manager";
+    if (hasAllHubAccess) {
       setHubs(((allHubsRes.data ?? []) as Hub[]));
     } else {
       const list = (hubsJoinRes.data ?? [])
@@ -67,10 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSelectedHubId((prev) => {
       if (prev) return prev;
       if (prof?.hub_id) return prof.hub_id;
-      const fromList =
-        prof?.role === "admin"
-          ? ((allHubsRes.data ?? [])[0] as Hub | undefined)?.id
-          : ((hubsJoinRes.data ?? [])[0] as { hub: Hub | null } | undefined)?.hub?.id;
+      const fromList = hasAllHubAccess
+        ? ((allHubsRes.data ?? [])[0] as Hub | undefined)?.id
+        : ((hubsJoinRes.data ?? [])[0] as { hub: Hub | null } | undefined)?.hub?.id;
       return fromList ?? null;
     });
   };
