@@ -19,32 +19,56 @@ export type EpodLineaRow = {
   exception_detail: string | null;
 };
 
-// Consulta directa (sin RPC), paginada en páginas de 1000 (el tope por
-// defecto de PostgREST) para traer TODAS las filas del día sin ningún límite
-// artificial — un hub puede mover fácilmente varios miles de paquetes en un
-// solo día.
+// Consulta directa (sin RPC), solo las columnas que el mapa/los contadores
+// realmente usan.
+//
+// Paginación: primero se pide el conteo exacto (head:true, sin traer filas)
+// para saber cuántas páginas de 1000 (el tope por defecto de PostgREST)
+// hacen falta, y luego se piden TODAS en paralelo con Promise.all en vez de
+// un loop secuencial de awaits — un hub puede mover varios miles de paquetes
+// en un solo día, y eso antes significaba varias decenas de esperas en fila.
+// Se ordena por id para que range() sea determinístico entre páginas
+// paralelas (sin ORDER BY, Postgres no garantiza el mismo orden entre
+// llamadas separadas, lo que podría duplicar o saltarse filas al paginar).
 const PAGE_SIZE = 1000;
+const COLUMNS = "id, waybill, lp_no, estado, cp, direccion, driver, latitude, longitude, exception_detail";
 
 export function useEpodLineasForDay(hubId: string | null, fecha: string | null) {
   return useQuery({
     queryKey: ["mapa-entregas-lineas", hubId, fecha],
     queryFn: async () => {
       if (!hubId || !fecha) return [] as EpodLineaRow[];
+
+      const { count, error: countError } = await supabase
+        .from("epod_lineas")
+        .select("id", { count: "exact", head: true })
+        .eq("hub_id", hubId)
+        .eq("fecha", fecha);
+      if (countError) throw countError;
+
+      const total = count ?? 0;
+      const pageCount = Math.ceil(total / PAGE_SIZE);
+      const pages = await Promise.all(
+        Array.from({ length: pageCount }, (_, i) => {
+          const from = i * PAGE_SIZE;
+          return supabase
+            .from("epod_lineas")
+            .select(COLUMNS)
+            .eq("hub_id", hubId)
+            .eq("fecha", fecha)
+            .order("id", { ascending: true })
+            .range(from, from + PAGE_SIZE - 1);
+        })
+      );
+
       const allRows: EpodLineaRow[] = [];
-      for (let from = 0; ; from += PAGE_SIZE) {
-        const { data, error } = await supabase
-          .from("epod_lineas")
-          .select("id, waybill, lp_no, estado, cp, direccion, driver, latitude, longitude, exception_detail")
-          .eq("hub_id", hubId)
-          .eq("fecha", fecha)
-          .range(from, from + PAGE_SIZE - 1);
+      for (const { data, error } of pages) {
         if (error) throw error;
-        const page = (data ?? []) as EpodLineaRow[];
-        allRows.push(...page);
-        if (page.length < PAGE_SIZE) break;
+        allRows.push(...((data ?? []) as EpodLineaRow[]));
       }
       return allRows;
     },
     enabled: !!hubId && !!fecha,
+    staleTime: 5 * 60 * 1000,
   });
 }

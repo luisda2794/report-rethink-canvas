@@ -10,38 +10,59 @@ import { supabase } from "@/integrations/supabase/client";
 // a aplicarse en producción (epod_available_dates, has_all_hub_access), lo
 // que costó tiempo diagnosticar. Una consulta directa al cliente de Supabase
 // no depende de ninguna migración de función — solo de que la tabla/columna
-// exista (ya confirmado). Se pagina en páginas de 1000 (el tope por defecto
-// de PostgREST) para no perder fechas si el hub tiene muchas filas, y se
-// deduplica en el frontend con un Set.
+// exista (ya confirmado).
+//
+// Paginación: primero se pide el conteo exacto (head:true, sin traer filas)
+// para saber cuántas páginas de 1000 (el tope por defecto de PostgREST)
+// hacen falta, y luego se piden TODAS en paralelo con Promise.all en vez de
+// un loop secuencial — con hubs de decenas de miles de filas, esto es la
+// diferencia entre varias decenas de esperas en fila y una sola espera.
+const PAGE_SIZE = 1000;
+
 export function useEpodDates(hubId: string | null) {
   return useQuery({
     queryKey: ["epod-dates", hubId],
     queryFn: async () => {
       if (!hubId) return [] as string[];
-      const pageSize = 1000;
+
+      const { count, error: countError } = await supabase
+        .from("epod_lineas")
+        .select("fecha", { count: "exact", head: true })
+        .eq("hub_id", hubId)
+        .not("fecha", "is", null);
+      if (countError) throw countError;
+
+      const total = count ?? 0;
+      const pageCount = Math.ceil(total / PAGE_SIZE);
+      const pages = await Promise.all(
+        Array.from({ length: pageCount }, (_, i) => {
+          const from = i * PAGE_SIZE;
+          return supabase
+            .from("epod_lineas")
+            .select("fecha")
+            .eq("hub_id", hubId)
+            .not("fecha", "is", null)
+            .order("fecha", { ascending: false })
+            .range(from, from + PAGE_SIZE - 1);
+        })
+      );
+
       const seen = new Set<string>();
       const dates: string[] = [];
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("epod_lineas")
-          .select("fecha")
-          .eq("hub_id", hubId)
-          .not("fecha", "is", null)
-          .order("fecha", { ascending: false })
-          .range(from, from + pageSize - 1);
+      for (const { data, error } of pages) {
         if (error) throw error;
-        const page = data ?? [];
-        for (const row of page) {
+        for (const row of data ?? []) {
           const fecha = row.fecha;
           if (fecha && !seen.has(fecha)) {
             seen.add(fecha);
             dates.push(fecha);
           }
         }
-        if (page.length < pageSize) break;
       }
+      dates.sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
       return dates;
     },
     enabled: !!hubId,
+    staleTime: 5 * 60 * 1000,
   });
 }
