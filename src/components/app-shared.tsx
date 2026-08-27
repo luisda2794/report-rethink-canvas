@@ -14,6 +14,7 @@ import {
   HelpCircleIcon,
   BookOpenIcon,
   CopyIcon,
+  UsersIcon,
 } from "lucide-react";
 import { navForRole, type Role } from "@/lib/roles";
 
@@ -40,6 +41,8 @@ const ICONS: Record<string, ReactNode> = {
   "/mapas-provincia": <MapIcon />,
   "/cd5": <FlameIcon />,
   "/mapas-admin": <SettingsIcon />,
+  "/drivers": <UsersIcon />,
+  "/borradores": <ReceiptIcon />,
   "/admin": <ShieldIcon />,
 };
 
@@ -53,6 +56,8 @@ const GROUP_OF: Record<string, string> = {
   "/mapas-provincia": "Operación",
   "/cd5": "Operación",
   "/mapas-admin": "Operación",
+  "/drivers": "Facturación",
+  "/borradores": "Facturación",
   "/admin": "Administración",
 };
 

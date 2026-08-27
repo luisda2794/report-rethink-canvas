@@ -16,12 +16,19 @@ export type NavItem = { to: string; label: string };
 // dentro de /reportes (no del nav lateral), y "/mapas-admin" está oculto del
 // nav por no usarse. Los tres siguen siendo rutas válidas — ver ROUTE_ACCESS,
 // que no cambia — así que el acceso directo por URL sigue funcionando.
+//
+// "/drivers" y "/borradores" (Drivers y Facturación por driver+CP) existían
+// antes, se desactivaron al no estar en ROUTE_ACCESS de ningún rol (RequireAuth
+// redirige si canAccess() da false — así es como se "apagó" el módulo, no
+// borrando el código) y se reactivan acá, solo para admin/manager.
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/mapa-entregas", label: "Mapa de Entregas" },
   { to: "/reportes", label: "Reportes" },
   { to: "/reclamaciones", label: "Reclamaciones" },
+  { to: "/drivers", label: "Drivers" },
+  { to: "/borradores", label: "Facturación" },
   { to: "/admin", label: "Admin" },
 ];
 
@@ -35,6 +42,8 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/reclamaciones",
     "/mapas-provincia",
     "/mapas-admin",
+    "/drivers",
+    "/borradores",
     "/admin",
   ],
   manager: [
@@ -46,6 +55,8 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/reclamaciones",
     "/mapas-provincia",
     "/mapas-admin",
+    "/drivers",
+    "/borradores",
   ],
   jefe_flota: [
     "/epod",

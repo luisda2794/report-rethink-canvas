@@ -196,6 +196,7 @@ export type Database = {
         Row: {
           codigo_postal: string
           created_at: string
+          driver_id: string | null
           hub_id: string
           id: string
           precio_aa: number
@@ -207,6 +208,7 @@ export type Database = {
         Insert: {
           codigo_postal: string
           created_at?: string
+          driver_id?: string | null
           hub_id: string
           id?: string
           precio_aa?: number
@@ -218,6 +220,7 @@ export type Database = {
         Update: {
           codigo_postal?: string
           created_at?: string
+          driver_id?: string | null
           hub_id?: string
           id?: string
           precio_aa?: number
@@ -228,7 +231,46 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "driver_tarifas_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "driver_tarifas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drivers: {
+        Row: {
+          created_at: string
+          hub_id: string
+          id: string
+          nombre: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          hub_id: string
+          id?: string
+          nombre: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          hub_id?: string
+          id?: string
+          nombre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_hub_id_fkey"
             columns: ["hub_id"]
             isOneToOne: false
             referencedRelation: "hubs"

@@ -33,9 +33,16 @@ export const Route = createFileRoute("/borradores")({
 // TYPES
 // ============================================================
 
+type Driver = {
+  id: string;
+  hub_id: string;
+  nombre: string;
+};
+
 type Tarifa = {
   id?: string;
   hub_id: string;
+  driver_id: string;
   codigo_postal: string;
   precio_door: number;
   precio_pudo: number;
@@ -44,6 +51,11 @@ type Tarifa = {
   _new?: boolean;
 };
 
+// "AA" es internamente el mismo nombre que ya usaba driver_tarifas.precio_aa,
+// pero cambió de significado: antes era el 2º+ intento TO_DOOR a la misma
+// dirección; ahora es el modelo PUDO por punto/día (1er paquete del día en un
+// pop_station_id = PUDO, los siguientes al mismo punto/día = AA). Se muestra
+// con TIPO_LABEL para no confundir con el modelo viejo.
 type DraftLine = {
   cp: string;
   tipo: "TO_DOOR" | "PUDO" | "AA";
@@ -52,8 +64,15 @@ type DraftLine = {
   subtotal: number;
 };
 
+const TIPO_LABEL: Record<DraftLine["tipo"], string> = {
+  TO_DOOR: "TO_DOOR",
+  PUDO: "PUDO (1º del día)",
+  AA: "PUDO (extra, mismo punto/día)",
+};
+
 type DraftResult = {
   driver_nombre: string;
+  driver_id: string | null;
   total_paquetes: number;
   base_imponible: number;
   iva_21: number;
@@ -78,44 +97,72 @@ type SavedBorrador = {
 };
 
 // ============================================================
-// ENTREGAS PROCESSING (from Supabase)
+// EPOD_LINEAS PROCESSING (from Supabase)
 // ============================================================
 
-type EntregaRow = {
+type EpodLineaBillingRow = {
+  lp_no: string;
   driver: string | null;
   fecha: string | null;
   cp: string | null;
-  tipo: string | null;
   tipo_norm: string | null;
-  es_aa: boolean | null;
+  pop_station_id: string | null;
 };
 
-function processEntregas(rows: EntregaRow[], tarifas: Tarifa[]): DraftResult[] {
+function normalizeName(s: string) {
+  return s.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// Modelo AA (PUDO): dentro de un mismo driver+CP, se agrupan los paquetes
+// PUDO por (pop_station_id, fecha) — el primero del grupo se factura a
+// precio_pudo, el resto del mismo punto el mismo día a precio_aa (más
+// barato). Si un paquete PUDO no trae pop_station_id no hay forma de saber
+// si comparte punto con otro, así que se factura individualmente a
+// precio_pudo (el precio lleno) en vez de asumir un agrupamiento — y se
+// marca con un warning para que quede visible, no oculto.
+function processEpodLineas(
+  rows: EpodLineaBillingRow[],
+  tarifas: Tarifa[],
+  drivers: Driver[],
+): DraftResult[] {
   if (rows.length === 0) return [];
 
-  const tarifaMap = new Map(tarifas.map((t) => [t.codigo_postal.trim(), t]));
+  const tarifaByDriverCp = new Map(
+    tarifas.map((t) => [`${t.driver_id}|${t.codigo_postal.trim()}`, t]),
+  );
+  const driverByName = new Map(drivers.map((d) => [normalizeName(d.nombre), d]));
 
-  type Row = { driver: string; cp: string; tipo: "PUDO" | "TO_DOOR" | "AA"; fecha: string };
+  type Row = {
+    driverKey: string;
+    driverNombre: string;
+    driverId: string | null;
+    cp: string;
+    tipo: "PUDO" | "TO_DOOR";
+    fecha: string;
+    popStationId: string;
+    lp: string;
+  };
   const filtered: Row[] = [];
   for (const r of rows) {
-    const rawDriver = (r.driver ?? "").trim();
+    const rawDriver = (r.driver ?? "").split(" | ")[0].trim();
     if (!rawDriver) continue;
-    const driver = rawDriver.split(" | ")[0].trim();
-    const tn = (r.tipo_norm ?? r.tipo ?? "").trim().toUpperCase();
-    const base: "PUDO" | "TO_DOOR" = tn === "PUDO" ? "PUDO" : "TO_DOOR";
-    const tipo: "PUDO" | "TO_DOOR" | "AA" = r.es_aa && base === "TO_DOOR" ? "AA" : base;
+    const match = driverByName.get(normalizeName(rawDriver));
     filtered.push({
-      driver,
+      driverKey: match ? `id:${match.id}` : `name:${normalizeName(rawDriver)}`,
+      driverNombre: match ? match.nombre : rawDriver,
+      driverId: match ? match.id : null,
       cp: (r.cp ?? "").trim(),
-      tipo,
+      tipo: (r.tipo_norm ?? "").trim().toUpperCase() === "PUDO" ? "PUDO" : "TO_DOOR",
       fecha: r.fecha ?? "",
+      popStationId: (r.pop_station_id ?? "").trim(),
+      lp: r.lp_no,
     });
   }
 
   const byDriver = new Map<string, Row[]>();
   for (const r of filtered) {
-    if (!byDriver.has(r.driver)) byDriver.set(r.driver, []);
-    byDriver.get(r.driver)!.push(r);
+    if (!byDriver.has(r.driverKey)) byDriver.set(r.driverKey, []);
+    byDriver.get(r.driverKey)!.push(r);
   }
 
   const dates = filtered.map((r) => r.fecha).filter(Boolean).sort();
@@ -123,40 +170,106 @@ function processEntregas(rows: EntregaRow[], tarifas: Tarifa[]): DraftResult[] {
   const fecha_hasta = dates[dates.length - 1] || fecha_desde;
 
   const results: DraftResult[] = [];
-  for (const [driver, rs] of byDriver) {
-    const agg = new Map<string, { cp: string; tipo: "TO_DOOR" | "PUDO" | "AA"; cantidad: number }>();
+  for (const [, rs] of byDriver) {
+    const driverId = rs[0].driverId;
+    const driverNombre = rs[0].driverNombre;
     const warningsSet = new Set<string>();
-    for (const r of rs) {
-      const key = `${r.cp}|${r.tipo}`;
-      if (!agg.has(key)) agg.set(key, { cp: r.cp, tipo: r.tipo, cantidad: 0 });
-      agg.get(key)!.cantidad++;
+
+    if (!driverId) {
+      // Sin driver registrado en /drivers: no hay driver_id con el que
+      // buscar tarifa, así que no se puede calcular nada — se deja
+      // explícito en vez de omitir o cobrar 0€ silenciosamente.
+      warningsSet.add(`"${driverNombre}" no está registrado en /drivers — crea el driver para poder facturarlo`);
+      const cpSet = new Set(rs.map((r) => r.cp || "—"));
+      const lineas: DraftLine[] = [...cpSet].map((cp) => ({
+        cp,
+        tipo: "TO_DOOR" as const,
+        cantidad: rs.filter((r) => (r.cp || "—") === cp).length,
+        precio_unitario: 0,
+        subtotal: 0,
+      }));
+      results.push({
+        driver_nombre: driverNombre,
+        driver_id: null,
+        total_paquetes: rs.length,
+        base_imponible: 0,
+        iva_21: 0,
+        total: 0,
+        fecha_desde,
+        fecha_hasta,
+        lineas,
+        warnings: [...warningsSet],
+      });
+      continue;
     }
+
+    // TO_DOOR: cantidad simple por CP.
+    const doorAgg = new Map<string, number>();
+    for (const r of rs) {
+      if (r.tipo !== "TO_DOOR") continue;
+      doorAgg.set(r.cp, (doorAgg.get(r.cp) ?? 0) + 1);
+    }
+
+    // PUDO: agrupar por (pop_station_id, fecha) para aplicar el modelo AA.
+    const pudoGroups = new Map<string, Row[]>();
+    let ungroupedPudo = 0;
+    for (const r of rs) {
+      if (r.tipo !== "PUDO") continue;
+      if (!r.popStationId) {
+        ungroupedPudo++;
+        const soloKey = `__solo__${r.lp}`;
+        pudoGroups.set(soloKey, [r]);
+        continue;
+      }
+      const key = `${r.popStationId}|${r.fecha}`;
+      if (!pudoGroups.has(key)) pudoGroups.set(key, []);
+      pudoGroups.get(key)!.push(r);
+    }
+    if (ungroupedPudo > 0) {
+      warningsSet.add(`${ungroupedPudo} paquete(s) PUDO sin punto de recogida identificado — facturados a precio de 1º`);
+    }
+    const pudoAgg = new Map<string, number>(); // cp -> cantidad a precio_pudo
+    const aaAgg = new Map<string, number>(); // cp -> cantidad a precio_aa
+    for (const group of pudoGroups.values()) {
+      const cp = group[0].cp;
+      pudoAgg.set(cp, (pudoAgg.get(cp) ?? 0) + 1);
+      if (group.length > 1) {
+        aaAgg.set(cp, (aaAgg.get(cp) ?? 0) + (group.length - 1));
+      }
+    }
+
+    const priceFor = (cp: string, tipo: DraftLine["tipo"]): number | null => {
+      const tar = tarifaByDriverCp.get(`${driverId}|${cp}`);
+      if (!tar) return null;
+      return tipo === "PUDO" ? Number(tar.precio_pudo) : tipo === "AA" ? Number(tar.precio_aa) : Number(tar.precio_door);
+    };
+
     const lineas: DraftLine[] = [];
     let base = 0;
     let total_paquetes = 0;
-    for (const { cp, tipo, cantidad } of agg.values()) {
-      const tar = tarifaMap.get(cp);
-      let precio = 0;
-      if (!tar) {
-        warningsSet.add(`CP ${cp} sin tarifa configurada`);
-      } else {
-        precio = tipo === "PUDO"
-          ? Number(tar.precio_pudo)
-          : tipo === "AA"
-            ? Number(tar.precio_aa)
-            : Number(tar.precio_door);
-      }
-      const subtotal = +(cantidad * precio).toFixed(2);
-      lineas.push({ cp, tipo, cantidad, precio_unitario: precio, subtotal });
+    const cpsWithoutTarifa = new Set<string>();
+    const pushLinea = (cp: string, tipo: DraftLine["tipo"], cantidad: number) => {
+      if (cantidad <= 0) return;
+      const precio = priceFor(cp, tipo);
+      if (precio === null) cpsWithoutTarifa.add(cp || "(sin CP)");
+      const p = precio ?? 0;
+      const subtotal = +(cantidad * p).toFixed(2);
+      lineas.push({ cp: cp || "(sin CP)", tipo, cantidad, precio_unitario: p, subtotal });
       base += subtotal;
       total_paquetes += cantidad;
-    }
+    };
+    for (const [cp, cantidad] of doorAgg) pushLinea(cp, "TO_DOOR", cantidad);
+    for (const [cp, cantidad] of pudoAgg) pushLinea(cp, "PUDO", cantidad);
+    for (const [cp, cantidad] of aaAgg) pushLinea(cp, "AA", cantidad);
+    for (const cp of cpsWithoutTarifa) warningsSet.add(`CP ${cp} sin tarifa configurada para ${driverNombre}`);
+
     lineas.sort((a, b) => a.cp.localeCompare(b.cp) || a.tipo.localeCompare(b.tipo));
     base = +base.toFixed(2);
     const iva_21 = +(base * 0.21).toFixed(2);
     const total = +(base + iva_21).toFixed(2);
     results.push({
-      driver_nombre: driver,
+      driver_nombre: driverNombre,
+      driver_id: driverId,
       total_paquetes,
       base_imponible: base,
       iva_21,
@@ -181,7 +294,7 @@ function exportBorradorExcel(d: DraftResult, hubMarca: string) {
     [`Período: ${d.fecha_desde} → ${d.fecha_hasta}`],
     [],
     ["CP", "Tipo", "Cantidad", "Precio unit.", "Subtotal"],
-    ...d.lineas.map((l) => [l.cp, l.tipo, l.cantidad, l.precio_unitario, l.subtotal]),
+    ...d.lineas.map((l) => [l.cp, TIPO_LABEL[l.tipo], l.cantidad, l.precio_unitario, l.subtotal]),
     [],
     ["", "", "", "Base imponible", d.base_imponible],
     ["", "", "", "IVA 21%", d.iva_21],
@@ -241,22 +354,49 @@ function BorradoresPage() {
 // ============================================================
 
 function TarifasSection({ hubId }: { hubId: string }) {
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [driverId, setDriverId] = useState<string>("");
   const [tarifas, setTarifas] = useState<Tarifa[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingDrivers, setLoadingDrivers] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const loadDrivers = async () => {
+    setLoadingDrivers(true);
+    const { data, error } = await supabase
+      .from("drivers")
+      .select("id, hub_id, nombre")
+      .eq("hub_id", hubId)
+      .order("nombre");
+    if (error) toast.error(error.message);
+    const list = (data ?? []) as Driver[];
+    setDrivers(list);
+    setDriverId((prev) => (list.some((d) => d.id === prev) ? prev : list[0]?.id ?? ""));
+    setLoadingDrivers(false);
+  };
+
+  useEffect(() => {
+    loadDrivers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubId]);
+
   const load = async () => {
+    if (!driverId) {
+      setTarifas([]);
+      return;
+    }
     setLoading(true);
     const { data, error } = await supabase
       .from("driver_tarifas")
-      .select("id, hub_id, codigo_postal, precio_door, precio_pudo, precio_aa")
-      .eq("hub_id", hubId)
+      .select("id, hub_id, driver_id, codigo_postal, precio_door, precio_pudo, precio_aa")
+      .eq("driver_id", driverId)
       .order("codigo_postal");
     if (error) toast.error(error.message);
     setTarifas(
       (data ?? []).map((t) => ({
         id: t.id,
         hub_id: t.hub_id,
+        driver_id: t.driver_id as string,
         codigo_postal: t.codigo_postal,
         precio_door: Number(t.precio_door),
         precio_pudo: Number(t.precio_pudo),
@@ -269,7 +409,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubId]);
+  }, [driverId]);
 
   const updateField = (idx: number, field: keyof Tarifa, value: string) => {
     setTarifas((prev) =>
@@ -286,14 +426,16 @@ function TarifasSection({ hubId }: { hubId: string }) {
   };
 
   const addRow = () => {
+    if (!driverId) return;
     setTarifas((prev) => [
       ...prev,
       {
         hub_id: hubId,
+        driver_id: driverId,
         codigo_postal: "",
         precio_door: 1.05,
-        precio_pudo: 0.3,
-        precio_aa: 0.3,
+        precio_pudo: 1.0,
+        precio_aa: 0.2,
         _new: true,
         _dirty: true,
       },
@@ -314,6 +456,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
   };
 
   const saveAll = async () => {
+    if (!driverId) return;
     setSaving(true);
     const dirty = tarifas.filter((t) => t._dirty && t.codigo_postal.trim());
     if (dirty.length === 0) {
@@ -324,6 +467,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
     const payload = dirty.map((t) => ({
       ...(t.id ? { id: t.id } : {}),
       hub_id: hubId,
+      driver_id: driverId,
       codigo_postal: t.codigo_postal.trim(),
       precio_door: t.precio_door,
       precio_pudo: t.precio_pudo,
@@ -331,7 +475,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
     }));
     const { error } = await supabase
       .from("driver_tarifas")
-      .upsert(payload, { onConflict: "hub_id,codigo_postal" });
+      .upsert(payload, { onConflict: "driver_id,codigo_postal" });
     if (error) {
       toast.error(error.message);
     } else {
@@ -343,97 +487,118 @@ function TarifasSection({ hubId }: { hubId: string }) {
 
   return (
     <section className="animate-fade-up">
-      <div className="mb-6">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">
-          Tarifas por CP
-        </h2>
-        <p className="text-muted-text text-sm mt-1">
-          Configura el precio por tipo de entrega para cada código postal.
-        </p>
+      <div className="mb-6 flex items-end justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            Tarifas por CP y driver
+          </h2>
+          <p className="text-muted-text text-sm mt-1">
+            Cada driver tiene su propio precio por código postal. Gestiona los drivers en{" "}
+            <Link to="/drivers" className="text-electric hover:underline">/drivers</Link>.
+          </p>
+        </div>
+        <select
+          value={driverId}
+          onChange={(e) => setDriverId(e.target.value)}
+          disabled={loadingDrivers || drivers.length === 0}
+          className="border border-hairline rounded px-3 py-2 text-sm bg-background font-mono min-w-[220px]"
+        >
+          {drivers.length === 0 && <option value="">Sin drivers</option>}
+          {drivers.map((d) => (
+            <option key={d.id} value={d.id}>{d.nombre}</option>
+          ))}
+        </select>
       </div>
 
-      <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-surface-2 border-b border-hairline font-mono text-[10px] tracking-widest uppercase text-muted-text">
-                <th className="text-left px-4 py-3">Código Postal</th>
-                <th className="text-right px-4 py-3">TO_DOOR (€)</th>
-                <th className="text-right px-4 py-3">PUDO (€)</th>
-                <th className="text-right px-4 py-3">AA (€)</th>
-                <th className="px-4 py-3 w-16" />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
-                    Cargando…
-                  </td>
+      {!loadingDrivers && drivers.length === 0 ? (
+        <div className="px-4 py-6 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r">
+          No hay drivers creados para este hub. <Link to="/drivers" className="underline">Crea un driver</Link> antes de configurar tarifas.
+        </div>
+      ) : (
+        <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-surface-2 border-b border-hairline font-mono text-[10px] tracking-widest uppercase text-muted-text">
+                  <th className="text-left px-4 py-3">Código Postal</th>
+                  <th className="text-right px-4 py-3">TO_DOOR (€)</th>
+                  <th className="text-right px-4 py-3">PUDO · 1º del día (€)</th>
+                  <th className="text-right px-4 py-3">PUDO · extra mismo punto (€)</th>
+                  <th className="px-4 py-3 w-16" />
                 </tr>
-              ) : tarifas.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
-                    Sin tarifas configuradas
-                  </td>
-                </tr>
-              ) : (
-                tarifas.map((t, idx) => (
-                  <tr
-                    key={t.id ?? `new-${idx}`}
-                    className={`border-b border-hairline/50 ${t._dirty ? "bg-electric/5" : ""}`}
-                  >
-                    <td className="px-4 py-2">
-                      <input
-                        value={t.codigo_postal}
-                        onChange={(e) => updateField(idx, "codigo_postal", e.target.value)}
-                        placeholder="28001"
-                        className="w-full bg-transparent border-0 focus:ring-0 focus:outline-none font-mono text-sm text-ink"
-                      />
-                    </td>
-                    {(["precio_door", "precio_pudo", "precio_aa"] as const).map((f) => (
-                      <td key={f} className="px-4 py-2 text-right">
-                        <input
-                          type="number"
-                          step="0.0001"
-                          value={t[f] as number}
-                          onChange={(e) => updateField(idx, f, e.target.value)}
-                          className="w-24 bg-transparent border-0 focus:ring-0 focus:outline-none font-mono text-sm text-ink text-right"
-                        />
-                      </td>
-                    ))}
-                    <td className="px-4 py-2 text-right">
-                      <button
-                        onClick={() => removeRow(idx)}
-                        className="text-muted-text hover:text-danger transition-colors"
-                        aria-label="Eliminar tarifa"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
+                      Cargando…
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : tarifas.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
+                      Sin tarifas configuradas para este driver
+                    </td>
+                  </tr>
+                ) : (
+                  tarifas.map((t, idx) => (
+                    <tr
+                      key={t.id ?? `new-${idx}`}
+                      className={`border-b border-hairline/50 ${t._dirty ? "bg-electric/5" : ""}`}
+                    >
+                      <td className="px-4 py-2">
+                        <input
+                          value={t.codigo_postal}
+                          onChange={(e) => updateField(idx, "codigo_postal", e.target.value)}
+                          placeholder="28001"
+                          className="w-full bg-transparent border-0 focus:ring-0 focus:outline-none font-mono text-sm text-ink"
+                        />
+                      </td>
+                      {(["precio_door", "precio_pudo", "precio_aa"] as const).map((f) => (
+                        <td key={f} className="px-4 py-2 text-right">
+                          <input
+                            type="number"
+                            step="0.0001"
+                            value={t[f] as number}
+                            onChange={(e) => updateField(idx, f, e.target.value)}
+                            className="w-24 bg-transparent border-0 focus:ring-0 focus:outline-none font-mono text-sm text-ink text-right"
+                          />
+                        </td>
+                      ))}
+                      <td className="px-4 py-2 text-right">
+                        <button
+                          onClick={() => removeRow(idx)}
+                          className="text-muted-text hover:text-danger transition-colors"
+                          aria-label="Eliminar tarifa"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex items-center justify-between p-4 bg-surface-2/50 border-t border-hairline">
+            <button
+              onClick={addRow}
+              disabled={!driverId}
+              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono tracking-widest uppercase text-ink hover:text-electric transition-colors disabled:opacity-50"
+            >
+              <Plus className="size-3.5" /> Añadir CP
+            </button>
+            <button
+              onClick={saveAll}
+              disabled={saving || !driverId}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-ink text-white rounded font-mono text-xs tracking-widest uppercase hover:bg-electric transition-colors disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+              Guardar cambios
+            </button>
+          </div>
         </div>
-        <div className="flex items-center justify-between p-4 bg-surface-2/50 border-t border-hairline">
-          <button
-            onClick={addRow}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono tracking-widest uppercase text-ink hover:text-electric transition-colors"
-          >
-            <Plus className="size-3.5" /> Añadir CP
-          </button>
-          <button
-            onClick={saveAll}
-            disabled={saving}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-ink text-white rounded font-mono text-xs tracking-widest uppercase hover:bg-electric transition-colors disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-            Guardar cambios
-          </button>
-        </div>
-      </div>
+      )}
     </section>
   );
 }
@@ -453,10 +618,16 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
   const [results, setResults] = useState<DraftResult[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [driversCount, setDriversCount] = useState(0);
   const [tarifasCount, setTarifasCount] = useState(0);
   const [periodCount, setPeriodCount] = useState<number | null>(null);
 
   useEffect(() => {
+    supabase
+      .from("drivers")
+      .select("id", { count: "exact", head: true })
+      .eq("hub_id", hubId)
+      .then(({ count }) => setDriversCount(count ?? 0));
     supabase
       .from("driver_tarifas")
       .select("id", { count: "exact", head: true })
@@ -468,7 +639,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
     let cancelled = false;
     void (async () => {
       const { count } = await supabase
-        .from("entregas")
+        .from("epod_lineas")
         .select("id", { count: "exact", head: true })
         .eq("hub_id", hubId)
         .gte("fecha", fromDate)
@@ -478,23 +649,37 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
     return () => { cancelled = true; };
   }, [hubId, fromDate, toDate]);
 
-  const fetchEntregas = async (): Promise<EntregaRow[]> => {
-    const all: EntregaRow[] = [];
-    const pageSize = 1000;
-    let from = 0;
-    for (;;) {
-      const { data, error: qErr } = await supabase
-        .from("entregas")
-        .select("driver, fecha, cp, tipo, tipo_norm, es_aa")
-        .eq("hub_id", hubId)
-        .gte("fecha", fromDate)
-        .lte("fecha", toDate)
-        .range(from, from + pageSize - 1);
+  // Paginación en paralelo (conteo primero + Promise.all de todas las
+  // páginas) en vez de un loop secuencial de awaits — mismo patrón ya usado
+  // en Mapa de Entregas, mucho más rápido para hubs con miles de paquetes.
+  const PAGE_SIZE = 1000;
+  const fetchEpodLineas = async (): Promise<EpodLineaBillingRow[]> => {
+    const { count, error: countErr } = await supabase
+      .from("epod_lineas")
+      .select("id", { count: "exact", head: true })
+      .eq("hub_id", hubId)
+      .gte("fecha", fromDate)
+      .lte("fecha", toDate);
+    if (countErr) throw countErr;
+    const total = count ?? 0;
+    const pageCount = Math.ceil(total / PAGE_SIZE);
+    const pages = await Promise.all(
+      Array.from({ length: pageCount }, (_, i) => {
+        const from = i * PAGE_SIZE;
+        return supabase
+          .from("epod_lineas")
+          .select("lp_no, driver, fecha, cp, tipo_norm, pop_station_id")
+          .eq("hub_id", hubId)
+          .gte("fecha", fromDate)
+          .lte("fecha", toDate)
+          .order("id", { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
+      }),
+    );
+    const all: EpodLineaBillingRow[] = [];
+    for (const { data, error: qErr } of pages) {
       if (qErr) throw qErr;
-      const rows = (data ?? []) as EntregaRow[];
-      all.push(...rows);
-      if (rows.length < pageSize) break;
-      from += pageSize;
+      all.push(...((data ?? []) as EpodLineaBillingRow[]));
     }
     return all;
   };
@@ -503,21 +688,28 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
     setGenerating(true);
     setError(null);
     try {
-      const { data: tarifasData, error: tErr } = await supabase
-        .from("driver_tarifas")
-        .select("id, hub_id, codigo_postal, precio_door, precio_pudo, precio_aa")
-        .eq("hub_id", hubId);
+      const [{ data: driversData, error: dErr }, { data: tarifasData, error: tErr }] = await Promise.all([
+        supabase.from("drivers").select("id, hub_id, nombre").eq("hub_id", hubId),
+        supabase
+          .from("driver_tarifas")
+          .select("id, hub_id, driver_id, codigo_postal, precio_door, precio_pudo, precio_aa")
+          .eq("hub_id", hubId)
+          .not("driver_id", "is", null),
+      ]);
+      if (dErr) throw dErr;
       if (tErr) throw tErr;
+      const drivers = (driversData ?? []) as Driver[];
       const tarifas: Tarifa[] = (tarifasData ?? []).map((t) => ({
         id: t.id,
         hub_id: t.hub_id,
+        driver_id: t.driver_id as string,
         codigo_postal: t.codigo_postal,
         precio_door: Number(t.precio_door),
         precio_pudo: Number(t.precio_pudo),
         precio_aa: Number(t.precio_aa),
       }));
-      const rows = await fetchEntregas();
-      const res = processEntregas(rows, tarifas);
+      const rows = await fetchEpodLineas();
+      const res = processEpodLineas(rows, tarifas, drivers);
       // Override fecha_desde/hasta with chosen period for consistency
       for (const r of res) { r.fecha_desde = fromDate; r.fecha_hasta = toDate; }
       setResults(res);
@@ -542,6 +734,10 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
   };
 
   const saveBorrador = async (d: DraftResult) => {
+    if (!d.driver_id) {
+      toast.error(`"${d.driver_nombre}" no está registrado en /drivers — no se puede guardar`);
+      return false;
+    }
     const { data: b, error: bErr } = await supabase
       .from("borradores")
       .insert({
@@ -580,17 +776,20 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
 
   const saveAll = async () => {
     let ok = 0;
+    let skipped = 0;
     for (const d of results) {
       if (savedIds.has(d.driver_nombre)) continue;
+      if (!d.driver_id) { skipped++; continue; }
       if (await saveBorrador(d)) ok++;
     }
     if (ok > 0) toast.success(`${ok} borrador(es) guardados`);
+    if (skipped > 0) toast.warning(`${skipped} driver(es) sin registrar en /drivers, no se guardaron`);
   };
 
   const downloadAll = () => results.forEach((d) => exportBorradorExcel(d, hubMarca));
 
   const hasData = (periodCount ?? 0) > 0;
-  const canGenerate = hasData && tarifasCount > 0 && !generating;
+  const canGenerate = hasData && driversCount > 0 && tarifasCount > 0 && !generating;
 
   return (
     <section className="animate-fade-up">
@@ -661,7 +860,12 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
         </div>
       )}
 
-      {tarifasCount === 0 && (
+      {driversCount === 0 ? (
+        <div className="mt-3 px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r flex items-center gap-2">
+          <AlertCircle className="size-4 shrink-0" />
+          Crea al menos un <Link to="/drivers" className="underline">driver</Link> antes de generar.
+        </div>
+      ) : tarifasCount === 0 && (
         <div className="mt-3 px-4 py-2.5 border-l-2 border-amber-500 bg-amber-500/10 text-amber-700 font-mono text-xs rounded-r flex items-center gap-2">
           <AlertCircle className="size-4 shrink-0" />
           Configura al menos un CP en tarifas antes de generar.
@@ -693,20 +897,31 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
           {results.map((d) => {
             const open = expanded.has(d.driver_nombre);
             const saved = savedIds.has(d.driver_nombre);
+            const unregistered = !d.driver_id;
             return (
-              <article key={d.driver_nombre} className="bg-surface border border-hairline rounded-lg overflow-hidden">
+              <article
+                key={d.driver_nombre}
+                className={`bg-surface border rounded-lg overflow-hidden ${unregistered ? "border-danger/40" : "border-hairline"}`}
+              >
                 <div
                   className="flex items-center gap-4 p-5 cursor-pointer hover:bg-surface-2 transition-colors"
                   onClick={() => toggleExpand(d.driver_nombre)}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-syne font-bold text-ink text-base">{d.driver_nombre}</div>
+                    <div className="font-syne font-bold text-ink text-base flex items-center gap-2">
+                      {d.driver_nombre}
+                      {unregistered && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded border border-danger/30 bg-danger/10 text-danger font-mono text-[9px] uppercase tracking-widest">
+                          No registrado
+                        </span>
+                      )}
+                    </div>
                     <div className="font-mono text-[10px] tracking-widest text-muted-text uppercase mt-0.5">
                       {d.total_paquetes} paquetes · {d.fecha_desde} → {d.fecha_hasta}
                     </div>
                   </div>
                   <div className="font-playfair italic font-medium text-electric text-2xl tabular-nums">
-                    {d.total.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
+                    {unregistered ? "—" : d.total.toLocaleString("es-ES", { style: "currency", currency: "EUR" })}
                   </div>
                   {open ? <ChevronUp className="size-4 text-muted-text" /> : <ChevronDown className="size-4 text-muted-text" />}
                 </div>
@@ -732,7 +947,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
                         {d.lineas.map((l, i) => (
                           <tr key={i} className="border-t border-hairline/50">
                             <td className="px-5 py-1.5 font-mono">{l.cp}</td>
-                            <td className="px-5 py-1.5 font-mono text-xs">{l.tipo}</td>
+                            <td className="px-5 py-1.5 font-mono text-xs">{TIPO_LABEL[l.tipo]}</td>
                             <td className="px-5 py-1.5 text-right tabular-nums">{l.cantidad}</td>
                             <td className="px-5 py-1.5 text-right tabular-nums font-mono">
                               {l.precio_unitario.toFixed(4)} €
@@ -772,7 +987,8 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
                       </button>
                       <button
                         onClick={() => saveOne(d)}
-                        disabled={saved}
+                        disabled={saved || unregistered}
+                        title={unregistered ? "Registra este driver en /drivers antes de guardar" : undefined}
                         className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono tracking-widest uppercase bg-ink text-white rounded hover:bg-electric transition-colors disabled:opacity-50"
                       >
                         {saved ? <Check className="size-3.5" /> : <Save className="size-3.5" />}
