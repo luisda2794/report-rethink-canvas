@@ -19,23 +19,31 @@ export type EpodLineaRow = {
   exception_detail: string | null;
 };
 
-// Tope defensivo: un día normal de un hub no debería acercarse a esto, pero
-// evita pedir una página infinita si algún día trae muchísimas filas.
-const MAX_ROWS = 5000;
+// Consulta directa (sin RPC), paginada en páginas de 1000 (el tope por
+// defecto de PostgREST) para traer TODAS las filas del día sin ningún límite
+// artificial — un hub puede mover fácilmente varios miles de paquetes en un
+// solo día.
+const PAGE_SIZE = 1000;
 
 export function useEpodLineasForDay(hubId: string | null, fecha: string | null) {
   return useQuery({
     queryKey: ["mapa-entregas-lineas", hubId, fecha],
     queryFn: async () => {
       if (!hubId || !fecha) return [] as EpodLineaRow[];
-      const { data, error } = await supabase
-        .from("epod_lineas")
-        .select("id, waybill, lp_no, estado, cp, direccion, driver, latitude, longitude, exception_detail")
-        .eq("hub_id", hubId)
-        .eq("fecha", fecha)
-        .limit(MAX_ROWS);
-      if (error) throw error;
-      return (data ?? []) as EpodLineaRow[];
+      const allRows: EpodLineaRow[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase
+          .from("epod_lineas")
+          .select("id, waybill, lp_no, estado, cp, direccion, driver, latitude, longitude, exception_detail")
+          .eq("hub_id", hubId)
+          .eq("fecha", fecha)
+          .range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        const page = (data ?? []) as EpodLineaRow[];
+        allRows.push(...page);
+        if (page.length < PAGE_SIZE) break;
+      }
+      return allRows;
     },
     enabled: !!hubId && !!fecha,
   });
