@@ -13,7 +13,7 @@ import {
   FileSpreadsheet,
   Calendar as CalendarIcon,
 } from "lucide-react";
-import * as XLSX from "xlsx";
+import XLSXStyle from "xlsx-js-style";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
@@ -81,6 +81,7 @@ type DraftResult = {
   fecha_hasta: string;
   lineas: DraftLine[];
   warnings: string[];
+  detalle?: DetalleRow[];
 };
 
 type SavedBorrador = {
@@ -105,8 +106,24 @@ type EpodLineaBillingRow = {
   driver: string | null;
   fecha: string | null;
   cp: string | null;
+  direccion: string | null;
   tipo_norm: string | null;
   pop_station_id: string | null;
+};
+
+// Una fila por paquete facturado, con lo necesario para armar la sección
+// "Detalle por día" del Excel — se calcula además del agregado por CP+tipo
+// (DraftResult.lineas) que ya se usaba para la vista en pantalla y el guardado
+// en borradores/borrador_lineas (eso no cambia). Solo existe para resultados
+// recién generados: un borrador ya guardado en la base no tiene este nivel de
+// detalle (borrador_lineas solo guarda el agregado), así que el Excel de un
+// borrador guardado no puede reconstruir el detalle por día.
+type DetalleRow = {
+  fecha: string;
+  direccion: string;
+  cp: string;
+  tipo: DraftLine["tipo"];
+  precio_unitario: number;
 };
 
 function normalizeName(s: string) {
@@ -137,6 +154,7 @@ function processEpodLineas(
     driverNombre: string;
     driverId: string | null;
     cp: string;
+    direccion: string;
     tipo: "PUDO" | "TO_DOOR";
     fecha: string;
     popStationId: string;
@@ -152,6 +170,7 @@ function processEpodLineas(
       driverNombre: match ? match.nombre : rawDriver,
       driverId: match ? match.id : null,
       cp: (r.cp ?? "").trim(),
+      direccion: (r.direccion ?? "").trim(),
       tipo: (r.tipo_norm ?? "").trim().toUpperCase() === "PUDO" ? "PUDO" : "TO_DOOR",
       fecha: r.fecha ?? "",
       popStationId: (r.pop_station_id ?? "").trim(),
@@ -267,6 +286,22 @@ function processEpodLineas(
     base = +base.toFixed(2);
     const iva_21 = +(base * 0.21).toFixed(2);
     const total = +(base + iva_21).toFixed(2);
+
+    // Detalle por paquete (para la sección "Detalle por día" del Excel) —
+    // misma clasificación TO_DOOR/PUDO-1º/PUDO-Nº que ya se usó arriba para
+    // el agregado, pero sin agregar: una fila por paquete.
+    const detalle: DetalleRow[] = [];
+    for (const r of rs) {
+      if (r.tipo !== "TO_DOOR") continue;
+      detalle.push({ fecha: r.fecha, direccion: r.direccion, cp: r.cp, tipo: "TO_DOOR", precio_unitario: priceFor(r.cp, "TO_DOOR") ?? 0 });
+    }
+    for (const group of pudoGroups.values()) {
+      group.forEach((r, i) => {
+        const tipo: DraftLine["tipo"] = i === 0 ? "PUDO" : "AA";
+        detalle.push({ fecha: r.fecha, direccion: r.direccion, cp: r.cp, tipo, precio_unitario: priceFor(r.cp, tipo) ?? 0 });
+      });
+    }
+
     results.push({
       driver_nombre: driverNombre,
       driver_id: driverId,
@@ -278,6 +313,7 @@ function processEpodLineas(
       fecha_hasta,
       lineas,
       warnings: [...warningsSet],
+      detalle,
     });
   }
   results.sort((a, b) => b.total - a.total);
@@ -285,27 +321,250 @@ function processEpodLineas(
 }
 
 // ============================================================
-// EXCEL EXPORT
+// EXCEL EXPORT — formato "Borrador de Factura" (ItaSpain), con colores
+// exactos por categoría vía xlsx-js-style (la única librería del proyecto
+// que puede escribir rellenos de celda; xlsx normal no puede).
 // ============================================================
 
-function exportBorradorExcel(d: DraftResult, hubMarca: string) {
-  const ws_data: (string | number)[][] = [
-    [`${hubMarca} — ${d.driver_nombre}`],
-    [`Período: ${d.fecha_desde} → ${d.fecha_hasta}`],
-    [],
-    ["CP", "Tipo", "Cantidad", "Precio unit.", "Subtotal"],
-    ...d.lineas.map((l) => [l.cp, TIPO_LABEL[l.tipo], l.cantidad, l.precio_unitario, l.subtotal]),
-    [],
-    ["", "", "", "Base imponible", d.base_imponible],
-    ["", "", "", "IVA 21%", d.iva_21],
-    ["", "", "", "Total", d.total],
-  ];
-  const ws = XLSX.utils.aoa_to_sheet(ws_data);
-  ws["!cols"] = [{ wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 14 }];
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Borrador");
+const XLS_TITLE_BLUE = "2E5FA3";
+const XLS_LEGEND_TODOOR = "F5F8FF";
+const XLS_LEGEND_PUDO = "F3E5F5"; // PUDO 1er y PUDO Nº comparten familia morada
+const XLS_DAY_SUBTOTAL = "C5D3E8";
+const XLS_GRAND_TOTAL = "0D1B36";
+const XLS_WHITE = "FFFFFF";
+const XLS_BORDER = "D3D3D3";
+
+const XLS_THIN_BORDER = {
+  top: { style: "thin", color: { rgb: XLS_BORDER } },
+  bottom: { style: "thin", color: { rgb: XLS_BORDER } },
+  left: { style: "thin", color: { rgb: XLS_BORDER } },
+  right: { style: "thin", color: { rgb: XLS_BORDER } },
+};
+
+const CATEGORIA_LABEL: Record<DraftLine["tipo"], string> = {
+  TO_DOOR: "TO_DOOR",
+  PUDO: "PUDO-1er paq",
+  AA: "PUDO-Nº paq",
+};
+
+const CATEGORIA_FILL: Record<DraftLine["tipo"], string> = {
+  TO_DOOR: XLS_LEGEND_TODOOR,
+  PUDO: XLS_LEGEND_PUDO,
+  AA: XLS_LEGEND_PUDO,
+};
+
+const DIAS_SEMANA = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+const MESES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+const MESES_CAP = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+function parseIsoDate(iso: string): Date {
+  const [y, m, day] = iso.split("-").map(Number);
+  return new Date(y || 2000, (m || 1) - 1, day || 1);
+}
+function formatDDMM(iso: string): string {
+  const d = parseIsoDate(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function formatDiaSeparador(iso: string): string {
+  const d = parseIsoDate(iso);
+  return `📅 ${DIAS_SEMANA[d.getDay()]} ${d.getDate()} DE ${MESES[d.getMonth()]}`;
+}
+function formatPeriodo(desde: string, hasta: string): string {
+  const d1 = parseIsoDate(desde);
+  const d2 = parseIsoDate(hasta);
+  if (d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth()) {
+    const mes = MESES_CAP[d1.getMonth()];
+    const rango = d1.getDate() === d2.getDate() ? `${d1.getDate()}` : `${d1.getDate()}-${d2.getDate()}`;
+    return `${mes} ${d1.getFullYear()} (${rango} ${mes})`;
+  }
+  return `${desde} → ${hasta}`;
+}
+// Varios CP pueden tener distinto precio para el mismo driver — si todos
+// coinciden se muestra un único valor, si no, un rango "según CP".
+function formatValores(vals: number[]): string {
+  const uniq = [...new Set(vals.map((v) => v.toFixed(4)))].map(Number);
+  if (uniq.length === 0) return "—";
+  if (uniq.length === 1) return `${uniq[0].toFixed(2)} €`;
+  const min = Math.min(...uniq);
+  const max = Math.max(...uniq);
+  return `según CP (${min.toFixed(2)}–${max.toFixed(2)} €)`;
+}
+
+type XlsStyle = Record<string, unknown>;
+
+function exportBorradorFacturaExcel(d: DraftResult, hubMarca: string) {
+  const aoa: (string | number)[][] = [];
+  const styles: { r: number; c: number; s: XlsStyle }[] = [];
+  const merges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
+  const push = (row: (string | number)[]) => { aoa.push(row); return aoa.length - 1; };
+  const style = (r: number, c: number, s: XlsStyle) => styles.push({ r, c, s });
+  const styleRange = (r: number, c0: number, c1: number, s: XlsStyle) => {
+    for (let c = c0; c <= c1; c++) style(r, c, s);
+  };
+
+  const bold = { font: { bold: true } };
+  const titleStyle = { font: { bold: true, color: { rgb: XLS_WHITE }, sz: 13 }, fill: { patternType: "solid", fgColor: { rgb: XLS_TITLE_BLUE } }, alignment: { vertical: "center" } };
+  const sectionTitleStyle = { font: { bold: true, sz: 11 } };
+  const headerStyle = { font: { bold: true, color: { rgb: XLS_WHITE } }, fill: { patternType: "solid", fgColor: { rgb: XLS_TITLE_BLUE } }, alignment: { horizontal: "center", vertical: "center" }, border: XLS_THIN_BORDER };
+  const daySepStyle = { font: { bold: true, color: { rgb: XLS_WHITE } }, fill: { patternType: "solid", fgColor: { rgb: XLS_TITLE_BLUE } } };
+  const daySubtotalStyle = { font: { bold: true }, fill: { patternType: "solid", fgColor: { rgb: XLS_DAY_SUBTOTAL } }, border: XLS_THIN_BORDER };
+  const grandTotalStyle = { font: { bold: true, color: { rgb: XLS_WHITE } }, fill: { patternType: "solid", fgColor: { rgb: XLS_GRAND_TOTAL } }, border: XLS_THIN_BORDER };
+  const cellBorder = { border: XLS_THIN_BORDER };
+  const legendCell = (fill: string): XlsStyle => ({ font: { bold: true, sz: 9 }, fill: { patternType: "solid", fgColor: { rgb: fill } }, alignment: { vertical: "center", wrapText: true }, border: XLS_THIN_BORDER });
+  const categoriaCell = (tipo: DraftLine["tipo"]): XlsStyle => ({ fill: { patternType: "solid", fgColor: { rgb: CATEGORIA_FILL[tipo] } }, border: XLS_THIN_BORDER });
+
+  // --- Cabecera ---
+  // Filas con relleno de color sobre celdas fusionadas se rellenan a las 7
+  // columnas (aunque el texto solo importa en la primera) — aoa_to_sheet
+  // solo crea celdas para los índices presentes en cada fila, y sin celda no
+  // hay dónde aplicar el estilo/relleno en el resto de la fusión.
+  let r = push([`${hubMarca.toUpperCase()} — BORRADOR DE FACTURA`, "", "", "", "", "", ""]);
+  styleRange(r, 0, 6, titleStyle);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+
+  r = push(["Repartidor:", d.driver_nombre]);
+  style(r, 0, bold);
+  r = push(["Período:", formatPeriodo(d.fecha_desde, d.fecha_hasta)]);
+  style(r, 0, bold);
+
+  const doorVals = d.lineas.filter((l) => l.tipo === "TO_DOOR").map((l) => l.precio_unitario);
+  const pudoVals = d.lineas.filter((l) => l.tipo === "PUDO").map((l) => l.precio_unitario);
+  const aaVals = d.lineas.filter((l) => l.tipo === "AA").map((l) => l.precio_unitario);
+  r = push(["Tarifa TO_DOOR:", formatValores(doorVals)]);
+  style(r, 0, bold);
+  r = push(["Tarifa PUDO/AA:", `1er paq. = ${formatValores(pudoVals)} · 2º+ paq. = ${formatValores(aaVals)}`]);
+  style(r, 0, bold);
+  r = push(["IVA:", "21%"]);
+  style(r, 0, bold);
+  r = push(["Total paquetes:", d.total_paquetes]);
+  style(r, 0, bold);
+
+  push([]);
+
+  // --- Leyenda de colores ---
+  r = push(["LEYENDA DE COLORES"]);
+  style(r, 0, sectionTitleStyle);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+
+  r = push(["TO_DOOR (tarifa normal)", "", "PUDO — 1er paq (tarifa normal)", "", "PUDO — 2º+ paq (tarifa extra)", "", ""]);
+  style(r, 0, legendCell(XLS_LEGEND_TODOOR));
+  style(r, 2, legendCell(XLS_LEGEND_PUDO));
+  style(r, 4, legendCell(XLS_LEGEND_PUDO));
+
+  push([]);
+
+  // --- Resumen por concepto ---
+  r = push(["RESUMEN POR CONCEPTO"]);
+  style(r, 0, sectionTitleStyle);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+
+  r = push(["Concepto", "Paquetes", "Tarifa", "", "Base imp.", "IVA 21%", "Total c/IVA"]);
+  styleRange(r, 0, 6, headerStyle);
+
+  const conceptOrder: DraftLine["tipo"][] = ["TO_DOOR", "PUDO", "AA"];
+  const conceptVals: Record<DraftLine["tipo"], number[]> = { TO_DOOR: doorVals, PUDO: pudoVals, AA: aaVals };
+  for (const tipo of conceptOrder) {
+    const lineasTipo = d.lineas.filter((l) => l.tipo === tipo);
+    if (lineasTipo.length === 0) continue;
+    const cantidad = lineasTipo.reduce((s, l) => s + l.cantidad, 0);
+    const base = lineasTipo.reduce((s, l) => s + l.subtotal, 0);
+    const iva = +(base * 0.21).toFixed(2);
+    r = push([CATEGORIA_LABEL[tipo], cantidad, formatValores(conceptVals[tipo]), "", +base.toFixed(2), iva, +(base + iva).toFixed(2)]);
+    styleRange(r, 0, 6, cellBorder);
+  }
+
+  r = push(["", "", "", "Base imponible:", d.base_imponible, "", ""]);
+  style(r, 3, bold);
+  r = push(["", "", "", "IVA (21%):", "", d.iva_21, ""]);
+  style(r, 3, bold);
+  r = push(["TOTAL A FACTURAR", "", d.total_paquetes, "BASE + IVA:", d.base_imponible, d.iva_21, d.total]);
+  styleRange(r, 0, 6, daySubtotalStyle);
+
+  push([]);
+
+  // --- Detalle por día ---
+  if (!d.detalle || d.detalle.length === 0) {
+    r = push(["DETALLE POR DÍA"]);
+    style(r, 0, sectionTitleStyle);
+    r = push(["Detalle por día no disponible para facturas guardadas anteriormente — vuelve a generar el borrador para incluirlo."]);
+    style(r, 0, { font: { italic: true, color: { rgb: "6B7280" } } });
+  } else {
+    r = push(["DETALLE POR DÍA"]);
+    style(r, 0, sectionTitleStyle);
+    merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+
+    r = push(["Fecha", "Dirección", "CP", "Tipo", "Base", "IVA 21%", "Total"]);
+    styleRange(r, 0, 6, headerStyle);
+
+    const porDia = new Map<string, DetalleRow[]>();
+    for (const row of d.detalle) {
+      if (!porDia.has(row.fecha)) porDia.set(row.fecha, []);
+      porDia.get(row.fecha)!.push(row);
+    }
+    const fechas = [...porDia.keys()].sort();
+
+    let granBase = 0;
+    let granIva = 0;
+    for (const fecha of fechas) {
+      const rowsDia = [...porDia.get(fecha)!].sort(
+        (a, b) => a.direccion.localeCompare(b.direccion) || a.cp.localeCompare(b.cp),
+      );
+
+      r = push([formatDiaSeparador(fecha), "", "", "", "", "", ""]);
+      styleRange(r, 0, 6, daySepStyle);
+      merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+
+      let diaBase = 0;
+      let diaIva = 0;
+      for (const row of rowsDia) {
+        const base = row.precio_unitario;
+        const iva = base * 0.21;
+        diaBase += base;
+        diaIva += iva;
+        r = push([
+          formatDDMM(row.fecha),
+          row.direccion || "—",
+          row.cp || "—",
+          CATEGORIA_LABEL[row.tipo],
+          +base.toFixed(2),
+          +iva.toFixed(2),
+          +(base + iva).toFixed(2),
+        ]);
+        styleRange(r, 0, 6, categoriaCell(row.tipo));
+      }
+      granBase += diaBase;
+      granIva += diaIva;
+
+      r = push([`Total ${formatDDMM(fecha)}`, "", "", "", +diaBase.toFixed(2), +diaIva.toFixed(2), +(diaBase + diaIva).toFixed(2)]);
+      styleRange(r, 0, 6, daySubtotalStyle);
+    }
+
+    r = push(["TOTAL GENERAL", "", "", "", +granBase.toFixed(2), +granIva.toFixed(2), +(granBase + granIva).toFixed(2)]);
+    styleRange(r, 0, 6, grandTotalStyle);
+  }
+
+  const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
+  ws["!merges"] = merges;
+  ws["!cols"] = [12, 30, 12, 16, 14, 14, 14].map((wch) => ({ wch }));
+  for (const { r: rr, c, s } of styles) {
+    const ref = XLSXStyle.utils.encode_cell({ r: rr, c });
+    const cell = (ws as Record<string, unknown>)[ref] as { s?: unknown } | undefined;
+    if (cell) cell.s = s;
+  }
+
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, ws, "Borrador Factura");
+  const buf = XLSXStyle.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
   const safe = d.driver_nombre.replace(/[^a-z0-9]+/gi, "_");
-  XLSX.writeFile(wb, `Borrador_${safe}_${d.fecha_desde}_${d.fecha_hasta}.xlsx`);
+  a.download = `Borrador_${safe}_${d.fecha_desde}_${d.fecha_hasta}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ============================================================
@@ -360,6 +619,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dupHighlight, setDupHighlight] = useState<number | null>(null);
 
   const loadDrivers = async () => {
     setLoadingDrivers(true);
@@ -411,7 +671,24 @@ function TarifasSection({ hubId }: { hubId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverId]);
 
+  // Bloquea en el momento el CP duplicado para el mismo driver, en vez de
+  // dejar que se guarde y reviente el upsert con "ON CONFLICT DO UPDATE
+  // command cannot affect row a second time" (el error que ya vimos). Si el
+  // valor tipeado coincide con el de otra fila, no se actualiza el estado
+  // (el input se queda con el valor anterior) y se resalta la fila original.
   const updateField = (idx: number, field: keyof Tarifa, value: string) => {
+    if (field === "codigo_postal") {
+      const normalized = value.trim();
+      if (normalized) {
+        const dupIdx = tarifas.findIndex((t, i) => i !== idx && t.codigo_postal.trim() === normalized);
+        if (dupIdx !== -1) {
+          toast.error(`El CP ${normalized} ya está configurado para este driver`);
+          setDupHighlight(dupIdx);
+          setTimeout(() => setDupHighlight((h) => (h === dupIdx ? null : h)), 2000);
+          return;
+        }
+      }
+    }
     setTarifas((prev) =>
       prev.map((t, i) =>
         i === idx
@@ -464,7 +741,16 @@ function TarifasSection({ hubId }: { hubId: string }) {
       setSaving(false);
       return;
     }
-    const payload = dirty.map((t) => ({
+    // Red de seguridad: aunque updateField ya bloquea CPs duplicados al
+    // tipear, se deduplica igual por (driver_id, codigo_postal) antes de
+    // mandar el upsert — si llegara a colarse un duplicado, Postgres tira
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    // porque el mismo lote intentaría afectar la misma fila dos veces. Se
+    // conserva la última fila (la más reciente en el array).
+    const byCp = new Map<string, Tarifa>();
+    for (const t of dirty) byCp.set(t.codigo_postal.trim(), t);
+    const deduped = [...byCp.values()];
+    const payload = deduped.map((t) => ({
       ...(t.id ? { id: t.id } : {}),
       hub_id: hubId,
       driver_id: driverId,
@@ -479,7 +765,7 @@ function TarifasSection({ hubId }: { hubId: string }) {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success(`${dirty.length} tarifa(s) guardadas`);
+      toast.success(`${deduped.length} tarifa(s) guardadas`);
       await load();
     }
     setSaving(false);
@@ -544,7 +830,13 @@ function TarifasSection({ hubId }: { hubId: string }) {
                   tarifas.map((t, idx) => (
                     <tr
                       key={t.id ?? `new-${idx}`}
-                      className={`border-b border-hairline/50 ${t._dirty ? "bg-electric/5" : ""}`}
+                      className={`border-b border-hairline/50 transition-colors ${
+                        dupHighlight === idx
+                          ? "bg-danger/10 ring-1 ring-inset ring-danger/50"
+                          : t._dirty
+                            ? "bg-electric/5"
+                            : ""
+                      }`}
                     >
                       <td className="px-4 py-2">
                         <input
@@ -668,7 +960,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
         const from = i * PAGE_SIZE;
         return supabase
           .from("epod_lineas")
-          .select("lp_no, driver, fecha, cp, tipo_norm, pop_station_id")
+          .select("lp_no, driver, fecha, cp, direccion, tipo_norm, pop_station_id")
           .eq("hub_id", hubId)
           .gte("fecha", fromDate)
           .lte("fecha", toDate)
@@ -786,7 +1078,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
     if (skipped > 0) toast.warning(`${skipped} driver(es) sin registrar en /drivers, no se guardaron`);
   };
 
-  const downloadAll = () => results.forEach((d) => exportBorradorExcel(d, hubMarca));
+  const downloadAll = () => results.forEach((d) => exportBorradorFacturaExcel(d, hubMarca));
 
   const hasData = (periodCount ?? 0) > 0;
   const canGenerate = hasData && driversCount > 0 && tarifasCount > 0 && !generating;
@@ -980,7 +1272,7 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
                     </table>
                     <div className="flex gap-2 p-4 border-t border-hairline bg-surface-2/30">
                       <button
-                        onClick={() => exportBorradorExcel(d, hubMarca)}
+                        onClick={() => exportBorradorFacturaExcel(d, hubMarca)}
                         className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono tracking-widest uppercase border border-hairline rounded hover:border-electric hover:text-electric transition-colors"
                       >
                         <Download className="size-3.5" /> Excel
@@ -1075,6 +1367,7 @@ function SavedBorradoresSection({ hubId, hubMarca }: { hubId: string; hubMarca: 
     }
     const draft: DraftResult = {
       driver_nombre: b.driver_nombre,
+      driver_id: null,
       total_paquetes: b.total_paquetes,
       base_imponible: Number(b.base_imponible),
       iva_21: Number(b.iva_21),
@@ -1090,7 +1383,7 @@ function SavedBorradoresSection({ hubId, hubMarca }: { hubId: string; hubMarca: 
         subtotal: Number(l.subtotal),
       })),
     };
-    exportBorradorExcel(draft, hubMarca);
+    exportBorradorFacturaExcel(draft, hubMarca);
   };
 
   return (
