@@ -13,6 +13,7 @@ import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
 import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
 import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
+import { Route as MapaEntregasRouteImport } from './routes/mapa-entregas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
@@ -22,12 +23,12 @@ import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/reportes_.clientes-locales.admin'
-import { Route as ReportesClientesLocalesRouteImport } from './routes/reportes_.clientes-locales'
 import { Route as ReportesSuperReporteRouteImport } from './routes/reportes_.super-reporte'
 import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
 import { Route as ReportesFlowMeetingRouteImport } from './routes/reportes_.flow-meeting'
+import { Route as ReportesClientesLocalesRouteImport } from './routes/reportes_.clientes-locales'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
+import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/reportes_.clientes-locales.admin'
 import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
 import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
 
@@ -49,6 +50,11 @@ const MapasProvinciaRoute = MapasProvinciaRouteImport.update({
 const MapasAdminRoute = MapasAdminRouteImport.update({
   id: '/mapas-admin',
   path: '/mapas-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapaEntregasRoute = MapaEntregasRouteImport.update({
+  id: '/mapa-entregas',
+  path: '/mapa-entregas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -96,17 +102,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportesClientesLocalesRoute = ReportesClientesLocalesRouteImport.update({
-  id: '/reportes_/clientes-locales',
-  path: '/reportes/clientes-locales',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportesClientesLocalesAdminRoute =
-  ReportesClientesLocalesAdminRouteImport.update({
-    id: '/reportes_/clientes-locales/admin',
-    path: '/reportes/clientes-locales/admin',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ReportesSuperReporteRoute = ReportesSuperReporteRouteImport.update({
   id: '/reportes_/super-reporte',
   path: '/reportes/super-reporte',
@@ -123,11 +118,22 @@ const ReportesFlowMeetingRoute = ReportesFlowMeetingRouteImport.update({
   path: '/reportes/flow-meeting',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportesClientesLocalesRoute = ReportesClientesLocalesRouteImport.update({
+  id: '/reportes_/clientes-locales',
+  path: '/reportes/clientes-locales',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RecTokenRoute = RecTokenRouteImport.update({
   id: '/rec/$token',
   path: '/rec/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReportesClientesLocalesAdminRoute =
+  ReportesClientesLocalesAdminRouteImport.update({
+    id: '/admin',
+    path: '/admin',
+    getParentRoute: () => ReportesClientesLocalesRoute,
+  } as any)
 const ApiReportesIdRoute = ApiReportesIdRouteImport.update({
   id: '/api/reportes/$id',
   path: '/api/reportes/$id',
@@ -149,18 +155,19 @@ export interface FileRoutesByFullPath {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes/clientes-locales': typeof ReportesClientesLocalesRouteWithChildren
   '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes/super-reporte': typeof ReportesSuperReporteRoute
-  '/reportes/clientes-locales': typeof ReportesClientesLocalesRoute
-  '/reportes/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
+  '/reportes/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -172,18 +179,19 @@ export interface FileRoutesByTo {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes/clientes-locales': typeof ReportesClientesLocalesRouteWithChildren
   '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes/super-reporte': typeof ReportesSuperReporteRoute
-  '/reportes/clientes-locales': typeof ReportesClientesLocalesRoute
-  '/reportes/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
+  '/reportes/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,18 +204,19 @@ export interface FileRoutesById {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/login': typeof LoginRoute
+  '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
+  '/reportes_/clientes-locales': typeof ReportesClientesLocalesRouteWithChildren
   '/reportes_/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes_/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes_/super-reporte': typeof ReportesSuperReporteRoute
-  '/reportes_/clientes-locales': typeof ReportesClientesLocalesRoute
-  '/reportes_/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
   '/api/reportes/$id': typeof ApiReportesIdRoute
+  '/reportes_/clientes-locales/admin': typeof ReportesClientesLocalesAdminRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,18 +230,19 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapa-entregas'
     | '/mapas-admin'
     | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes/clientes-locales'
     | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/reportes/super-reporte'
-    | '/reportes/clientes-locales'
-    | '/reportes/clientes-locales/admin'
     | '/api/public/cd5'
     | '/api/reportes/$id'
+    | '/reportes/clientes-locales/admin'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -244,18 +254,19 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapa-entregas'
     | '/mapas-admin'
     | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes/clientes-locales'
     | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/reportes/super-reporte'
-    | '/reportes/clientes-locales'
-    | '/reportes/clientes-locales/admin'
     | '/api/public/cd5'
     | '/api/reportes/$id'
+    | '/reportes/clientes-locales/admin'
   id:
     | '__root__'
     | '/'
@@ -267,18 +278,19 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/login'
+    | '/mapa-entregas'
     | '/mapas-admin'
     | '/mapas-provincia'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
+    | '/reportes_/clientes-locales'
     | '/reportes_/flow-meeting'
     | '/reportes_/paquetes-en-riesgo'
     | '/reportes_/super-reporte'
-    | '/reportes_/clientes-locales'
-    | '/reportes_/clientes-locales/admin'
     | '/api/public/cd5'
     | '/api/reportes/$id'
+    | '/reportes_/clientes-locales/admin'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -291,16 +303,16 @@ export interface RootRouteChildren {
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
   LoginRoute: typeof LoginRoute
+  MapaEntregasRoute: typeof MapaEntregasRoute
   MapasAdminRoute: typeof MapasAdminRoute
   MapasProvinciaRoute: typeof MapasProvinciaRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
+  ReportesClientesLocalesRoute: typeof ReportesClientesLocalesRouteWithChildren
   ReportesFlowMeetingRoute: typeof ReportesFlowMeetingRoute
   ReportesPaquetesEnRiesgoRoute: typeof ReportesPaquetesEnRiesgoRoute
   ReportesSuperReporteRoute: typeof ReportesSuperReporteRoute
-  ReportesClientesLocalesRoute: typeof ReportesClientesLocalesRoute
-  ReportesClientesLocalesAdminRoute: typeof ReportesClientesLocalesAdminRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
   ApiReportesIdRoute: typeof ApiReportesIdRoute
 }
@@ -333,6 +345,13 @@ declare module '@tanstack/react-router' {
       path: '/mapas-admin'
       fullPath: '/mapas-admin'
       preLoaderRoute: typeof MapasAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapa-entregas': {
+      id: '/mapa-entregas'
+      path: '/mapa-entregas'
+      fullPath: '/mapa-entregas'
+      preLoaderRoute: typeof MapaEntregasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -398,20 +417,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reportes_/clientes-locales/admin': {
-      id: '/reportes_/clientes-locales/admin'
-      path: '/reportes/clientes-locales/admin'
-      fullPath: '/reportes/clientes-locales/admin'
-      preLoaderRoute: typeof ReportesClientesLocalesAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reportes_/clientes-locales': {
-      id: '/reportes_/clientes-locales'
-      path: '/reportes/clientes-locales'
-      fullPath: '/reportes/clientes-locales'
-      preLoaderRoute: typeof ReportesClientesLocalesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/reportes_/super-reporte': {
       id: '/reportes_/super-reporte'
       path: '/reportes/super-reporte'
@@ -433,12 +438,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportesFlowMeetingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reportes_/clientes-locales': {
+      id: '/reportes_/clientes-locales'
+      path: '/reportes/clientes-locales'
+      fullPath: '/reportes/clientes-locales'
+      preLoaderRoute: typeof ReportesClientesLocalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rec/$token': {
       id: '/rec/$token'
       path: '/rec/$token'
       fullPath: '/rec/$token'
       preLoaderRoute: typeof RecTokenRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/reportes_/clientes-locales/admin': {
+      id: '/reportes_/clientes-locales/admin'
+      path: '/admin'
+      fullPath: '/reportes/clientes-locales/admin'
+      preLoaderRoute: typeof ReportesClientesLocalesAdminRouteImport
+      parentRoute: typeof ReportesClientesLocalesRoute
     }
     '/api/reportes/$id': {
       id: '/api/reportes/$id'
@@ -457,6 +476,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ReportesClientesLocalesRouteChildren {
+  ReportesClientesLocalesAdminRoute: typeof ReportesClientesLocalesAdminRoute
+}
+
+const ReportesClientesLocalesRouteChildren: ReportesClientesLocalesRouteChildren =
+  {
+    ReportesClientesLocalesAdminRoute: ReportesClientesLocalesAdminRoute,
+  }
+
+const ReportesClientesLocalesRouteWithChildren =
+  ReportesClientesLocalesRoute._addFileChildren(
+    ReportesClientesLocalesRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -467,19 +500,29 @@ const rootRouteChildren: RootRouteChildren = {
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
   LoginRoute: LoginRoute,
+  MapaEntregasRoute: MapaEntregasRoute,
   MapasAdminRoute: MapasAdminRoute,
   MapasProvinciaRoute: MapasProvinciaRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
+  ReportesClientesLocalesRoute: ReportesClientesLocalesRouteWithChildren,
   ReportesFlowMeetingRoute: ReportesFlowMeetingRoute,
   ReportesPaquetesEnRiesgoRoute: ReportesPaquetesEnRiesgoRoute,
   ReportesSuperReporteRoute: ReportesSuperReporteRoute,
-  ReportesClientesLocalesRoute: ReportesClientesLocalesRoute,
-  ReportesClientesLocalesAdminRoute: ReportesClientesLocalesAdminRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,
   ApiReportesIdRoute: ApiReportesIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
