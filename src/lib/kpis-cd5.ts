@@ -30,11 +30,22 @@ const STUCK_ESTADOS = new Set(["driver_received", "driver_received_incidencias"]
 
 type Cd5Row = {
   waybill: string | null;
+  lp_no: string;
   fecha: string | null;
   estado: string;
   exception_detail: string | null;
   row_index: number;
 };
+
+// waybill puede venir NULL para un hub entero si el ePOD que se subió traía
+// una variante de columna no cubierta por el parser (ya pasó con Luan
+// Express: "Waybill Number" en vez de "Waybill No" — corregido en el parser
+// de /epod, pero eso no arregla las filas YA subidas). lp_no es NOT NULL por
+// schema, así que sirve de identificador de respaldo siempre confiable —
+// nunca hay que asumir que waybill está poblado.
+function packageId(waybill: string | null, lpNo: string): string {
+  return waybill || lpNo;
+}
 
 export type Cd5DayPoint = {
   fecha: string;
@@ -58,7 +69,6 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
     .from("epod_lineas")
     .select("id", { count: "exact", head: true })
     .eq("hub_id", hubId)
-    .not("waybill", "is", null)
     .gte("fecha", from)
     .lte("fecha", to);
   if (countErr) throw countErr;
@@ -70,9 +80,8 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
       const start = i * PAGE_SIZE;
       return supabase
         .from("epod_lineas")
-        .select("waybill, fecha, estado, exception_detail, row_index")
+        .select("waybill, lp_no, fecha, estado, exception_detail, row_index")
         .eq("hub_id", hubId)
-        .not("waybill", "is", null)
         .gte("fecha", from)
         .lte("fecha", to)
         .order("id", { ascending: true })
@@ -101,7 +110,7 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
   const estadoOn = new Map<string, { estado: string; rowIndex: number }>(); // `${waybill}|${fecha}`
 
   for (const r of rows) {
-    const wb = r.waybill;
+    const wb = packageId(r.waybill, r.lp_no);
     const fecha = r.fecha;
     if (!wb || !fecha) continue;
 

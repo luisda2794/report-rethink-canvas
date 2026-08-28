@@ -42,7 +42,10 @@ export const Route = createFileRoute("/epod")({
 // ============================================================
 
 const COL = {
-  waybill: ["Número de Waybill", "Waybill No", "Waybill"],
+  // "Waybill Number" (no abreviado) es una variante real que ya vimos en
+  // ePODs de Luan Express — pickField() matchea exacto tras normalizar, así
+  // que "Waybill No" no la cubre ("waybillno" vs "waybillnumber").
+  waybill: ["Número de Waybill", "Waybill No", "Waybill Number", "Waybill"],
   lp: ["LP No.", "LPNo", "LP No"],
   fecha: ["Fecha de la tarea", "Task Date", "Date"],
   fecha_inbound: ["Fecha Inbound", "Inbound Date"],
