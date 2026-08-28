@@ -67,7 +67,8 @@ type Cd5Row = {
   row_index: number;
 };
 
-type TimelineEntry = { fecha: string; estado: string; rowIndex: number };
+type Event = { wb: string; fecha: string; estado: string; rowIndex: number };
+type Checkpoint = { fecha: string; kind: "anchor" | "eval"; trendDay: string };
 
 export type Cd5DayPoint = {
   fecha: string;
@@ -118,28 +119,27 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
   return all;
 }
 
-/** Última entrada de la línea de tiempo (ya ordenada asc por fecha, row_index) con fecha <= day. */
-function statusAsOf(timeline: TimelineEntry[], day: string): TimelineEntry | null {
-  let lo = 0;
-  let hi = timeline.length - 1;
-  let ans = -1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >> 1;
-    if (timeline[mid].fecha <= day) {
-      ans = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return ans >= 0 ? timeline[ans] : null;
-}
-
+// Una sola pasada cronológica en vez de 20 (una por día de tendencia):
+// se ordenan TODOS los eventos una vez, y se recorren linealmente
+// manteniendo un "estado actual por paquete" que se va actualizando — en
+// vez de reconstruirlo desde cero (con una búsqueda por paquete) 20 veces.
+// Los 20 días de ancla y los 20 días evaluados (40 "puntos de lectura" en
+// total, alguno puede coincidir) se intercalan como checkpoints en la misma
+// línea de tiempo: al llegar a cada uno, el mapa de estado ya refleja
+// exactamente lo que pasó hasta esa fecha inclusive — sin volver a mirar
+// filas viejas. Los checkpoints de tipo "ancla" arman el cohorte de ese
+// día (usando el mapa en ese momento) y lo guardan para leerlo 5 días
+// después en el checkpoint "eval" correspondiente. Complejidad: ordenar
+// todos los eventos (O(N log N)) + un barrido lineal con dos punteros — ya
+// no son 20 recorridas independientes del historial completo.
 function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
   let earliestFecha: string | null = null;
   let latestFecha: string | null = null;
 
-  const timelines = new Map<string, TimelineEntry[]>();
+  const events: Event[] = [];
+  // Exclusión por Dirección Incorrecta: se calcula sobre la ÚLTIMA incidencia
+  // de todo el historial del waybill (no solo hasta el día ancla), igual que
+  // antes — por eso se resuelve aparte del barrido incremental.
   const lastException = new Map<string, { fecha: string; rowIndex: number; detail: string }>();
 
   for (const r of rows) {
@@ -150,8 +150,7 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
     const wb = packageId(r.waybill, r.lp_no);
     if (!wb) continue;
 
-    if (!timelines.has(wb)) timelines.set(wb, []);
-    timelines.get(wb)!.push({ fecha: r.fecha, estado: r.estado, rowIndex: r.row_index });
+    events.push({ wb, fecha: r.fecha, estado: r.estado, rowIndex: r.row_index });
 
     const detail = (r.exception_detail ?? "").trim();
     if (detail) {
@@ -161,44 +160,61 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
       }
     }
   }
-
-  for (const tl of timelines.values()) {
-    tl.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.rowIndex - b.rowIndex));
-  }
+  events.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.rowIndex - b.rowIndex));
 
   const excluded = new Set<string>();
   for (const [wb, exc] of lastException) {
     if (isDireccionIncorrecta(exc.detail)) excluded.add(wb);
   }
 
-  const points = trendDays.map((diaEvaluado) => {
-    const anchor = isoAddDays(diaEvaluado, -5);
-    let total = 0;
-    let resueltos = 0;
+  const checkpoints: Checkpoint[] = [];
+  for (const d of trendDays) {
+    checkpoints.push({ fecha: isoAddDays(d, -5), kind: "anchor", trendDay: d });
+    checkpoints.push({ fecha: d, kind: "eval", trendDay: d });
+  }
+  checkpoints.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
 
-    for (const [wb, tl] of timelines) {
-      if (excluded.has(wb)) continue;
-      const inbound = tl[0].fecha;
+  const estadoActual = new Map<string, string>();
+  const inboundPorPaquete = new Map<string, string>();
+  const cohortesPorDia = new Map<string, string[]>();
+  const pointsPorDia = new Map<string, Cd5DayPoint>();
 
-      let enCohorte: boolean;
-      if (inbound === anchor) {
-        enCohorte = true; // llegó justo el día ancla
-      } else if (inbound < anchor) {
-        const asOfAnchor = statusAsOf(tl, anchor);
-        enCohorte = !!asOfAnchor && isStuckEstado(asOfAnchor.estado);
-      } else {
-        enCohorte = false; // todavía no había llegado en el día ancla
-      }
-      if (!enCohorte) continue;
-
-      total++;
-      const asOfEval = statusAsOf(tl, diaEvaluado);
-      if (asOfEval && isEntregado(asOfEval.estado)) resueltos++;
+  let ei = 0;
+  for (const cp of checkpoints) {
+    // Aplica todos los eventos hasta esta fecha (inclusive) antes de leer el
+    // estado — así el checkpoint ve exactamente "lo que pasó hasta ahí".
+    while (ei < events.length && events[ei].fecha <= cp.fecha) {
+      const e = events[ei];
+      estadoActual.set(e.wb, e.estado);
+      if (!inboundPorPaquete.has(e.wb)) inboundPorPaquete.set(e.wb, e.fecha); // primera vez visto = el más antiguo (eventos ya en orden)
+      ei++;
     }
 
-    return { fecha: diaEvaluado, total, resueltos, pct: total > 0 ? (resueltos / total) * 100 : null };
-  });
+    if (cp.kind === "anchor") {
+      const cohorte: string[] = [];
+      for (const [wb, inbound] of inboundPorPaquete) {
+        if (excluded.has(wb)) continue;
+        if (inbound === cp.fecha) {
+          cohorte.push(wb); // llegó justo el día ancla
+        } else if (inbound < cp.fecha) {
+          const estado = estadoActual.get(wb);
+          if (estado && isStuckEstado(estado)) cohorte.push(wb); // seguía atascado ese día
+        }
+      }
+      cohortesPorDia.set(cp.trendDay, cohorte);
+    } else {
+      const cohorte = cohortesPorDia.get(cp.trendDay) ?? [];
+      let resueltos = 0;
+      for (const wb of cohorte) {
+        const estado = estadoActual.get(wb);
+        if (estado && isEntregado(estado)) resueltos++;
+      }
+      const total = cohorte.length;
+      pointsPorDia.set(cp.trendDay, { fecha: cp.trendDay, total, resueltos, pct: total > 0 ? (resueltos / total) * 100 : null });
+    }
+  }
 
+  const points = trendDays.map((d) => pointsPorDia.get(d)!);
   return { points, earliestFecha, latestFecha };
 }
 

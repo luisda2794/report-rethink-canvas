@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { AlertTriangle, Copy, MapPin, Sparkles, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, Copy, Loader2, MapPin, Sparkles, TrendingUp, Users } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
@@ -112,7 +112,10 @@ function KpisPage() {
       ) : isError ? (
         <p className="text-sm text-destructive">No se pudieron cargar los KPIs de este hub.</p>
       ) : isLoading ? (
-        <p className="text-sm text-muted-foreground">Cargando…</p>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" />
+          Calculando CD5 y DSR — puede tardar unos segundos en hubs con mucho histórico…
+        </div>
       ) : !hasAnyData ? (
         <p className="text-sm text-muted-foreground">Sin actividad en los últimos {KPIS_TREND_BUSINESS_DAYS} días hábiles para este hub.</p>
       ) : (
