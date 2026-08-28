@@ -1,522 +1,366 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import {
-  ArrowDown,
-  AlertTriangle,
-  Check,
-  Loader2,
-  AlertCircle,
-  Upload,
-  FileSpreadsheet,
-  X,
-  Database,
-  Copy,
-  Sparkles,
-  Users,
-  MapPin,
-} from "lucide-react";
-import * as XLSX from "xlsx";
-import { format, subDays } from "date-fns";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { useMemo } from "react";
+import { AlertTriangle, Copy, MapPin, Sparkles, TrendingUp, Users } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
 import { RequireAuth } from "@/components/RequireAuth";
 import { ReportCard } from "@/components/ReportCard";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-
+import { useCd5Trend, type Cd5DayPoint } from "@/lib/kpis-cd5";
+import { useDsrTrend, KPIS_TREND_BUSINESS_DAYS, type DsrDayPoint } from "@/lib/kpis-dsr";
+import { DSR_BANDS, dsrBandFor } from "@/lib/kpis-dsr-bands";
+import { mostRecentBusinessDay, toIso } from "@/lib/business-days";
 
 export const Route = createFileRoute("/reportes")({
   component: () => (
     <RequireAuth path="/reportes">
-      <ReportesPage />
+      <KpisPage />
     </RequireAuth>
-  ),
-  errorComponent: ({ error, reset }) => (
-    <div className="p-8 max-w-xl mx-auto space-y-3">
-      <h2 className="text-lg font-semibold">Algo falló al cargar reportes</h2>
-      <pre className="text-xs bg-muted p-3 rounded overflow-auto">{String(error?.message ?? error)}</pre>
-      <Button onClick={reset} size="sm">Reintentar</Button>
-    </div>
   ),
   head: () => ({
     meta: [
-      { title: "Menssajero — Reportes" },
+      { title: "Menssajero — KPIs" },
       {
         name: "description",
-        content:
-          "Genera reportes (DSR, CD4, CD6, OOH, ROP, PFM) subiendo el archivo de Cainiao.",
+        content: "CD5 y DSR diarios del hub, solo de lunes a viernes.",
       },
     ],
   }),
 });
 
-const API_BASE = "/api/reportes";
-
-type ReportState =
-  | { kind: "idle" }
-  | { kind: "loading" }
-  | { kind: "done" }
-  | { kind: "error"; message: string };
-
-type Reporte = {
-  id: string;
-  code: string;
-  name: string;
-  desc: string;
-  freq: "DIARIO" | "SEMANAL";
-  target?: string;
-};
-
-const TABS = {
-  carretera: {
-    label: "En Carretera",
-    reportes: [
-      { id: "riesgo", code: "ROP", name: "Riesgo Operativo", desc: "En reparto hoy con 3+ incidencias previas.", freq: "DIARIO" as const, target: "CRÍTICO" },
-      { id: "preflow", code: "PFM", name: "Pre Flow Meeting", desc: "PUDO por driver · Puntos y paquetes de hoy.", freq: "DIARIO" as const, target: "OPERATIVO" },
-    ],
-  },
-  kpis: {
-    label: "KPIs Flota",
-    reportes: [
-      { id: "dsr", code: "DSR", name: "Tasa de entrega", desc: "Éxito diario por driver y CP · Solo L–V.", freq: "SEMANAL" as const, target: "TGT ≥ 90%" },
-      { id: "cd4", code: "CD4", name: "Alerta preventiva", desc: "Paquetes en riesgo antes de D+4.", freq: "DIARIO" as const, target: "PREVENTIVO" },
-      { id: "cd6", code: "CD6", name: "Plazo crítico", desc: "Entrega antes D+6 · Target 99.5%.", freq: "DIARIO" as const, target: "TGT ≥ 99.5%" },
-      { id: "ooh", code: "OOH", name: "PUDO / Out of Home", desc: "Uso de puntos de recogida semanal.", freq: "SEMANAL" as const, target: "TGT ≥ 95%" },
-    ],
-  },
-} as const;
-
-// ARCHIVADO: bloque legado de generación de reportes (Usar datos guardados,
-// subir Excel de Cainiao y pestañas ROP · PFM · DSR · CD4 · CD6 · OOH).
-// Reemplazado en la UI por las tarjetas dedicadas (Paquetes en Riesgo, Flow
-// Meeting, Duplicados, Mapas Provincia). Se conserva el código por si hace
-// falta reactivarlo: cambiar a `true`.
-const SHOW_LEGACY_REPORT_TOOLS = false;
-
-function filenameFromDisposition(header: string | null, fallback: string) {
-  if (!header) return fallback;
-  const m = /filename\*=UTF-8''([^;]+)/i.exec(header) || /filename="?([^";]+)"?/i.exec(header);
-  if (!m) return fallback;
-  try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+// --- CD5: target 99.5%, semáforo estándar (más alto = mejor) ---
+const CD5_TARGET = 99.5;
+function cd5Color(pct: number): string {
+  if (pct >= 99.5) return "var(--success)";
+  if (pct >= 95) return "var(--warn)";
+  return "var(--danger)";
 }
 
-function isoToday() { return new Date().toISOString().slice(0, 10); }
+function esDate(iso: string, opts: Intl.DateTimeFormatOptions): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("es-ES", opts);
+}
+const axisLabel = (iso: string) => esDate(iso, { day: "2-digit", month: "2-digit" });
+const tooltipLabel = (iso: string) => esDate(iso, { weekday: "short", day: "numeric", month: "short" });
+const longLabel = (iso: string) => esDate(iso, { weekday: "long", day: "numeric", month: "long" });
 
-function ReportesPage() {
+function KpisPage() {
   const { selectedHub } = useAuth();
-  const [tab, setTab] = useState<keyof typeof TABS>("carretera");
-  const [states, setStates] = useState<Record<string, ReportState>>({});
-  const [file, setFile] = useState<File | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [genLoading, setGenLoading] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [fromDate, setFromDate] = useState(() => format(subDays(new Date(), 6), "yyyy-MM-dd"));
-  const [toDate, setToDate] = useState(() => format(new Date(), "yyyy-MM-dd"));
+  const hubId = selectedHub?.id ?? null;
 
-  const onPickFile = (f: File | null) => {
-    setFile(f);
-    setStates({});
-    setGenError(null);
-  };
+  const cd5 = useCd5Trend(hubId, KPIS_TREND_BUSINESS_DAYS);
+  const dsr = useDsrTrend(hubId, KPIS_TREND_BUSINESS_DAYS);
 
-  // Al cambiar de hub, limpiar el archivo cargado/generado para forzar
-  // regenerar con los datos del hub actualmente seleccionado.
-  useEffect(() => {
-    setFile(null);
-    setStates({});
-    setGenError(null);
-  }, [selectedHub?.id]);
+  const cd5Points = cd5.data ?? [];
+  const dsrByFecha = useMemo(() => new Map((dsr.data ?? []).map((p) => [p.fecha, p])), [dsr.data]);
 
-  const generarDesdeBase = async () => {
-    if (!selectedHub) return;
-    setGenLoading(true);
-    setGenError(null);
-    try {
-      const CAINIAO_HEADERS = [
-        "Número de Waybill","LP No.","Fecha de la tarea","Sitiocode","Plan de envíocode",
-        "Estado de la Tarea","Tipo de pedido","Tipo de Entrega","Nombre del Repartidor","Nombre de DSP",
-        "Orden de grupo de tareas","La primera clasificación del número de la bolsa grande","País receptor",
-        "Área de destino","La ciudad de destino","Código postal","Dirección detallada",
-        "Receptor a  latitud","Receptor a  longitud","Entrega real  latitud","Entrega real  longitud",
-        "Distancia de brecha de entrega","Contacto","Teléfono de contacto","Teléfono de contacto",
-        "Correo","Tiempo de creación","Tiempo de recepción","Tiempo de salida","Comience el tiempo de entrega",
-        "Tiempo de Entrega","Método de inicio de sesión","Detalles firmados","Firma","Fotos firmadas",
-        "Nombre del firmante","Signo POD","Tiempo del Fracaso de la Entrega","Tipo de Excepción",
-        "Detalles de la Excepción","Número de contactos","Última hora de contacto","Advertencia de envío falso",
-        "popStationId","ID de tarea","Nombre del esquema","Tipo de paquete","dspActionTime","dspAction",
-        "dspOperatorName","hasNewTaskForNextDayDelivery","ocrFailTimes","Motivo de error de programación",
-        "returnRemark","badCustomerTag","badZipCodeTag","Punto de conexión","deliveryMode","PUDO address",
-        "PUDO Validation Fail","SDSA Failure Reason (PUDO)","Peso (g)","Amplio","Anchura","Alto",
-        "eligibleMailbox","Tipo de envío falso","Duración de la llamada de número virtual",
-        "Causa de falla de llamada","Tipo de llamada","ocrFailType","Nombre del vendedor","pointBizCode",
-        "Nombre del mercado","stationWaveCode","pinCode","hasPinCode","sellerInterception",
-        "sellerInterceptionStatus","Vendedor Nombre","Zona","originalPlanTaskDate",
-        "Llegando al hub equivocado","Nombre de Hub incorrecto","hasCommercialAreaTag",
-        "podCheckManualResult","podCheckManualReason","podCheckTimeManual","podCheckInspector",
-      ] as const;
-
-      type CainiaoSourceRow = {
-        lp_no: string;
-        waybill: string | null;
-        driver: string | null;
-        fecha: string | null;
-        fecha_inbound: string | null;
-        cp: string | null;
-        direccion: string | null;
-        contacto: string | null;
-        tipo: string | null;
-        estado: string | null;
-        pop_station_id: string | null;
-      };
-
-      const appendRows = (page: CainiaoSourceRow[]) => {
-        for (const r of page) {
-          const row: Record<string, string> = {};
-          for (const h of CAINIAO_HEADERS) row[h] = "";
-          const fechaTs = r.fecha ? `${r.fecha} 08:00:00` : "";
-          const inboundTs = r.fecha_inbound ? `${r.fecha_inbound} 08:00:00` : fechaTs;
-          row["Número de Waybill"] = r.waybill ?? "";
-          row["LP No."] = r.lp_no ?? "";
-          row["Fecha de la tarea"] = r.fecha ?? "";
-          row["Estado de la Tarea"] = r.estado ?? "";
-          row["Tipo de pedido"] = "Entrega";
-          row["Tipo de Entrega"] = r.tipo ?? "";
-          row["Nombre del Repartidor"] = r.driver ?? "";
-          row["Nombre de DSP"] = selectedHub.marca ?? "";
-          row["País receptor"] = "ES";
-          row["Código postal"] = r.cp ?? "";
-          row["Dirección detallada"] = r.direccion ?? "";
-          row["Contacto"] = r.contacto ?? "";
-          row["Tiempo de creación"] = inboundTs;
-          row["Tiempo de recepción"] = inboundTs;
-          row["Tiempo de salida"] = fechaTs;
-          row["Comience el tiempo de entrega"] = fechaTs;
-          row["Tiempo de Entrega"] = r.estado === "Entregado" ? fechaTs : "";
-          row["Tiempo del Fracaso de la Entrega"] = r.estado && r.estado !== "Entregado" ? fechaTs : "";
-          row["Tipo de Excepción"] = r.estado && !["Entregado", "Driver_received", "Assigned"].includes(r.estado) ? r.estado : "";
-          row["popStationId"] = r.pop_station_id ?? "";
-          dataRows.push(row);
-        }
-      };
-
-      const pageSize = 1000;
-      const dataRows: Array<Record<string, string>> = [];
-      let hasRawEpodLines = false;
-
-      for (let from = 0; ; from += pageSize) {
-        const { data, error } = await supabase
-          .from("epod_lineas")
-          .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, estado, pop_station_id")
-          .eq("hub_id", selectedHub.id)
-          .gte("fecha", fromDate)
-          .lte("fecha", toDate)
-          .order("fecha", { ascending: true })
-          .order("row_index", { ascending: true })
-          .range(from, from + pageSize - 1);
-        if (error) throw error;
-        const page = data ?? [];
-        if (page.length > 0) hasRawEpodLines = true;
-        appendRows(page);
-        if (page.length < pageSize) break;
+  // Día mostrado en las tarjetas grandes: el hábil más reciente con datos en
+  // CUALQUIERA de las dos métricas, retrocediendo desde hoy (ajustado a
+  // hábil) si hace falta.
+  const today = toIso(mostRecentBusinessDay());
+  const shown = useMemo(() => {
+    for (let i = cd5Points.length - 1; i >= 0; i--) {
+      const c = cd5Points[i];
+      const d = dsrByFecha.get(c.fecha);
+      if (c.total > 0 || (d && d.total > 0)) {
+        return { fecha: c.fecha, cd5: c, dsr: d ?? null };
       }
-
-      if (!hasRawEpodLines) {
-        for (let from = 0; ; from += pageSize) {
-          const { data, error } = await supabase
-            .from("entregas")
-            .select("lp_no, waybill, driver, fecha, fecha_inbound, cp, direccion, contacto, tipo, estado, pop_station_id")
-            .eq("hub_id", selectedHub.id)
-            .gte("fecha", fromDate)
-            .lte("fecha", toDate)
-            .order("fecha", { ascending: true })
-            .range(from, from + pageSize - 1);
-          if (error) throw error;
-          const page = data ?? [];
-          appendRows(page);
-          if (page.length < pageSize) break;
-        }
-      }
-
-      if (dataRows.length === 0) {
-        setGenError("No hay entregas en ese rango para este hub.");
-        setGenLoading(false);
-        return;
-      }
-      const ws = XLSX.utils.json_to_sheet(dataRows, { header: [...CAINIAO_HEADERS] });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
-      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
-      const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const filename = `entregas_${selectedHub.marca}_${fromDate}_${toDate}.xlsx`;
-      const generated = new File([blob], filename, { type: blob.type });
-      onPickFile(generated);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error al generar";
-      setGenError(msg);
-    } finally {
-      setGenLoading(false);
     }
-  };
+    return null;
+  }, [cd5Points, dsrByFecha]);
 
-
-  const descargar = async (r: Reporte) => {
-    if (!file) return;
-    setStates((s) => ({ ...s, [r.id]: { kind: "loading" } }));
-    try {
-      const fd = new FormData();
-      fd.append("file", file, file.name);
-      const res = await fetch(`${API_BASE}/${r.id}`, {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) {
-        let msg = `Error ${res.status}`;
-        try {
-          const j = await res.json() as { detail?: unknown; message?: unknown };
-          const d = j.detail;
-          if (typeof d === "string") msg = d;
-          else if (Array.isArray(d)) msg = d.map((it) => (it && typeof it === "object" && "msg" in it ? `${((it as { loc?: unknown[] }).loc ?? []).join(".")}: ${(it as { msg?: string }).msg}` : JSON.stringify(it))).join("; ");
-          else if (d && typeof d === "object") msg = JSON.stringify(d);
-          else if (typeof j.message === "string") msg = j.message;
-        } catch { /* ignore */ }
-        setStates((s) => ({ ...s, [r.id]: { kind: "error", message: msg } }));
-        return;
-      }
-      const blob = await res.blob();
-      const filename = filenameFromDisposition(res.headers.get("Content-Disposition"), `${r.code}_${isoToday()}.xlsx`);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
-      setStates((s) => ({ ...s, [r.id]: { kind: "done" } }));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error inesperado";
-      setStates((s) => ({ ...s, [r.id]: { kind: "error", message: msg } }));
-    }
-  };
-
-  const reportes = TABS[tab].reportes;
+  const isLoading = cd5.isLoading || dsr.isLoading;
+  const isError = cd5.isError || dsr.isError;
+  const isWeekendFallback = shown != null && shown.fecha !== today;
 
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Reportes</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">KPIs</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Reportes disponibles para el Hub <HubLabel />.
+          CD5 y DSR para <span className="text-foreground font-semibold">{selectedHub?.marca ?? "—"}</span>, solo de lunes a viernes.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <ReportCard
-          to="/reportes/paquetes-en-riesgo"
-          icon={AlertTriangle}
-          title="Paquetes en Riesgo"
-          description="Paquetes en reparto que rompen CD5 (5+ días desde inbound)."
-        />
-        <ReportCard
-          to="/reportes/flow-meeting"
-          icon={Users}
-          title="Flow Meeting"
-          description="Dashboard de la reunión de flujo: KPIs, drivers, CPs e incidencias del día."
-        />
-        <ReportCard
-          to="/duplicados"
-          icon={Copy}
-          title="Duplicados"
-          description="Detección de paquetes duplicados en el ePOD y tasas reales vs. Cainiao."
-        />
-        <ReportCard
-          to="/reportes/super-reporte"
-          icon={Sparkles}
-          title="Súper Reporte"
-          description="Entregas por categoría, CD5/CD13 y CD3 en un solo reporte."
-        />
-        <ReportCard
-          to="/reportes/clientes-locales"
-          icon={MapPin}
-          title="Clientes Locales"
-          description="Clientes locales en reparto, flow meeting por CP y CD4."
-        />
-      </div>
-
-      {SHOW_LEGACY_REPORT_TOOLS && (
+      {!selectedHub ? (
+        <p className="text-sm text-muted-foreground">Selecciona un hub para ver sus KPIs.</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">No se pudieron cargar los KPIs de este hub.</p>
+      ) : isLoading ? (
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      ) : !shown ? (
+        <p className="text-sm text-muted-foreground">Sin actividad en los últimos {KPIS_TREND_BUSINESS_DAYS} días hábiles para este hub.</p>
+      ) : (
         <>
-          {/* GENERAR DESDE BASE */}
-          <Card className="shadow-none">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-3 mb-3">
-                <Database className="size-5 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold">Usar datos guardados</div>
-                  <div className="text-xs text-muted-foreground">Genera el Excel desde las entregas ya cargadas en la base</div>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col text-xs text-muted-foreground">
-                  Desde
-                  <input
-                    type="date"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                    className="mt-1 px-2 py-1.5 text-sm bg-background border rounded"
-                  />
-                </label>
-                <label className="flex flex-col text-xs text-muted-foreground">
-                  Hasta
-                  <input
-                    type="date"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                    className="mt-1 px-2 py-1.5 text-sm bg-background border rounded"
-                  />
-                </label>
-                <Button onClick={generarDesdeBase} disabled={!selectedHub || genLoading} size="sm" className="gap-2">
-                  {genLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Database className="size-3.5" />}
-                  {genLoading ? "Generando" : "Usar datos guardados"}
-                </Button>
-              </div>
-              {genError && (
-                <p className="mt-2 text-destructive text-xs flex items-start gap-1.5">
-                  <AlertCircle className="size-3 mt-0.5 shrink-0" />
-                  <span>{genError}</span>
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          {isWeekendFallback && (
+            <p className="text-xs text-muted-foreground border-l-2 border-muted-foreground/30 pl-3">
+              Mostrando {longLabel(shown.fecha)} — el hub no tuvo actividad
+              {" "}{today !== toIso(new Date()) ? "el fin de semana" : "en el día hábil más reciente"}.
+            </p>
+          )}
 
-          {/* FILE PICKER (fallback) */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault(); setDragOver(false);
-              const f = e.dataTransfer.files?.[0];
-              if (f) onPickFile(f);
-            }}
-            onClick={() => inputRef.current?.click()}
-            className={`p-5 bg-card border-2 border-dashed rounded-xl cursor-pointer transition-colors ${
-              dragOver ? "border-primary bg-primary/5" : "hover:border-primary/50"
-            }`}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Cd5Card day={shown.cd5} />
+            <DsrCard day={shown.dsr} />
+          </div>
+
+          <DsrBandTable />
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <Cd5TrendCard points={cd5Points} />
+            <DsrTrendCard points={dsr.data ?? []} />
+          </div>
+        </>
+      )}
+
+      <div>
+        <h2 className="text-sm font-semibold text-muted-foreground mb-3">Otros reportes</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ReportCard
+            to="/reportes/paquetes-en-riesgo"
+            icon={AlertTriangle}
+            title="Paquetes en Riesgo"
+            description="Paquetes en reparto que rompen CD5 (5+ días desde inbound)."
+          />
+          <ReportCard
+            to="/reportes/flow-meeting"
+            icon={Users}
+            title="Flow Meeting"
+            description="Dashboard de la reunión de flujo: KPIs, drivers, CPs e incidencias del día."
+          />
+          <ReportCard
+            to="/duplicados"
+            icon={Copy}
+            title="Duplicados"
+            description="Detección de paquetes duplicados en el ePOD y tasas reales vs. Cainiao."
+          />
+          <ReportCard
+            to="/reportes/super-reporte"
+            icon={Sparkles}
+            title="Súper Reporte"
+            description="Entregas por categoría, CD5/CD13 y CD3 en un solo reporte."
+          />
+          <ReportCard
+            to="/reportes/clientes-locales"
+            icon={MapPin}
+            title="Clientes Locales"
+            description="Clientes locales en reparto, flow meeting por CP y CD4."
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TARJETAS GRANDES
+// ============================================================
+
+function Cd5Card({ day }: { day: Cd5DayPoint }) {
+  const pct = day.pct;
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle>CD5 de hoy</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {pct == null ? (
+          <p className="text-sm text-muted-foreground">Sin cohorte ese día (ningún waybill cumplió 5 días de inbound).</p>
+        ) : (
+          <>
+            <div className="text-4xl font-semibold tabular-nums" style={{ color: cd5Color(pct) }}>
+              {pct.toFixed(1)}%
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground tabular-nums">
+              {day.resueltos}/{day.total} resueltos a tiempo · target {CD5_TARGET}%
+            </p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DsrCard({ day }: { day: DsrDayPoint | null }) {
+  if (!day || day.total === 0 || day.dsr == null) {
+    return (
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle>DSR de hoy</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">Sin entregas/fallos ese día.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  const band = dsrBandFor(day.dsr);
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle>DSR de hoy</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-baseline gap-3">
+          <div className="text-4xl font-semibold tabular-nums" style={{ color: band.color }}>
+            {day.dsr.toFixed(1)}%
+          </div>
+          <span
+            className="px-2 py-0.5 rounded text-xs font-semibold tabular-nums"
+            style={{ color: band.color, backgroundColor: `color-mix(in oklch, ${band.color} 15%, transparent)` }}
           >
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-            />
-            {file ? (
-              <div className="flex items-center gap-3">
-                <FileSpreadsheet className="size-6 text-primary shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate">{file.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {(file.size / 1024 / 1024).toFixed(2)} MB
-                  </div>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onPickFile(null); if (inputRef.current) inputRef.current.value = ""; }}
-                  className="p-1.5 rounded hover:bg-accent text-muted-foreground hover:text-foreground"
-                  aria-label="Quitar archivo"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <Upload className="size-6 text-primary" />
-                <div>
-                  <div className="text-sm font-semibold text-foreground">O sube el archivo de Cainiao</div>
-                  <div className="text-xs">Arrastra aquí o haz clic · .xlsx, .xls, .csv</div>
-                </div>
-              </div>
-            )}
-          </div>
+            {band.pctKpi}% de KPIs
+          </span>
+        </div>
+        <p className="mt-1.5 text-xs text-muted-foreground tabular-nums">
+          {day.delivered}/{day.total} entregados
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
 
-          {/* TABS */}
-          <div>
-            <div className="flex items-center gap-1 border-b mb-6">
-              {(Object.keys(TABS) as Array<keyof typeof TABS>).map((key) => {
-                const active = tab === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setTab(key)}
-                    className={`px-4 py-3 text-sm font-semibold relative transition-colors ${
-                      active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {TABS[key].label}
-                    {active && <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-primary" />}
-                  </button>
-                );
-              })}
-              <span className="ml-auto text-xs text-muted-foreground">
-                {reportes.length} reportes
-              </span>
+function DsrBandTable() {
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle className="text-sm">Bandas de cumplimiento DSR</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-4 gap-px bg-border rounded-md overflow-hidden text-sm">
+          {DSR_BANDS.map((b) => (
+            <div key={b.label} className="bg-card p-3 text-center">
+              <div className="text-xs text-muted-foreground">{b.label}</div>
+              <div className="mt-1 font-semibold tabular-nums" style={{ color: b.color }}>
+                {b.pctKpi}%
+              </div>
             </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-            <div className="space-y-2">
-              {reportes.map((r) => {
-                const state = states[r.id] ?? { kind: "idle" as const };
-                const disabled = !selectedHub || !file || state.kind === "loading";
-                return (
-                  <Card key={r.id} className="shadow-none flex flex-row items-center gap-5 p-5">
-                    <div className="font-semibold text-lg tabular-nums w-14 leading-none">
-                      {r.code}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2.5 mb-1 flex-wrap">
-                        <h3 className="font-semibold text-[15px] tracking-tight">{r.name}</h3>
-                        <span
-                          className={`px-1.5 py-0.5 text-[10px] tracking-wide border rounded ${
-                            r.freq === "DIARIO"
-                              ? "bg-primary/10 text-primary border-primary/20"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {r.freq}
-                        </span>
-                        {r.target && (
-                          <span className="hidden md:inline text-[10px] text-muted-foreground uppercase">
-                            · {r.target}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-muted-foreground text-[13px] truncate">{r.desc}</p>
-                      {state.kind === "error" && (
-                        <p className="mt-1.5 text-destructive text-xs flex items-start gap-1.5">
-                          <AlertCircle className="size-3 mt-0.5 shrink-0" />
-                          <span className="break-words">{state.message}</span>
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      onClick={() => descargar(r)}
-                      disabled={disabled}
-                      size="sm"
-                      variant={state.kind === "error" ? "destructive" : state.kind === "done" ? "outline" : "default"}
-                      className="gap-2 shrink-0"
-                    >
-                      {state.kind === "loading" && <Loader2 className="size-3.5 animate-spin" />}
-                      {state.kind === "done" && <Check className="size-3.5" />}
-                      {(state.kind === "idle" || state.kind === "error") && <ArrowDown className="size-3.5" />}
-                      {state.kind === "done" ? "Listo" : state.kind === "loading" ? "Generando" : state.kind === "error" ? "Reintentar" : "Descargar"}
-                    </Button>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
+// ============================================================
+// TENDENCIAS
+// ============================================================
+
+const cd5ChartConfig = { pct: { label: "CD5", color: "var(--electric)" } } satisfies ChartConfig;
+const dsrChartConfig = { dsr: { label: "DSR", color: "var(--electric)" } } satisfies ChartConfig;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function Cd5Dot(props: any) {
+  const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: Cd5DayPoint };
+  if (cx == null || cy == null || !payload || payload.pct == null) return <g />;
+  const color = cd5Color(payload.pct);
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke={color} />;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function DsrDot(props: any) {
+  const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: DsrDayPoint };
+  if (cx == null || cy == null || !payload || payload.dsr == null) return <g />;
+  const color = dsrBandFor(payload.dsr).color;
+  return <circle cx={cx} cy={cy} r={4} fill={color} stroke={color} />;
+}
+
+function Cd5Tooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: Cd5DayPoint }> }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
+      <p className="mb-1 font-medium text-foreground">{tooltipLabel(p.fecha)}</p>
+      {p.pct == null ? (
+        <p className="text-muted-foreground text-xs">Sin cohorte ese día</p>
+      ) : (
+        <>
+          <p className="tabular-nums" style={{ color: cd5Color(p.pct) }}>CD5 {p.pct.toFixed(1)}%</p>
+          <p className="text-xs text-muted-foreground tabular-nums">{p.resueltos}/{p.total} resueltos</p>
         </>
       )}
     </div>
   );
 }
 
-function HubLabel() {
-  const { selectedHub } = useAuth();
-  return <span className="text-foreground font-semibold">{selectedHub?.marca ?? "—"}</span>;
+function DsrTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: DsrDayPoint }> }) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
+      <p className="mb-1 font-medium text-foreground">{tooltipLabel(p.fecha)}</p>
+      {p.dsr == null ? (
+        <p className="text-muted-foreground text-xs">Sin datos ese día</p>
+      ) : (
+        <>
+          <p className="tabular-nums" style={{ color: dsrBandFor(p.dsr).color }}>
+            DSR {p.dsr.toFixed(1)}% · {dsrBandFor(p.dsr).pctKpi}% de KPIs
+          </p>
+          <p className="text-xs text-muted-foreground tabular-nums">{p.delivered}/{p.total} entregados</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function Cd5TrendCard({ points }: { points: Cd5DayPoint[] }) {
+  const chartData = points.map((p) => ({ ...p, label: axisLabel(p.fecha) }));
+  const hasData = points.some((p) => p.total > 0);
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="size-4 text-primary" /> Tendencia CD5 ({KPIS_TREND_BUSINESS_DAYS} días hábiles)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!hasData ? (
+          <p className="text-sm text-muted-foreground">Sin cohortes en el periodo.</p>
+        ) : (
+          <ChartContainer className="h-[220px] w-full" config={cd5ChartConfig}>
+            <LineChart data={chartData} margin={{ left: 8, right: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
+              <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={11} width={32} />
+              <ChartTooltip content={<Cd5Tooltip />} />
+              <ReferenceLine y={CD5_TARGET} stroke="var(--success)" strokeDasharray="4 4" strokeOpacity={0.6} />
+              <Line type="monotone" dataKey="pct" stroke="var(--color-pct)" strokeWidth={2} dot={<Cd5Dot />} connectNulls />
+            </LineChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DsrTrendCard({ points }: { points: DsrDayPoint[] }) {
+  const chartData = points.map((p) => ({ ...p, label: axisLabel(p.fecha) }));
+  const hasData = points.some((p) => p.total > 0);
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <TrendingUp className="size-4 text-primary" /> Tendencia DSR ({KPIS_TREND_BUSINESS_DAYS} días hábiles)
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!hasData ? (
+          <p className="text-sm text-muted-foreground">Sin entregas/fallos en el periodo.</p>
+        ) : (
+          <ChartContainer className="h-[220px] w-full" config={dsrChartConfig}>
+            <LineChart data={chartData} margin={{ left: 8, right: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={11} />
+              <YAxis domain={[0, 100]} tickLine={false} axisLine={false} fontSize={11} width={32} />
+              <ChartTooltip content={<DsrTooltip />} />
+              <ReferenceLine y={96} stroke="var(--success)" strokeDasharray="4 4" strokeOpacity={0.6} />
+              <ReferenceLine y={94} stroke="var(--warn)" strokeDasharray="4 4" strokeOpacity={0.6} />
+              <ReferenceLine y={91} stroke="var(--danger)" strokeDasharray="4 4" strokeOpacity={0.6} />
+              <Line type="monotone" dataKey="dsr" stroke="var(--color-dsr)" strokeWidth={2} dot={<DsrDot />} connectNulls />
+            </LineChart>
+          </ChartContainer>
+        )}
+      </CardContent>
+    </Card>
+  );
 }

@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { isDeliveredEstado, isFailedEstado } from "@/lib/resolve-event-date";
+import { isDireccionIncorrecta } from "@/lib/direccion-incorrecta";
 import { getClientesLocalesConfig, isClienteLocal, type CpLocalidad } from "@/lib/clientes-locales-config";
 import { categorizeCliente, type Categoria } from "@/lib/client-category";
 import { exportStyledExcel } from "@/lib/xlsx-export";
@@ -201,17 +202,8 @@ function localidadForCp(cp: string, mapping: CpLocalidad[]): string {
 // denominador). Un intento fallido con motivo "Falta de Tiempo"/"Fuerza
 // Mayor"/"Vehículo Averiado" NO se excluye — el waybill sigue en el
 // denominador con normalidad, simplemente esa falla no cuenta como entrega.
-function stripAccents(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
-}
-const DIRECCION_INCORRECTA_VARIANTS = new Set([
-  "direccion incorrecta",
-  "dirreccion incorrecta",
-  "address error",
-]);
-function isDireccionIncorrecta(s: string): boolean {
-  return DIRECCION_INCORRECTA_VARIANTS.has(stripAccents(s).trim().toLowerCase());
-}
+// (isDireccionIncorrecta ahora vive en @/lib/direccion-incorrecta, compartida
+// con /reportes KPIs — mismo criterio.)
 
 // ---------------------------------------------------------------------------
 // Tipos

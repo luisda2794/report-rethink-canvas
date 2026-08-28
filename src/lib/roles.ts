@@ -25,7 +25,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/mapa-entregas", label: "Mapa de Entregas" },
-  { to: "/reportes", label: "Reportes" },
+  { to: "/reportes", label: "KPIs" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
