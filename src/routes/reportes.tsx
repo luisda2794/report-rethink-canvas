@@ -194,7 +194,7 @@ function Cd5Card({ day }: { day: Cd5DayPoint | null }) {
       </CardHeader>
       <CardContent>
         {!day || pct == null ? (
-          <p className="text-sm text-muted-foreground">Sin cohorte ese día (ningún waybill cumplió 5 días de inbound).</p>
+          <p className="text-sm text-muted-foreground">Sin cohorte ese día (ningún waybill con 5+ días de inbound).</p>
         ) : (
           <>
             <div className="text-4xl font-semibold tabular-nums" style={{ color: cd5Color(pct) }}>

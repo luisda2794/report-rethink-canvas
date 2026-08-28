@@ -13,9 +13,14 @@ import { isoAddDays, lastNBusinessDays } from "@/lib/business-days";
 // sesión) en vez de agregar un cuarto RPC.
 //
 // Cohorte del día D = waybills cuyo inbound (MIN(fecha) en todo su historial)
-// fue hace exactamente 5 días de calendario (D - 5), excluyendo los que
-// tengan "Dirección Incorrecta" como última incidencia (misma regla que
-// SHEIN CD4 / Locales CD5). % CD5 = (cohorte − siguen en reparto) / cohorte.
+// fue hace 5 días de calendario O MÁS (D - inbound >= 5) — no exactamente 5:
+// un paquete que lleva 8 o 20 días sigue "rompiendo CD5" todos los días
+// siguientes hasta que se resuelve, no solo el día en que cumplió justo 5.
+// (Corregido — la versión anterior usaba "=5" exacto, lo que daba cohortes
+// vacíos en días de poco volumen puntual; ">=5" es también el criterio que
+// ya usa paquetes_en_riesgo_stats.) Se excluyen los que tengan "Dirección
+// Incorrecta" como última incidencia (misma regla que SHEIN CD4/Locales
+// CD5). % CD5 = (cohorte − siguen en reparto) / cohorte.
 //
 // Para que MIN(fecha) sea confiable (no un mínimo "recortado" por el rango
 // que se pide a la base) se trae bastante más historial hacia atrás del que
@@ -125,11 +130,13 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
   }
 
   const points = trendDays.map((fecha) => {
+    // "5 días o más": inbound tiene que ser el día D-5 o cualquier día
+    // anterior — por eso t0 <= t0Target, no t0 === t0Target.
     const t0Target = isoAddDays(fecha, -5);
     let total = 0;
     let resueltos = 0;
     for (const [wb, t0] of minFecha) {
-      if (t0 !== t0Target || excluded.has(wb)) continue;
+      if (t0 > t0Target || excluded.has(wb)) continue;
       const onDay = estadoOn.get(`${wb}|${fecha}`);
       if (!onDay) continue; // el waybill no aparece en el ePOD de ese día — no evaluable
       total++;
