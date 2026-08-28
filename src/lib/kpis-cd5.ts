@@ -12,21 +12,51 @@ import { isoAddDays, lastNBusinessDays } from "@/lib/business-days";
 // migración más que podría no llegar a producción — ver el historial de esta
 // sesión) en vez de agregar un cuarto RPC.
 //
-// Cohorte del día D = waybills cuyo inbound (MIN(fecha) en todo su historial)
-// fue hace 5 días de calendario O MÁS (D - inbound >= 5) — no exactamente 5:
-// un paquete que lleva 8 o 20 días sigue "rompiendo CD5" todos los días
-// siguientes hasta que se resuelve, no solo el día en que cumplió justo 5.
-// (Corregido — la versión anterior usaba "=5" exacto, lo que daba cohortes
-// vacíos en días de poco volumen puntual; ">=5" es también el criterio que
-// ya usa paquetes_en_riesgo_stats.) Se excluyen los que tengan "Dirección
-// Incorrecta" como última incidencia (misma regla que SHEIN CD4/Locales
-// CD5). % CD5 = (cohorte − siguen en reparto) / cohorte.
+// Definición final de CD5 (día evaluado D, ancla A = D - 5 días de calendario):
 //
-// Para que MIN(fecha) sea confiable (no un mínimo "recortado" por el rango
-// que se pide a la base) se trae bastante más historial hacia atrás del que
-// se necesita para el cohorte de cada día evaluado.
+//   Cohorte de A = waybills con
+//     (a) inbound === A (llegaron ese día), O
+//     (b) inbound < A Y su último estado conocido con fecha <= A era
+//         Driver_received/Driver_received_incidencias (ya venían atascados,
+//         sin resolver, exactamente ese día — sin importar cuándo llegaron).
+//
+//   Evaluación en D = para cada waybill del cohorte, su último estado
+//   conocido con fecha <= D: "Entregado" = resuelto a tiempo, cualquier otra
+//   cosa (incluido seguir en Driver_received) = roto. Esta evaluación queda
+//   congelada — no se corrige si el paquete se entrega después de D.
+//
+//   % CD5 = resueltos / cohorte × 100.
+//
+// "Último estado conocido con fecha <= X" es un corte histórico, no exige
+// que exista una fila exacta ese día — así un paquete que no se re-sube
+// todos los días igual arrastra su último estado real conocido.
+//
+// waybill puede venir NULL para un hub entero si el ePOD subido traía una
+// variante de columna no cubierta por el parser (pasó con Luan Express:
+// "Waybill Number" en vez de "Waybill No" — corregido en /epod, pero eso no
+// arregla filas ya subidas). lp_no es NOT NULL por schema: se usa
+// waybill || lp_no como identificador, nunca solo waybill.
+//
+// Se trae el historial completo del hub una sola vez (paginado en paralelo)
+// y se reconstruyen los 20 cohortes en memoria, en vez de golpear la base
+// una vez por día evaluado.
 
 const STUCK_ESTADOS = new Set(["driver_received", "driver_received_incidencias"]);
+
+function normalizeEstado(s: string): string {
+  return s.trim().toLowerCase().replace(/\s+/g, "_");
+}
+function isStuckEstado(s: string): boolean {
+  return STUCK_ESTADOS.has(normalizeEstado(s));
+}
+function isEntregado(s: string): boolean {
+  const n = s.trim().toLowerCase();
+  return n === "entregado" || n === "delivered";
+}
+
+function packageId(waybill: string | null, lpNo: string): string {
+  return waybill || lpNo;
+}
 
 type Cd5Row = {
   waybill: string | null;
@@ -37,15 +67,7 @@ type Cd5Row = {
   row_index: number;
 };
 
-// waybill puede venir NULL para un hub entero si el ePOD que se subió traía
-// una variante de columna no cubierta por el parser (ya pasó con Luan
-// Express: "Waybill Number" en vez de "Waybill No" — corregido en el parser
-// de /epod, pero eso no arregla las filas YA subidas). lp_no es NOT NULL por
-// schema, así que sirve de identificador de respaldo siempre confiable —
-// nunca hay que asumir que waybill está poblado.
-function packageId(waybill: string | null, lpNo: string): string {
-  return waybill || lpNo;
-}
+type TimelineEntry = { fecha: string; estado: string; rowIndex: number };
 
 export type Cd5DayPoint = {
   fecha: string;
@@ -96,63 +118,85 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
   return all;
 }
 
+/** Última entrada de la línea de tiempo (ya ordenada asc por fecha, row_index) con fecha <= day. */
+function statusAsOf(timeline: TimelineEntry[], day: string): TimelineEntry | null {
+  let lo = 0;
+  let hi = timeline.length - 1;
+  let ans = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (timeline[mid].fecha <= day) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return ans >= 0 ? timeline[ans] : null;
+}
+
 function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
   let earliestFecha: string | null = null;
   let latestFecha: string | null = null;
+
+  const timelines = new Map<string, TimelineEntry[]>();
+  const lastException = new Map<string, { fecha: string; rowIndex: number; detail: string }>();
+
   for (const r of rows) {
     if (!r.fecha) continue;
     if (!earliestFecha || r.fecha < earliestFecha) earliestFecha = r.fecha;
     if (!latestFecha || r.fecha > latestFecha) latestFecha = r.fecha;
-  }
 
-  const minFecha = new Map<string, string>();
-  const lastException = new Map<string, { fecha: string; rowIndex: number; detail: string }>();
-  const estadoOn = new Map<string, { estado: string; rowIndex: number }>(); // `${waybill}|${fecha}`
-
-  for (const r of rows) {
     const wb = packageId(r.waybill, r.lp_no);
-    const fecha = r.fecha;
-    if (!wb || !fecha) continue;
+    if (!wb) continue;
 
-    const prevMin = minFecha.get(wb);
-    if (!prevMin || fecha < prevMin) minFecha.set(wb, fecha);
+    if (!timelines.has(wb)) timelines.set(wb, []);
+    timelines.get(wb)!.push({ fecha: r.fecha, estado: r.estado, rowIndex: r.row_index });
 
     const detail = (r.exception_detail ?? "").trim();
     if (detail) {
       const prev = lastException.get(wb);
-      if (!prev || fecha > prev.fecha || (fecha === prev.fecha && r.row_index > prev.rowIndex)) {
-        lastException.set(wb, { fecha, rowIndex: r.row_index, detail });
+      if (!prev || r.fecha > prev.fecha || (r.fecha === prev.fecha && r.row_index > prev.rowIndex)) {
+        lastException.set(wb, { fecha: r.fecha, rowIndex: r.row_index, detail });
       }
-    }
-
-    const key = `${wb}|${fecha}`;
-    const prevEstado = estadoOn.get(key);
-    if (!prevEstado || r.row_index > prevEstado.rowIndex) {
-      estadoOn.set(key, { estado: r.estado, rowIndex: r.row_index });
     }
   }
 
-  // Waybills excluidos por Dirección Incorrecta, resuelto una sola vez.
+  for (const tl of timelines.values()) {
+    tl.sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : a.rowIndex - b.rowIndex));
+  }
+
   const excluded = new Set<string>();
   for (const [wb, exc] of lastException) {
     if (isDireccionIncorrecta(exc.detail)) excluded.add(wb);
   }
 
-  const points = trendDays.map((fecha) => {
-    // "5 días o más": inbound tiene que ser el día D-5 o cualquier día
-    // anterior — por eso t0 <= t0Target, no t0 === t0Target.
-    const t0Target = isoAddDays(fecha, -5);
+  const points = trendDays.map((diaEvaluado) => {
+    const anchor = isoAddDays(diaEvaluado, -5);
     let total = 0;
     let resueltos = 0;
-    for (const [wb, t0] of minFecha) {
-      if (t0 > t0Target || excluded.has(wb)) continue;
-      const onDay = estadoOn.get(`${wb}|${fecha}`);
-      if (!onDay) continue; // el waybill no aparece en el ePOD de ese día — no evaluable
+
+    for (const [wb, tl] of timelines) {
+      if (excluded.has(wb)) continue;
+      const inbound = tl[0].fecha;
+
+      let enCohorte: boolean;
+      if (inbound === anchor) {
+        enCohorte = true; // llegó justo el día ancla
+      } else if (inbound < anchor) {
+        const asOfAnchor = statusAsOf(tl, anchor);
+        enCohorte = !!asOfAnchor && isStuckEstado(asOfAnchor.estado);
+      } else {
+        enCohorte = false; // todavía no había llegado en el día ancla
+      }
+      if (!enCohorte) continue;
+
       total++;
-      const norm = onDay.estado.trim().toLowerCase().replace(/\s+/g, "_");
-      if (!STUCK_ESTADOS.has(norm)) resueltos++;
+      const asOfEval = statusAsOf(tl, diaEvaluado);
+      if (asOfEval && isEntregado(asOfEval.estado)) resueltos++;
     }
-    return { fecha, total, resueltos, pct: total > 0 ? (resueltos / total) * 100 : null };
+
+    return { fecha: diaEvaluado, total, resueltos, pct: total > 0 ? (resueltos / total) * 100 : null };
   });
 
   return { points, earliestFecha, latestFecha };
@@ -160,7 +204,7 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
 
 export function useCd5Trend(hubId: string | null, businessDays: number) {
   return useQuery({
-    queryKey: ["kpis-cd5-trend", hubId, businessDays],
+    queryKey: ["kpis-cd5-trend-v2", hubId, businessDays],
     enabled: !!hubId,
     queryFn: async (): Promise<Cd5TrendResult> => {
       if (!hubId) return { points: [], earliestFecha: null, latestFecha: null };
