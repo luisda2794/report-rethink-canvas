@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { isDireccionIncorrecta } from "@/lib/direccion-incorrecta";
 import { isoAddDays, lastNBusinessDays } from "@/lib/business-days";
+import { readCacheRange, writeCacheBatch } from "@/lib/hub-daily-cache";
 
 // CD5 no tiene todavía un cálculo diario reutilizable en la base — las tres
 // implementaciones existentes (paquetes_en_riesgo_stats, refresh_cd5_snapshots,
@@ -119,6 +120,22 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
   return all;
 }
 
+// Span real de historial (MIN/MAX fecha) del hub — dos consultas baratas
+// (usan idx_epod_lineas_hub_fecha). Hace falta cuando la tendencia viene
+// 100% de caché (ver useCd5Trend): en ese camino no se leyó ninguna fila
+// real, así que no hay de dónde sacar earliestFecha/latestFecha — y esos
+// dos valores alimentan la detección de "historial insuficiente" en la UI,
+// que es sobre los datos reales del hub, no sobre la ventana de 20 días
+// pedida (que siempre "existe" una vez que todo quedó cacheado, tenga o no
+// suficiente historial real detrás).
+async function fetchHistorySpan(hubId: string): Promise<{ earliestFecha: string | null; latestFecha: string | null }> {
+  const [{ data: minRow }, { data: maxRow }] = await Promise.all([
+    supabase.from("epod_lineas").select("fecha").eq("hub_id", hubId).not("fecha", "is", null).order("fecha", { ascending: true }).limit(1).maybeSingle(),
+    supabase.from("epod_lineas").select("fecha").eq("hub_id", hubId).not("fecha", "is", null).order("fecha", { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  return { earliestFecha: minRow?.fecha ?? null, latestFecha: maxRow?.fecha ?? null };
+}
+
 // Una sola pasada cronológica en vez de 20 (una por día de tendencia):
 // se ordenan TODOS los eventos una vez, y se recorren linealmente
 // manteniendo un "estado actual por paquete" que se va actualizando — en
@@ -218,18 +235,69 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
   return { points, earliestFecha, latestFecha };
 }
 
+// Cálculo de un solo día (el que se acaba de subir) — lo usa el trigger de
+// /epod después de cada subida, y el backfill masivo hace su propia versión
+// en lote (ver backfillCd5Cache) en vez de llamar esto en loop, para no
+// repetir 20+ veces un fetch de ventana casi idéntica.
+export async function computeCd5ForDay(hubId: string, fecha: string): Promise<Cd5DayPoint> {
+  const from = isoAddDays(fecha, -5 - LOOKBACK_BUFFER_DAYS);
+  const rows = await fetchCd5Rows(hubId, from, fecha);
+  const { points } = computeCd5Trend(rows, [fecha]);
+  return points[0];
+}
+
+// Recalcula y cachea CD5 para un conjunto arbitrario de días en una sola
+// pasada (un solo fetch + un solo barrido cronológico) — usado por el botón
+// admin "Recalcular caché completa" para rellenar el histórico de hubs que
+// ya tenían datos antes de esta capa de caché.
+export async function backfillCd5Cache(hubId: string, allDates: string[]): Promise<void> {
+  if (allDates.length === 0) return;
+  const sorted = [...allDates].sort();
+  const oldest = sorted[0];
+  const newest = sorted[sorted.length - 1];
+  const from = isoAddDays(oldest, -5 - LOOKBACK_BUFFER_DAYS);
+  const rows = await fetchCd5Rows(hubId, from, newest);
+  const { points } = computeCd5Trend(rows, sorted);
+  await writeCacheBatch(
+    hubId,
+    "cd5",
+    points.map((p) => ({ fecha: p.fecha, datos: p })),
+  );
+}
+
 export function useCd5Trend(hubId: string | null, businessDays: number) {
   return useQuery({
-    queryKey: ["kpis-cd5-trend-v2", hubId, businessDays],
+    queryKey: ["kpis-cd5-trend-v3", hubId, businessDays],
     enabled: !!hubId,
     queryFn: async (): Promise<Cd5TrendResult> => {
       if (!hubId) return { points: [], earliestFecha: null, latestFecha: null };
       const trendDays = lastNBusinessDays(businessDays);
+
+      // Lectura con fallback: si la caché ya tiene los 20 días pedidos,
+      // instantáneo. Si falta cualquiera, se recalcula en vivo la ventana
+      // completa (como ya hacía antes de esta capa) y de paso se deja la
+      // caché tibia — nunca es una dependencia dura, solo acelera.
+      const cached = await readCacheRange<Cd5DayPoint>(hubId, "cd5", trendDays);
+      if (trendDays.every((d) => cached.has(d))) {
+        const span = await fetchHistorySpan(hubId);
+        return {
+          points: trendDays.map((d) => cached.get(d)!),
+          earliestFecha: span.earliestFecha,
+          latestFecha: span.latestFecha,
+        };
+      }
+
       const oldest = trendDays[0];
       const newest = trendDays[trendDays.length - 1];
       const from = isoAddDays(oldest, -5 - LOOKBACK_BUFFER_DAYS);
       const rows = await fetchCd5Rows(hubId, from, newest);
-      return computeCd5Trend(rows, trendDays);
+      const result = computeCd5Trend(rows, trendDays);
+      void writeCacheBatch(
+        hubId,
+        "cd5",
+        result.points.map((p) => ({ fecha: p.fecha, datos: p })),
+      ).catch((e) => console.error("[kpis-cd5] Error escribiendo caché:", e));
+      return result;
     },
     staleTime: 5 * 60 * 1000,
   });

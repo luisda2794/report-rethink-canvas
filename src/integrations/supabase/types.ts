@@ -560,6 +560,41 @@ export type Database = {
           },
         ]
       }
+      hub_daily_cache: {
+        Row: {
+          calculado_en: string
+          datos: Json
+          fecha: string
+          hub_id: string
+          id: string
+          tipo: string
+        }
+        Insert: {
+          calculado_en?: string
+          datos: Json
+          fecha: string
+          hub_id: string
+          id?: string
+          tipo: string
+        }
+        Update: {
+          calculado_en?: string
+          datos?: Json
+          fecha?: string
+          hub_id?: string
+          id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hub_daily_cache_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hubs: {
         Row: {
           activo: boolean

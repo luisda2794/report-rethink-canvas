@@ -18,6 +18,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { recomputeCacheAfterUpload } from "@/lib/cache-recompute";
 
 export const Route = createFileRoute("/epod")({
   component: () => (
@@ -504,6 +505,13 @@ function EpodPage() {
         aaModelo,
       });
       toast.success(`ePOD procesado: ${inserted} nuevos paquetes`);
+      // No bloqueante: recalcula CD5/Flow Meeting/Paquetes en Riesgo para
+      // los días de esta subida y deja hub_daily_cache tibia. Si falla o el
+      // usuario cierra la pestaña antes de que termine, no rompe nada — los
+      // reportes igual caen a cálculo en vivo la próxima vez que se abren.
+      void recomputeCacheAfterUpload(selectedHub.id, dates).catch((e) =>
+        console.error("[ePOD] Error recalculando caché de reportes:", e),
+      );
       await loadHistory();
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
