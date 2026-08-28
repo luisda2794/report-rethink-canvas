@@ -388,7 +388,10 @@ async function fetchDbRowsForHubDate(hubId: string, fecha: string): Promise<Epod
   return fromEntregas;
 }
 
-function FlowMeetingPage() {
+// embedded=true: se usa dentro de la pestaña "Flow Meeting" de /reportes
+// (KPIs) — oculta el link "Volver a Reportes", que no tiene sentido ahí
+// (ya estamos en /reportes). El resto del componente no cambia.
+export function FlowMeetingPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { selectedHub } = useAuth();
   const [hub, setHub] = useState<HubKey | "">("");
   const [file, setFile] = useState<File | null>(null);
@@ -553,14 +556,16 @@ function FlowMeetingPage() {
   return (
     <div className="flex flex-col gap-6 print:bg-white">
       <div className="print:px-6 print:py-4">
-        <div className="mb-4 print:hidden">
-          <Link
-            to="/reportes"
-            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="size-3.5" /> Volver a Reportes
-          </Link>
-        </div>
+        {!embedded && (
+          <div className="mb-4 print:hidden">
+            <Link
+              to="/reportes"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="size-3.5" /> Volver a Reportes
+            </Link>
+          </div>
+        )}
 
         <header className="mb-6 print:mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>

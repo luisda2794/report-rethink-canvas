@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo } from "react";
-import { AlertTriangle, Copy, Loader2, MapPin, Sparkles, TrendingUp, Users } from "lucide-react";
+import { Loader2, TrendingUp } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequireAuth } from "@/components/RequireAuth";
-import { ReportCard } from "@/components/ReportCard";
+import { KpisRiesgoTab } from "@/components/kpis-riesgo-tab";
+import { FlowMeetingPage } from "@/routes/reportes_.flow-meeting";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCd5Trend, type Cd5DayPoint } from "@/lib/kpis-cd5";
 import { useDsrTrend, KPIS_TREND_BUSINESS_DAYS, type DsrDayPoint } from "@/lib/kpis-dsr";
@@ -145,41 +147,18 @@ function KpisPage() {
         </>
       )}
 
-      <div>
-        <h2 className="text-sm font-semibold text-muted-foreground mb-3">Otros reportes</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <ReportCard
-            to="/reportes/paquetes-en-riesgo"
-            icon={AlertTriangle}
-            title="Paquetes en Riesgo"
-            description="Paquetes en reparto que rompen CD5 (5+ días desde inbound)."
-          />
-          <ReportCard
-            to="/reportes/flow-meeting"
-            icon={Users}
-            title="Flow Meeting"
-            description="Dashboard de la reunión de flujo: KPIs, drivers, CPs e incidencias del día."
-          />
-          <ReportCard
-            to="/duplicados"
-            icon={Copy}
-            title="Duplicados"
-            description="Detección de paquetes duplicados en el ePOD y tasas reales vs. Cainiao."
-          />
-          <ReportCard
-            to="/reportes/super-reporte"
-            icon={Sparkles}
-            title="Súper Reporte"
-            description="Entregas por categoría, CD5/CD13 y CD3 en un solo reporte."
-          />
-          <ReportCard
-            to="/reportes/clientes-locales"
-            icon={MapPin}
-            title="Clientes Locales"
-            description="Clientes locales en reparto, flow meeting por CP y CD4."
-          />
-        </div>
-      </div>
+      <Tabs defaultValue="riesgo">
+        <TabsList>
+          <TabsTrigger value="riesgo">Paquetes en Riesgo</TabsTrigger>
+          <TabsTrigger value="flow">Flow Meeting</TabsTrigger>
+        </TabsList>
+        <TabsContent value="riesgo" className="mt-4">
+          <KpisRiesgoTab hubId={hubId} hubMarca={selectedHub?.marca ?? "hub"} />
+        </TabsContent>
+        <TabsContent value="flow" className="mt-4">
+          <FlowMeetingPage embedded />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
