@@ -18,6 +18,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { recomputeCacheAfterUpload } from "@/lib/cache-recompute";
 
 export const Route = createFileRoute("/epod")({
   component: () => (
@@ -504,6 +505,13 @@ function EpodPage() {
         aaModelo,
       });
       toast.success(`ePOD procesado: ${inserted} nuevos paquetes`);
+      // No bloqueante: recalcula Flow Meeting para los días de esta subida y
+      // deja hub_daily_cache tibia (solo Flow Meeting por ahora — round 1 del
+      // rollout incremental). Si falla, no rompe nada — Flow Meeting igual
+      // cae a cálculo en vivo la próxima vez que se abre.
+      void recomputeCacheAfterUpload(selectedHub.id, dates).catch((e) =>
+        console.error("[ePOD] Error recalculando caché de reportes:", e),
+      );
       await loadHistory();
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
