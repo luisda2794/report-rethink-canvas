@@ -38,6 +38,13 @@ export type Cd5DayPoint = {
   pct: number | null;
 };
 
+export type Cd5TrendResult = {
+  points: Cd5DayPoint[];
+  /** Span real de historial disponible para el hub (dentro de la ventana consultada). */
+  earliestFecha: string | null;
+  latestFecha: string | null;
+};
+
 const PAGE_SIZE = 1000;
 const LOOKBACK_BUFFER_DAYS = 100;
 
@@ -75,7 +82,15 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
   return all;
 }
 
-function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5DayPoint[] {
+function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
+  let earliestFecha: string | null = null;
+  let latestFecha: string | null = null;
+  for (const r of rows) {
+    if (!r.fecha) continue;
+    if (!earliestFecha || r.fecha < earliestFecha) earliestFecha = r.fecha;
+    if (!latestFecha || r.fecha > latestFecha) latestFecha = r.fecha;
+  }
+
   const minFecha = new Map<string, string>();
   const lastException = new Map<string, { fecha: string; rowIndex: number; detail: string }>();
   const estadoOn = new Map<string, { estado: string; rowIndex: number }>(); // `${waybill}|${fecha}`
@@ -109,7 +124,7 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5DayPoint[] {
     if (isDireccionIncorrecta(exc.detail)) excluded.add(wb);
   }
 
-  return trendDays.map((fecha) => {
+  const points = trendDays.map((fecha) => {
     const t0Target = isoAddDays(fecha, -5);
     let total = 0;
     let resueltos = 0;
@@ -123,14 +138,16 @@ function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5DayPoint[] {
     }
     return { fecha, total, resueltos, pct: total > 0 ? (resueltos / total) * 100 : null };
   });
+
+  return { points, earliestFecha, latestFecha };
 }
 
 export function useCd5Trend(hubId: string | null, businessDays: number) {
   return useQuery({
     queryKey: ["kpis-cd5-trend", hubId, businessDays],
     enabled: !!hubId,
-    queryFn: async (): Promise<Cd5DayPoint[]> => {
-      if (!hubId) return [];
+    queryFn: async (): Promise<Cd5TrendResult> => {
+      if (!hubId) return { points: [], earliestFecha: null, latestFecha: null };
       const trendDays = lastNBusinessDays(businessDays);
       const oldest = trendDays[0];
       const newest = trendDays[trendDays.length - 1];

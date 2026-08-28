@@ -12,6 +12,8 @@ import { useDsrTrend, KPIS_TREND_BUSINESS_DAYS, type DsrDayPoint } from "@/lib/k
 import { DSR_BANDS, dsrBandFor } from "@/lib/kpis-dsr-bands";
 import { mostRecentBusinessDay, toIso } from "@/lib/business-days";
 
+const MIN_HISTORY_DAYS_FOR_CD5 = 5;
+
 export const Route = createFileRoute("/reportes")({
   component: () => (
     <RequireAuth path="/reportes">
@@ -51,27 +53,50 @@ function KpisPage() {
   const cd5 = useCd5Trend(hubId, KPIS_TREND_BUSINESS_DAYS);
   const dsr = useDsrTrend(hubId, KPIS_TREND_BUSINESS_DAYS);
 
-  const cd5Points = cd5.data ?? [];
-  const dsrByFecha = useMemo(() => new Map((dsr.data ?? []).map((p) => [p.fecha, p])), [dsr.data]);
+  const cd5Points = cd5.data?.points ?? [];
+  const dsrPoints = dsr.data ?? [];
 
-  // Día mostrado en las tarjetas grandes: el hábil más reciente con datos en
-  // CUALQUIERA de las dos métricas, retrocediendo desde hoy (ajustado a
-  // hábil) si hace falta.
+  // "Hoy" real de calendario (no ajustado a hábil) — el día en curso, cuyos
+  // datos todavía son parciales. Se excluye del DSR acumulado pero se sigue
+  // mostrando en la tendencia como referencia visual.
+  const todayReal = toIso(new Date());
+
+  // Historial insuficiente para CD5 = menos de 5 días de span real de datos
+  // — no es un bug, es que ningún waybill pudo llegar a 5 días de inbound
+  // todavía. Se distingue de "esta métrica cargó pero el cohorte de este día
+  // puntual dio vacío", que es un estado normal y esperable día a día.
+  const cd5History = cd5.data;
+  const cd5HistorySpanDays =
+    cd5History?.earliestFecha && cd5History?.latestFecha
+      ? Math.round((Date.parse(cd5History.latestFecha) - Date.parse(cd5History.earliestFecha)) / 86_400_000)
+      : null;
+  const cd5InsufficientHistory = cd5HistorySpanDays != null && cd5HistorySpanDays < MIN_HISTORY_DAYS_FOR_CD5;
+
+  // Día mostrado en la tarjeta grande de CD5: el hábil más reciente con
+  // cohorte, retrocediendo desde hoy (ajustado a hábil) si hace falta.
   const today = toIso(mostRecentBusinessDay());
-  const shown = useMemo(() => {
+  const shownCd5 = useMemo(() => {
     for (let i = cd5Points.length - 1; i >= 0; i--) {
-      const c = cd5Points[i];
-      const d = dsrByFecha.get(c.fecha);
-      if (c.total > 0 || (d && d.total > 0)) {
-        return { fecha: c.fecha, cd5: c, dsr: d ?? null };
-      }
+      if (cd5Points[i].total > 0) return cd5Points[i];
     }
     return null;
-  }, [cd5Points, dsrByFecha]);
+  }, [cd5Points]);
+
+  // DSR acumulado: promedio ponderado (mismo criterio que "DSR global del
+  // periodo" en el Dashboard) de todos los días hábiles de la tendencia,
+  // EXCLUYENDO hoy porque el día todavía no cerró — incluirlo distorsiona el
+  // resultado con datos parciales (ya pasó antes con otras métricas).
+  const dsrAccumulated = useMemo(() => {
+    const closed = dsrPoints.filter((p) => p.fecha !== todayReal);
+    const delivered = closed.reduce((s, p) => s + p.delivered, 0);
+    const total = closed.reduce((s, p) => s + p.total, 0);
+    return { delivered, total, dsr: total > 0 ? (delivered / total) * 100 : null, dias: closed.length };
+  }, [dsrPoints, todayReal]);
 
   const isLoading = cd5.isLoading || dsr.isLoading;
   const isError = cd5.isError || dsr.isError;
-  const isWeekendFallback = shown != null && shown.fecha !== today;
+  const isCd5Fallback = shownCd5 != null && shownCd5.fecha !== today;
+  const hasAnyData = shownCd5 != null || dsrAccumulated.total > 0;
 
   return (
     <div className="flex flex-col gap-6">
@@ -88,27 +113,31 @@ function KpisPage() {
         <p className="text-sm text-destructive">No se pudieron cargar los KPIs de este hub.</p>
       ) : isLoading ? (
         <p className="text-sm text-muted-foreground">Cargando…</p>
-      ) : !shown ? (
+      ) : !hasAnyData ? (
         <p className="text-sm text-muted-foreground">Sin actividad en los últimos {KPIS_TREND_BUSINESS_DAYS} días hábiles para este hub.</p>
       ) : (
         <>
-          {isWeekendFallback && (
+          {isCd5Fallback && (
             <p className="text-xs text-muted-foreground border-l-2 border-muted-foreground/30 pl-3">
-              Mostrando {longLabel(shown.fecha)} — el hub no tuvo actividad
-              {" "}{today !== toIso(new Date()) ? "el fin de semana" : "en el día hábil más reciente"}.
+              CD5: mostrando {longLabel(shownCd5!.fecha)} — el hub no tuvo cohorte
+              {" "}{today !== todayReal ? "el fin de semana" : "en el día hábil más reciente"}.
             </p>
           )}
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Cd5Card day={shown.cd5} />
-            <DsrCard day={shown.dsr} />
+            {cd5InsufficientHistory ? (
+              <Cd5InsufficientHistoryCard spanDays={cd5HistorySpanDays ?? 0} />
+            ) : (
+              <Cd5Card day={shownCd5} />
+            )}
+            <DsrAccumuladoCard result={dsrAccumulated} businessDays={KPIS_TREND_BUSINESS_DAYS} />
           </div>
 
           <DsrBandTable />
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <Cd5TrendCard points={cd5Points} />
-            <DsrTrendCard points={dsr.data ?? []} />
+            <Cd5TrendCard points={cd5Points} insufficientHistory={cd5InsufficientHistory} />
+            <DsrTrendCard points={dsrPoints} todayReal={todayReal} />
           </div>
         </>
       )}
@@ -156,15 +185,15 @@ function KpisPage() {
 // TARJETAS GRANDES
 // ============================================================
 
-function Cd5Card({ day }: { day: Cd5DayPoint }) {
-  const pct = day.pct;
+function Cd5Card({ day }: { day: Cd5DayPoint | null }) {
+  const pct = day?.pct ?? null;
   return (
     <Card className="shadow-none">
       <CardHeader>
         <CardTitle>CD5 de hoy</CardTitle>
       </CardHeader>
       <CardContent>
-        {pct == null ? (
+        {!day || pct == null ? (
           <p className="text-sm text-muted-foreground">Sin cohorte ese día (ningún waybill cumplió 5 días de inbound).</p>
         ) : (
           <>
@@ -181,29 +210,47 @@ function Cd5Card({ day }: { day: Cd5DayPoint }) {
   );
 }
 
-function DsrCard({ day }: { day: DsrDayPoint | null }) {
-  if (!day || day.total === 0 || day.dsr == null) {
+function Cd5InsufficientHistoryCard({ spanDays }: { spanDays: number }) {
+  return (
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle>CD5 de hoy</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-muted-foreground">
+          No hay suficiente histórico para calcular CD5 de este hub — se necesitan al menos{" "}
+          {MIN_HISTORY_DAYS_FOR_CD5} días de datos y por ahora hay {spanDays === 0 ? "menos de 1" : spanDays}.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+type DsrAccumulatedResult = { delivered: number; total: number; dsr: number | null; dias: number };
+
+function DsrAccumuladoCard({ result, businessDays }: { result: DsrAccumulatedResult; businessDays: number }) {
+  if (result.total === 0 || result.dsr == null) {
     return (
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle>DSR de hoy</CardTitle>
+          <CardTitle>DSR Acumulado</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Sin entregas/fallos ese día.</p>
+          <p className="text-sm text-muted-foreground">Sin entregas/fallos cerrados en el periodo (sin contar hoy).</p>
         </CardContent>
       </Card>
     );
   }
-  const band = dsrBandFor(day.dsr);
+  const band = dsrBandFor(result.dsr);
   return (
     <Card className="shadow-none">
       <CardHeader>
-        <CardTitle>DSR de hoy</CardTitle>
+        <CardTitle>DSR Acumulado</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="flex items-baseline gap-3">
           <div className="text-4xl font-semibold tabular-nums" style={{ color: band.color }}>
-            {day.dsr.toFixed(1)}%
+            {result.dsr.toFixed(1)}%
           </div>
           <span
             className="px-2 py-0.5 rounded text-xs font-semibold tabular-nums"
@@ -213,7 +260,7 @@ function DsrCard({ day }: { day: DsrDayPoint | null }) {
           </span>
         </div>
         <p className="mt-1.5 text-xs text-muted-foreground tabular-nums">
-          {day.delivered}/{day.total} entregados
+          {result.delivered}/{result.total} entregados · últimos {result.dias} de {businessDays} días hábiles (sin contar hoy)
         </p>
       </CardContent>
     </Card>
@@ -259,9 +306,14 @@ function Cd5Dot(props: any) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DsrDot(props: any) {
-  const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: DsrDayPoint };
+  const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: DsrDayPoint & { enCurso?: boolean } };
   if (cx == null || cy == null || !payload || payload.dsr == null) return <g />;
   const color = dsrBandFor(payload.dsr).color;
+  // Hoy (día en curso, no cuenta en el DSR acumulado) se marca hueco en vez
+  // de relleno, para distinguirlo visualmente sin ocultarlo de la tendencia.
+  if (payload.enCurso) {
+    return <circle cx={cx} cy={cy} r={4} fill="var(--background)" stroke={color} strokeWidth={2} />;
+  }
   return <circle cx={cx} cy={cy} r={4} fill={color} stroke={color} />;
 }
 
@@ -283,12 +335,15 @@ function Cd5Tooltip({ active, payload }: { active?: boolean; payload?: Array<{ p
   );
 }
 
-function DsrTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: DsrDayPoint }> }) {
+function DsrTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: DsrDayPoint & { enCurso?: boolean } }> }) {
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0].payload;
   return (
     <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
-      <p className="mb-1 font-medium text-foreground">{tooltipLabel(p.fecha)}</p>
+      <p className="mb-1 font-medium text-foreground">
+        {tooltipLabel(p.fecha)}
+        {p.enCurso && <span className="ml-1.5 text-[10px] text-muted-foreground uppercase tracking-wide">En curso</span>}
+      </p>
       {p.dsr == null ? (
         <p className="text-muted-foreground text-xs">Sin datos ese día</p>
       ) : (
@@ -297,13 +352,14 @@ function DsrTooltip({ active, payload }: { active?: boolean; payload?: Array<{ p
             DSR {p.dsr.toFixed(1)}% · {dsrBandFor(p.dsr).pctKpi}% de KPIs
           </p>
           <p className="text-xs text-muted-foreground tabular-nums">{p.delivered}/{p.total} entregados</p>
+          {p.enCurso && <p className="text-[11px] text-muted-foreground/80 mt-1">No cuenta en el DSR acumulado (día sin cerrar).</p>}
         </>
       )}
     </div>
   );
 }
 
-function Cd5TrendCard({ points }: { points: Cd5DayPoint[] }) {
+function Cd5TrendCard({ points, insufficientHistory }: { points: Cd5DayPoint[]; insufficientHistory: boolean }) {
   const chartData = points.map((p) => ({ ...p, label: axisLabel(p.fecha) }));
   const hasData = points.some((p) => p.total > 0);
   return (
@@ -314,7 +370,11 @@ function Cd5TrendCard({ points }: { points: Cd5DayPoint[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {!hasData ? (
+        {insufficientHistory ? (
+          <p className="text-sm text-muted-foreground">
+            No hay suficiente histórico para calcular CD5 — se necesitan al menos {MIN_HISTORY_DAYS_FOR_CD5} días de datos.
+          </p>
+        ) : !hasData ? (
           <p className="text-sm text-muted-foreground">Sin cohortes en el periodo.</p>
         ) : (
           <ChartContainer className="h-[220px] w-full" config={cd5ChartConfig}>
@@ -333,8 +393,8 @@ function Cd5TrendCard({ points }: { points: Cd5DayPoint[] }) {
   );
 }
 
-function DsrTrendCard({ points }: { points: DsrDayPoint[] }) {
-  const chartData = points.map((p) => ({ ...p, label: axisLabel(p.fecha) }));
+function DsrTrendCard({ points, todayReal }: { points: DsrDayPoint[]; todayReal: string }) {
+  const chartData = points.map((p) => ({ ...p, label: axisLabel(p.fecha), enCurso: p.fecha === todayReal }));
   const hasData = points.some((p) => p.total > 0);
   return (
     <Card className="shadow-none">
