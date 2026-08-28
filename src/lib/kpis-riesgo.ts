@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { readCacheOne, writeCache } from "@/lib/hub-daily-cache";
 
 // Pestaña "Paquetes en Riesgo" de /reportes (KPIs). Criterio (distinto del
 // que ya usa /reportes/paquetes-en-riesgo, que solo mira antigüedad):
@@ -108,7 +107,7 @@ async function fetchRiesgoRows(hubId: string): Promise<RiesgoRow[]> {
   return all;
 }
 
-export function computeRiesgo(rows: RiesgoRow[]): RiesgoResult {
+function computeRiesgo(rows: RiesgoRow[]): RiesgoResult {
   let fechaEvaluada: string | null = null;
   for (const r of rows) {
     if (r.fecha && (!fechaEvaluada || r.fecha > fechaEvaluada)) fechaEvaluada = r.fecha;
@@ -168,48 +167,14 @@ export function computeRiesgo(rows: RiesgoRow[]): RiesgoResult {
   return { paquetes, fechaEvaluada };
 }
 
-// Usado tanto por el fallback de useRiesgo como por el trigger de /epod
-// después de cada subida y por el backfill masivo — un solo lugar con la
-// lógica de "traer + calcular", nunca duplicada.
-export async function fetchAndComputeRiesgo(hubId: string): Promise<RiesgoResult> {
-  const rows = await fetchRiesgoRows(hubId);
-  return computeRiesgo(rows);
-}
-
 export function useRiesgo(hubId: string | null) {
   return useQuery({
     queryKey: ["kpis-riesgo", hubId],
     enabled: !!hubId,
     queryFn: async (): Promise<RiesgoResult> => {
       if (!hubId) return { paquetes: [], fechaEvaluada: null };
-
-      // La caché de riesgo solo sirve si coincide con la fecha más reciente
-      // real en epod_lineas — a diferencia de CD5 (días pasados congelados
-      // para siempre), acá "el día evaluado" cambia con cada subida nueva,
-      // así que hay que confirmar que no haya una fecha más nueva sin
-      // cachear todavía antes de confiar en lo guardado.
-      const { data: latestRow, error: latestErr } = await supabase
-        .from("epod_lineas")
-        .select("fecha")
-        .eq("hub_id", hubId)
-        .order("fecha", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (latestErr) throw latestErr;
-      const latestFecha = latestRow?.fecha ?? null;
-
-      if (latestFecha) {
-        const cached = await readCacheOne<PaqueteEnRiesgo[]>(hubId, "paquetes_en_riesgo", latestFecha);
-        if (cached) return { paquetes: cached, fechaEvaluada: latestFecha };
-      }
-
-      const result = await fetchAndComputeRiesgo(hubId);
-      if (result.fechaEvaluada) {
-        void writeCache(hubId, "paquetes_en_riesgo", result.fechaEvaluada, result.paquetes).catch((e) =>
-          console.error("[kpis-riesgo] Error escribiendo caché:", e),
-        );
-      }
-      return result;
+      const rows = await fetchRiesgoRows(hubId);
+      return computeRiesgo(rows);
     },
     staleTime: 5 * 60 * 1000,
   });

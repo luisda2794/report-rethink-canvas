@@ -19,20 +19,8 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { resolveEventDate } from "@/lib/resolve-event-date";
 import { getClientesLocalesConfig, isClienteLocal, isSheinClient } from "@/lib/clientes-locales-config";
 import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import { useEpodDates } from "@/lib/use-epod-dates";
-import {
-  analyze,
-  categorizar,
-  dbRowsToRawRows,
-  fetchDbRowsForHubDate,
-  formatDate,
-  fromCachedAnalysis,
-  toCachedAnalysis,
-  type Analysis,
-  type CachedAnalysis,
-  type RawRow,
-} from "@/lib/flow-meeting-calc";
-import { readCacheOne, writeCache } from "@/lib/hub-daily-cache";
 
 export const Route = createFileRoute("/flow-meeting")({
   component: () => (
@@ -113,6 +101,22 @@ function resolveColumns(
   return { cols, optCols };
 }
 
+type Categoria = "COMPLETADO" | "DEVOLUCION" | "EN_REPARTO" | "FALLO" | "OTRO";
+
+type RawRow = {
+  waybill: string;
+  fecha: Date | null;
+  estado: string;
+  categoria: Categoria;
+  incidencia: string;
+  cp: string;
+  driver: string;
+  tipoEntrega: string;
+  mercado: string;
+  vendedor: string;
+  rowIndex: number;
+};
+
 function parseFecha(v: unknown): Date | null {
   if (v == null || v === "") return null;
   if (v instanceof Date) return v;
@@ -126,10 +130,169 @@ function parseFecha(v: unknown): Date | null {
   return isNaN(d.getTime()) ? null : d;
 }
 
+function dayStart(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+function formatDate(d: Date | null): string {
+  if (!d) return "—";
+  return d.toISOString().slice(0, 10);
+}
+
+function categorizar(estadoRaw: string): Categoria {
+  const s = estadoRaw.trim().toLowerCase();
+  if (s === "entregado" || s === "delivered") return "COMPLETADO";
+  if (s === "return_to_seller_success") return "DEVOLUCION";
+  if (s === "driver_received" || s === "driver_received_incidencias") return "EN_REPARTO";
+  if (s === "attempt failure" || s === "return_to_seller_fail") return "FALLO";
+  return "OTRO";
+}
+
+type DriverAgg = {
+  driver: string;
+  total: number;
+  entregado: number;
+  devolucion: number;
+  enReparto: number;
+  fallos: number;
+  otros: number;
+};
+
+type CpAgg = {
+  driver: string;
+  cp: string;
+  total: number;
+  completado: number;
+  enReparto: number;
+  fallos: number;
+};
+
+type Analysis = {
+  maxDate: Date | null;
+  totalDia: number;
+  completados: number;
+  devoluciones: number;
+  enReparto: number;
+  fallos: number;
+  otros: number;
+  pctCompletado: number;
+  pudoTotal: number;
+  pudoEntregados: number;
+  pudoPendientes: number;
+  drivers: DriverAgg[];
+  cps: CpAgg[];
+  cpsCount: number;
+  incidencias: Array<{ nombre: string; count: number }>;
+};
+
 function pctColor(pct: number): string {
   if (pct >= 85) return "#16a34a";
   if (pct >= 70) return "#f59e0b";
   return "#dc2626";
+}
+
+function analyze(rows: RawRow[]): Analysis {
+  const empty: Analysis = {
+    maxDate: null,
+    totalDia: 0,
+    completados: 0,
+    devoluciones: 0,
+    enReparto: 0,
+    fallos: 0,
+    otros: 0,
+    pctCompletado: 0,
+    pudoTotal: 0,
+    pudoEntregados: 0,
+    pudoPendientes: 0,
+    drivers: [],
+    cps: [],
+    cpsCount: 0,
+    incidencias: [],
+  };
+  const validDates = rows.map((r) => r.fecha).filter((x): x is Date => !!x);
+  if (validDates.length === 0) return empty;
+  const maxTs = Math.max(...validDates.map(dayStart));
+  const maxDate = new Date(maxTs);
+  const dayRows = rows.filter((r) => r.fecha && dayStart(r.fecha) === maxTs);
+  if (dayRows.length === 0) return empty;
+
+  let completados = 0, devoluciones = 0, enReparto = 0, fallos = 0, otros = 0;
+  let pudoTotal = 0, pudoEntregados = 0, pudoPendientes = 0;
+  const driverMap = new Map<string, DriverAgg>();
+  const cpMap = new Map<string, CpAgg>();
+  const incMap = new Map<string, number>();
+
+  for (const r of dayRows) {
+    switch (r.categoria) {
+      case "COMPLETADO": completados++; break;
+      case "DEVOLUCION": devoluciones++; break;
+      case "EN_REPARTO": enReparto++; break;
+      case "FALLO": fallos++; break;
+      default: otros++;
+    }
+    const tipo = r.tipoEntrega.trim().toUpperCase();
+    if (tipo === "PUDO") {
+      pudoTotal++;
+      if (r.categoria === "COMPLETADO") pudoEntregados++;
+      else if (r.categoria === "EN_REPARTO") pudoPendientes++;
+    }
+    const driverKey = r.driver || "— Sin asignar —";
+    let d = driverMap.get(driverKey);
+    if (!d) {
+      d = { driver: driverKey, total: 0, entregado: 0, devolucion: 0, enReparto: 0, fallos: 0, otros: 0 };
+      driverMap.set(driverKey, d);
+    }
+    d.total++;
+    if (r.categoria === "COMPLETADO") d.entregado++;
+    else if (r.categoria === "DEVOLUCION") d.devolucion++;
+    else if (r.categoria === "EN_REPARTO") d.enReparto++;
+    else if (r.categoria === "FALLO") d.fallos++;
+    else d.otros++;
+
+    const cpKey = `${driverKey}__${r.cp || "—"}`;
+    let c = cpMap.get(cpKey);
+    if (!c) {
+      c = { driver: driverKey, cp: r.cp || "—", total: 0, completado: 0, enReparto: 0, fallos: 0 };
+      cpMap.set(cpKey, c);
+    }
+    c.total++;
+    if (r.categoria === "COMPLETADO" || r.categoria === "DEVOLUCION") c.completado++;
+    else if (r.categoria === "EN_REPARTO") c.enReparto++;
+    else if (r.categoria === "FALLO") c.fallos++;
+
+    if (r.categoria === "FALLO" && r.incidencia) {
+      incMap.set(r.incidencia, (incMap.get(r.incidencia) ?? 0) + 1);
+    }
+  }
+
+  const totalDia = dayRows.length;
+  const compBase = completados + devoluciones + enReparto + fallos;
+  const pctCompletado = compBase > 0 ? ((completados + devoluciones) / compBase) * 100 : 0;
+
+  const drivers = Array.from(driverMap.values()).sort((a, b) => b.total - a.total);
+  const cps = Array.from(cpMap.values()).sort((a, b) => b.enReparto - a.enReparto || b.total - a.total);
+  const cpsUnique = new Set(cps.map((c) => c.cp)).size;
+  const incidencias = Array.from(incMap.entries())
+    .map(([nombre, count]) => ({ nombre, count }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    maxDate,
+    totalDia,
+    completados,
+    devoluciones,
+    enReparto,
+    fallos,
+    otros,
+    pctCompletado,
+    pudoTotal,
+    pudoEntregados,
+    pudoPendientes,
+    drivers,
+    cps,
+    cpsCount: cpsUnique,
+    incidencias,
+  };
 }
 
 function ProgressBar({ pct, className = "" }: { pct: number; className?: string }) {
@@ -161,6 +324,69 @@ function IncBar({ count, max }: { count: number; max: number }) {
 
 type ClienteTab = "todos" | "shein" | "locales";
 
+// Estado normalizado (epod_lineas.estado ya viene normalizado por
+// normalizeEstado() al subir el ePOD en /epod) — categorizar() ya compara en
+// minúsculas, así que "Driver_received"/"Entregado"/etc. matchean igual que
+// si vinieran de un Excel recién subido.
+type EpodLineaFlowRow = {
+  waybill: string | null;
+  fecha: string | null;
+  estado: string | null;
+  cp: string | null;
+  driver: string | null;
+  tipo: string | null;
+  market_place_name: string | null;
+  seller_name: string | null;
+  exception_detail: string | null;
+  row_index: number;
+};
+
+// Carga paginada (1000 filas por página, igual que ya hace reportes.tsx en
+// generarDesdeBase) — epod_lineas primero (histórico crudo); si un hub no
+// tiene nada ahí para esa fecha (uploads viejos previos a epod_lineas), cae a
+// entregas, que no tiene mercado/vendedor/incidencia (quedan vacíos).
+async function fetchDbRowsForHubDate(hubId: string, fecha: string): Promise<EpodLineaFlowRow[]> {
+  const pageSize = 1000;
+  const fromLineas: EpodLineaFlowRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("epod_lineas")
+      .select("waybill, fecha, estado, cp, driver, tipo, market_place_name, seller_name, exception_detail, row_index")
+      .eq("hub_id", hubId)
+      .eq("fecha", fecha)
+      .order("row_index", { ascending: true })
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    fromLineas.push(...page);
+    if (page.length < pageSize) break;
+  }
+  if (fromLineas.length > 0) return fromLineas;
+
+  const fromEntregas: EpodLineaFlowRow[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from("entregas")
+      .select("waybill, fecha, estado, cp, driver, tipo")
+      .eq("hub_id", hubId)
+      .eq("fecha", fecha)
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    fromEntregas.push(
+      ...page.map((r, i) => ({
+        ...r,
+        market_place_name: null,
+        seller_name: null,
+        exception_detail: null,
+        row_index: from + i,
+      })),
+    );
+    if (page.length < pageSize) break;
+  }
+  return fromEntregas;
+}
+
 function FlowMeetingPage() {
   const { selectedHub } = useAuth();
   const [hub, setHub] = useState<HubKey | "">("");
@@ -183,13 +409,6 @@ function FlowMeetingPage() {
     setDbDate(dbDates && dbDates.length > 0 ? dbDates[0] : null);
   }, [dbDates]);
 
-  // Cuando la carga "desde la base" pega en caché, se muestra este análisis
-  // ya calculado en vez de traer filas crudas — instantáneo, pero solo sirve
-  // para "Todos" (la caché guarda un único análisis agregado, no filas). Si
-  // el usuario abre SHEIN/Clientes Locales sin filas crudas todavía, un
-  // efecto más abajo las trae en ese momento (lazy) para poder filtrar.
-  const [dbCachedAnalysis, setDbCachedAnalysis] = useState<Analysis | null>(null);
-
   const filteredRows = useMemo(() => {
     if (!rows) return null;
     if (clienteTab === "todos") return rows;
@@ -201,27 +420,7 @@ function FlowMeetingPage() {
     return rows.filter((r) => isClienteLocal(r.mercado, r.vendedor, config) && !isSheinClient(r.mercado, r.vendedor, config));
   }, [rows, clienteTab]);
 
-  const analysis = useMemo(
-    () => (filteredRows ? analyze(filteredRows) : clienteTab === "todos" ? dbCachedAnalysis : null),
-    [filteredRows, dbCachedAnalysis, clienteTab],
-  );
-
-  // Si el usuario abre una pestaña de cliente mientras solo tenemos el
-  // análisis cacheado (sin filas crudas), traemos las filas en ese momento
-  // para poder filtrar — solo pasa una vez, después rows ya queda seteado.
-  useEffect(() => {
-    if (clienteTab === "todos" || rows || !dbCachedAnalysis || !selectedHub || !dbDate) return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const dbRows = await fetchDbRowsForHubDate(selectedHub.id, dbDate);
-        if (!cancelled) setRows(dbRowsToRawRows(dbRows));
-      } catch (e) {
-        console.error("[Flow Meeting] Error trayendo filas para filtrar por cliente:", e);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [clienteTab, rows, dbCachedAnalysis, selectedHub, dbDate]);
+  const analysis = useMemo(() => (filteredRows ? analyze(filteredRows) : null), [filteredRows]);
 
   // Común a ambas vías (archivo o base de datos): guarda las filas parseadas
   // y el resumen en localStorage — la lógica de análisis/render no distingue
@@ -254,30 +453,26 @@ function FlowMeetingPage() {
     setDbLoading(true);
     setDbError(null);
     setFile(null);
-    setRows(null);
-    setDbCachedAnalysis(null);
     try {
-      const hubLabel = `${selectedHub.marca} · ${selectedHub.nombre}`;
-
-      // Lectura con fallback: si ya está cacheado para este día, instantáneo
-      // (sin traer filas crudas). Si no, se calcula en vivo como siempre y
-      // de paso se deja la caché tibia para la próxima vez.
-      const cached = await readCacheOne<CachedAnalysis>(selectedHub.id, "flow_meeting", dbDate);
-      if (cached) {
-        setDbCachedAnalysis(fromCachedAnalysis(cached, dbDate));
-        setLoadedFrom({ label: hubLabel, via: "base de datos" });
-        setClienteTab("todos");
-        return;
-      }
-
       const dbRows = await fetchDbRowsForHubDate(selectedHub.id, dbDate);
       if (dbRows.length === 0) throw new Error("No hay filas para ese hub y fecha en la base de datos.");
-      const parsed = dbRowsToRawRows(dbRows);
-      applyParsedRows(parsed, hubLabel, "base de datos");
-      const a = analyze(parsed);
-      void writeCache(selectedHub.id, "flow_meeting", dbDate, toCachedAnalysis(a)).catch((e) =>
-        console.error("[Flow Meeting] Error escribiendo caché:", e),
-      );
+      const parsed: RawRow[] = dbRows.map((r) => {
+        const estado = r.estado ?? "";
+        return {
+          waybill: r.waybill ?? "",
+          fecha: r.fecha ? new Date(`${r.fecha}T00:00:00`) : null,
+          estado,
+          categoria: categorizar(estado),
+          incidencia: r.exception_detail ?? "",
+          cp: r.cp ?? "",
+          driver: r.driver ?? "",
+          tipoEntrega: r.tipo ?? "",
+          mercado: r.market_place_name ?? "",
+          vendedor: r.seller_name ?? "",
+          rowIndex: r.row_index,
+        };
+      });
+      applyParsedRows(parsed, `${selectedHub.marca} · ${selectedHub.nombre}`, "base de datos");
     } catch (e) {
       console.error("[Flow Meeting] Error cargando desde la base:", e);
       setDbError(e instanceof Error ? e.message : "Error cargando desde la base de datos.");
@@ -525,7 +720,7 @@ function FlowMeetingPage() {
             </section>
           </div>
 
-          {(rows || dbCachedAnalysis) && (
+          {rows && (
             <Tabs value={clienteTab} onValueChange={(v) => setClienteTab(v as ClienteTab)} className="print:hidden mb-6">
               <TabsList>
                 <TabsTrigger value="todos">Todos</TabsTrigger>

@@ -1,18 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Loader2, RefreshCw, TrendingUp } from "lucide-react";
+import { useMemo } from "react";
+import { Loader2, TrendingUp } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
-import { Button } from "@/components/ui/button";
 import { RequireAuth } from "@/components/RequireAuth";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCd5Trend, type Cd5DayPoint } from "@/lib/kpis-cd5";
 import { useDsrTrend, KPIS_TREND_BUSINESS_DAYS, type DsrDayPoint } from "@/lib/kpis-dsr";
 import { DSR_BANDS, dsrBandFor } from "@/lib/kpis-dsr-bands";
 import { mostRecentBusinessDay, toIso } from "@/lib/business-days";
-import { useEpodDates } from "@/lib/use-epod-dates";
-import { backfillAllCache, type BackfillProgress } from "@/lib/cache-recompute";
 
 const MIN_HISTORY_DAYS_FOR_CD5 = 5;
 
@@ -49,7 +46,7 @@ const tooltipLabel = (iso: string) => esDate(iso, { weekday: "short", day: "nume
 const longLabel = (iso: string) => esDate(iso, { weekday: "long", day: "numeric", month: "long" });
 
 function KpisPage() {
-  const { selectedHub, isAdmin } = useAuth();
+  const { selectedHub } = useAuth();
   const hubId = selectedHub?.id ?? null;
 
   const cd5 = useCd5Trend(hubId, KPIS_TREND_BUSINESS_DAYS);
@@ -102,14 +99,11 @@ function KpisPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">KPIs</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            CD5 y DSR para <span className="text-foreground font-semibold">{selectedHub?.marca ?? "—"}</span>, solo de lunes a viernes.
-          </p>
-        </div>
-        {isAdmin && hubId && <RecalcularCacheButton hubId={hubId} />}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">KPIs</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          CD5 y DSR para <span className="text-foreground font-semibold">{selectedHub?.marca ?? "—"}</span>, solo de lunes a viernes.
+        </p>
       </div>
 
       {!selectedHub ? (
@@ -149,53 +143,6 @@ function KpisPage() {
           </div>
         </>
       )}
-    </div>
-  );
-}
-
-// ============================================================
-// ADMIN — RECALCULAR CACHÉ COMPLETA
-// ============================================================
-
-// Para hubs que ya tenían histórico cargado antes de la caché (ej. Luan
-// Express con 58+ días) — la rellena retroactivamente sin re-subir nada.
-// Solo admin, y solo tiene sentido para el hub seleccionado (respeta el
-// mismo contexto de hub que el resto de la página).
-function RecalcularCacheButton({ hubId }: { hubId: string }) {
-  const { data: dates } = useEpodDates(hubId);
-  const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState<BackfillProgress | null>(null);
-
-  const run = async () => {
-    if (!dates || dates.length === 0 || running) return;
-    setRunning(true);
-    setProgress(null);
-    try {
-      await backfillAllCache(hubId, dates, setProgress);
-    } catch (e) {
-      console.error("[KPIs] Error recalculando caché completa:", e);
-    } finally {
-      setRunning(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      {progress && (
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {progress.etapa} ({progress.done}/{progress.total})
-        </span>
-      )}
-      <Button
-        onClick={() => void run()}
-        disabled={running || !dates || dates.length === 0}
-        variant="outline"
-        size="sm"
-        className="gap-2"
-      >
-        {running ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-        {running ? "Recalculando…" : "Recalcular caché completa"}
-      </Button>
     </div>
   );
 }
