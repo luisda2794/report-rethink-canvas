@@ -4,10 +4,7 @@ import { Loader2, TrendingUp } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, type ChartConfig } from "@/components/ui/chart";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RequireAuth } from "@/components/RequireAuth";
-import { KpisRiesgoTab } from "@/components/kpis-riesgo-tab";
-import { FlowMeetingPage } from "@/routes/reportes_.flow-meeting";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCd5Trend, type Cd5DayPoint } from "@/lib/kpis-cd5";
 import { useDsrTrend, KPIS_TREND_BUSINESS_DAYS, type DsrDayPoint } from "@/lib/kpis-dsr";
@@ -146,19 +143,6 @@ function KpisPage() {
           </div>
         </>
       )}
-
-      <Tabs defaultValue="riesgo">
-        <TabsList>
-          <TabsTrigger value="riesgo">Paquetes en Riesgo</TabsTrigger>
-          <TabsTrigger value="flow">Flow Meeting</TabsTrigger>
-        </TabsList>
-        <TabsContent value="riesgo" className="mt-4">
-          <KpisRiesgoTab hubId={hubId} hubMarca={selectedHub?.marca ?? "hub"} />
-        </TabsContent>
-        <TabsContent value="flow" className="mt-4">
-          <FlowMeetingPage embedded />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }

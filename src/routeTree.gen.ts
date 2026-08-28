@@ -16,8 +16,10 @@ import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
 import { Route as MapaEntregasRouteImport } from './routes/mapa-entregas'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FacturacionRouteImport } from './routes/facturacion'
+import { Route as FlowMeetingRouteImport } from './routes/flow-meeting'
 import { Route as EpodRouteImport } from './routes/epod'
 import { Route as DuplicadosRouteImport } from './routes/duplicados'
+import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
 import { Route as DriversRouteImport } from './routes/drivers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as Cd5RouteImport } from './routes/cd5'
@@ -26,7 +28,6 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportesSuperReporteRouteImport } from './routes/reportes_.super-reporte'
 import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
-import { Route as ReportesFlowMeetingRouteImport } from './routes/reportes_.flow-meeting'
 import { Route as ReportesClientesLocalesRouteImport } from './routes/reportes_.clientes-locales'
 import { Route as RecTokenRouteImport } from './routes/rec.$token'
 import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/reportes_.clientes-locales.admin'
@@ -68,6 +69,11 @@ const FacturacionRoute = FacturacionRouteImport.update({
   path: '/facturacion',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FlowMeetingRoute = FlowMeetingRouteImport.update({
+  id: '/flow-meeting',
+  path: '/flow-meeting',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const EpodRoute = EpodRouteImport.update({
   id: '/epod',
   path: '/epod',
@@ -76,6 +82,11 @@ const EpodRoute = EpodRouteImport.update({
 const DuplicadosRoute = DuplicadosRouteImport.update({
   id: '/duplicados',
   path: '/duplicados',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaquetesEnRiesgoRoute = PaquetesEnRiesgoRouteImport.update({
+  id: '/paquetes-en-riesgo',
+  path: '/paquetes-en-riesgo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DriversRoute = DriversRouteImport.update({
@@ -119,11 +130,6 @@ const ReportesPaquetesEnRiesgoRoute =
     path: '/reportes/paquetes-en-riesgo',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ReportesFlowMeetingRoute = ReportesFlowMeetingRouteImport.update({
-  id: '/reportes_/flow-meeting',
-  path: '/reportes/flow-meeting',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ReportesClientesLocalesRoute = ReportesClientesLocalesRouteImport.update({
   id: '/reportes_/clientes-locales',
   path: '/reportes/clientes-locales',
@@ -161,6 +167,8 @@ export interface FileRoutesByFullPath {
   '/duplicados': typeof DuplicadosRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
+  '/flow-meeting': typeof FlowMeetingRoute
+  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/login': typeof LoginRoute
   '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
@@ -169,7 +177,6 @@ export interface FileRoutesByFullPath {
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
   '/reportes/clientes-locales': typeof ReportesClientesLocalesRouteWithChildren
-  '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes/super-reporte': typeof ReportesSuperReporteRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
@@ -186,6 +193,8 @@ export interface FileRoutesByTo {
   '/duplicados': typeof DuplicadosRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
+  '/flow-meeting': typeof FlowMeetingRoute
+  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/login': typeof LoginRoute
   '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
@@ -194,7 +203,6 @@ export interface FileRoutesByTo {
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
   '/reportes/clientes-locales': typeof ReportesClientesLocalesRouteWithChildren
-  '/reportes/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes/super-reporte': typeof ReportesSuperReporteRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
@@ -212,6 +220,8 @@ export interface FileRoutesById {
   '/duplicados': typeof DuplicadosRoute
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
+  '/flow-meeting': typeof FlowMeetingRoute
+  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/login': typeof LoginRoute
   '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
@@ -220,7 +230,6 @@ export interface FileRoutesById {
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
   '/reportes_/clientes-locales': typeof ReportesClientesLocalesRouteWithChildren
-  '/reportes_/flow-meeting': typeof ReportesFlowMeetingRoute
   '/reportes_/paquetes-en-riesgo': typeof ReportesPaquetesEnRiesgoRoute
   '/reportes_/super-reporte': typeof ReportesSuperReporteRoute
   '/api/public/cd5': typeof ApiPublicCd5Route
@@ -239,6 +248,8 @@ export interface FileRouteTypes {
     | '/duplicados'
     | '/epod'
     | '/facturacion'
+    | '/flow-meeting'
+    | '/paquetes-en-riesgo'
     | '/login'
     | '/mapa-entregas'
     | '/mapas-admin'
@@ -247,7 +258,6 @@ export interface FileRouteTypes {
     | '/reportes'
     | '/rec/$token'
     | '/reportes/clientes-locales'
-    | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/reportes/super-reporte'
     | '/api/public/cd5'
@@ -264,6 +274,8 @@ export interface FileRouteTypes {
     | '/duplicados'
     | '/epod'
     | '/facturacion'
+    | '/flow-meeting'
+    | '/paquetes-en-riesgo'
     | '/login'
     | '/mapa-entregas'
     | '/mapas-admin'
@@ -272,7 +284,6 @@ export interface FileRouteTypes {
     | '/reportes'
     | '/rec/$token'
     | '/reportes/clientes-locales'
-    | '/reportes/flow-meeting'
     | '/reportes/paquetes-en-riesgo'
     | '/reportes/super-reporte'
     | '/api/public/cd5'
@@ -289,6 +300,8 @@ export interface FileRouteTypes {
     | '/duplicados'
     | '/epod'
     | '/facturacion'
+    | '/flow-meeting'
+    | '/paquetes-en-riesgo'
     | '/login'
     | '/mapa-entregas'
     | '/mapas-admin'
@@ -297,7 +310,6 @@ export interface FileRouteTypes {
     | '/reportes'
     | '/rec/$token'
     | '/reportes_/clientes-locales'
-    | '/reportes_/flow-meeting'
     | '/reportes_/paquetes-en-riesgo'
     | '/reportes_/super-reporte'
     | '/api/public/cd5'
@@ -315,15 +327,16 @@ export interface RootRouteChildren {
   DuplicadosRoute: typeof DuplicadosRoute
   EpodRoute: typeof EpodRoute
   FacturacionRoute: typeof FacturacionRoute
+  FlowMeetingRoute: typeof FlowMeetingRoute
   LoginRoute: typeof LoginRoute
   MapaEntregasRoute: typeof MapaEntregasRoute
   MapasAdminRoute: typeof MapasAdminRoute
   MapasProvinciaRoute: typeof MapasProvinciaRoute
+  PaquetesEnRiesgoRoute: typeof PaquetesEnRiesgoRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
   ReportesClientesLocalesRoute: typeof ReportesClientesLocalesRouteWithChildren
-  ReportesFlowMeetingRoute: typeof ReportesFlowMeetingRoute
   ReportesPaquetesEnRiesgoRoute: typeof ReportesPaquetesEnRiesgoRoute
   ReportesSuperReporteRoute: typeof ReportesSuperReporteRoute
   ApiPublicCd5Route: typeof ApiPublicCd5Route
@@ -395,6 +408,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DuplicadosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flow-meeting': {
+      id: '/flow-meeting'
+      path: '/flow-meeting'
+      fullPath: '/flow-meeting'
+      preLoaderRoute: typeof FlowMeetingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paquetes-en-riesgo': {
+      id: '/paquetes-en-riesgo'
+      path: '/paquetes-en-riesgo'
+      fullPath: '/paquetes-en-riesgo'
+      preLoaderRoute: typeof PaquetesEnRiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/drivers': {
       id: '/drivers'
       path: '/drivers'
@@ -449,13 +476,6 @@ declare module '@tanstack/react-router' {
       path: '/reportes/paquetes-en-riesgo'
       fullPath: '/reportes/paquetes-en-riesgo'
       preLoaderRoute: typeof ReportesPaquetesEnRiesgoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reportes_/flow-meeting': {
-      id: '/reportes_/flow-meeting'
-      path: '/reportes/flow-meeting'
-      fullPath: '/reportes/flow-meeting'
-      preLoaderRoute: typeof ReportesFlowMeetingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reportes_/clientes-locales': {
@@ -520,15 +540,16 @@ const rootRouteChildren: RootRouteChildren = {
   DuplicadosRoute: DuplicadosRoute,
   EpodRoute: EpodRoute,
   FacturacionRoute: FacturacionRoute,
+  FlowMeetingRoute: FlowMeetingRoute,
   LoginRoute: LoginRoute,
   MapaEntregasRoute: MapaEntregasRoute,
   MapasAdminRoute: MapasAdminRoute,
   MapasProvinciaRoute: MapasProvinciaRoute,
+  PaquetesEnRiesgoRoute: PaquetesEnRiesgoRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,
   ReportesClientesLocalesRoute: ReportesClientesLocalesRouteWithChildren,
-  ReportesFlowMeetingRoute: ReportesFlowMeetingRoute,
   ReportesPaquetesEnRiesgoRoute: ReportesPaquetesEnRiesgoRoute,
   ReportesSuperReporteRoute: ReportesSuperReporteRoute,
   ApiPublicCd5Route: ApiPublicCd5Route,

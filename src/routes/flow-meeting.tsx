@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import {
@@ -6,7 +6,6 @@ import {
   FileSpreadsheet,
   X,
   AlertCircle,
-  ArrowLeft,
   ChevronDown,
   Printer,
   Package,
@@ -23,9 +22,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useEpodDates } from "@/lib/use-epod-dates";
 
-export const Route = createFileRoute("/reportes_/flow-meeting")({
+export const Route = createFileRoute("/flow-meeting")({
   component: () => (
-    <RequireAuth path="/reportes">
+    <RequireAuth path="/flow-meeting">
       <FlowMeetingPage />
     </RequireAuth>
   ),
@@ -388,10 +387,7 @@ async function fetchDbRowsForHubDate(hubId: string, fecha: string): Promise<Epod
   return fromEntregas;
 }
 
-// embedded=true: se usa dentro de la pestaña "Flow Meeting" de /reportes
-// (KPIs) — oculta el link "Volver a Reportes", que no tiene sentido ahí
-// (ya estamos en /reportes). El resto del componente no cambia.
-export function FlowMeetingPage({ embedded = false }: { embedded?: boolean } = {}) {
+function FlowMeetingPage() {
   const { selectedHub } = useAuth();
   const [hub, setHub] = useState<HubKey | "">("");
   const [file, setFile] = useState<File | null>(null);
@@ -556,17 +552,6 @@ export function FlowMeetingPage({ embedded = false }: { embedded?: boolean } = {
   return (
     <div className="flex flex-col gap-6 print:bg-white">
       <div className="print:px-6 print:py-4">
-        {!embedded && (
-          <div className="mb-4 print:hidden">
-            <Link
-              to="/reportes"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="size-3.5" /> Volver a Reportes
-            </Link>
-          </div>
-        )}
-
         <header className="mb-6 print:mb-4 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight print:text-xl">

@@ -21,11 +21,18 @@ export type NavItem = { to: string; label: string };
 // antes, se desactivaron al no estar en ROUTE_ACCESS de ningún rol (RequireAuth
 // redirige si canAccess() da false — así es como se "apagó" el módulo, no
 // borrando el código) y se reactivan acá, solo para admin/manager.
+//
+// "/paquetes-en-riesgo" y "/flow-meeting" eran pestañas dentro de "/reportes"
+// (KPIs) y se movieron a rutas propias en el nav, al mismo nivel que el
+// resto — mismo acceso que ya tenía /reportes (admin/manager/jefe_flota),
+// ya que son herramientas operativas del día a día, no financieras.
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/mapa-entregas", label: "Mapa de Entregas" },
   { to: "/reportes", label: "KPIs" },
+  { to: "/paquetes-en-riesgo", label: "Paquetes en Riesgo" },
+  { to: "/flow-meeting", label: "Flow Meeting" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
@@ -38,6 +45,8 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/dashboard",
     "/mapa-entregas",
     "/reportes",
+    "/paquetes-en-riesgo",
+    "/flow-meeting",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
@@ -51,6 +60,8 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/dashboard",
     "/mapa-entregas",
     "/reportes",
+    "/paquetes-en-riesgo",
+    "/flow-meeting",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
@@ -63,6 +74,8 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/dashboard",
     "/mapa-entregas",
     "/reportes",
+    "/paquetes-en-riesgo",
+    "/flow-meeting",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
