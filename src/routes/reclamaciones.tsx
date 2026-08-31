@@ -19,7 +19,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusIndicator } from "@/components/indicator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input as InputPrimitive } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -333,9 +334,10 @@ function ReclamacionesPage() {
               </p>
             </div>
             <Button
+              variant="outline"
               onClick={() => setOpenModal({ mode: "create" })}
               disabled={!selectedHub}
-              className="bg-ink hover:bg-ink/90"
+              className="gap-2"
             >
               <Plus className="size-4" /> Nueva reclamación
             </Button>
@@ -598,18 +600,27 @@ function StatChip({
   value: number;
   tone: "danger" | "electric" | "amber" | "success";
 }) {
-  const cls = {
-    danger: "bg-destructive/10 border-destructive/30 text-destructive",
-    electric: "bg-electric/10 border-electric/30 text-electric",
-    amber:
-      "bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400",
-    success: "bg-success/10 border-success/30 text-success",
-  }[tone];
+  // Mismo patrón que las tarjetas de KPI del Dashboard: tarjeta blanca, sin
+  // color de fondo ni en el número — el color queda solo en el puntito de
+  // estado junto a la etiqueta (igual que StatusIndicator en team-on-duty).
+  const dotColor: Record<typeof tone, "rose" | "sky" | "amber" | "emerald"> = {
+    danger: "rose",
+    electric: "sky",
+    amber: "amber",
+    success: "emerald",
+  };
   return (
-    <div className={`flex items-center justify-between px-4 py-3 border rounded-lg ${cls}`}>
-      <span className="text-[11px] uppercase tracking-wide">{label}</span>
-      <span className="font-semibold text-2xl tabular-nums">{value}</span>
-    </div>
+    <Card className="shadow-none">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 font-normal text-muted-foreground text-xs">
+          <StatusIndicator color={dotColor[tone]} pulse={false} />
+          {label}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="font-semibold text-2xl tabular-nums">{value}</p>
+      </CardContent>
+    </Card>
   );
 }
 
