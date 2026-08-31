@@ -89,13 +89,13 @@ const ESTADO_LABEL: Record<Estado, string> = {
 function estadoClass(e: Estado): string {
   switch (e) {
     case "abierta":
-      return "border-danger/40 text-danger";
+      return "bg-danger/10 text-danger border-danger/30";
     case "enviada_driver":
-      return "border-electric/40 text-electric";
+      return "bg-electric/10 text-electric border-electric/30";
     case "respondida_driver":
-      return "border-amber-400/60 text-amber-700 dark:text-amber-400";
+      return "bg-amber-400/15 text-amber-700 dark:text-amber-400 border-amber-400/40";
     case "cerrada":
-      return "border-success/40 text-success";
+      return "bg-success/15 text-success border-success/30";
   }
 }
 
@@ -133,9 +133,9 @@ function SlaBadge({ rec, nowMs }: { rec: Reclamacion; nowMs: number }) {
   const sla = computeSla(rec, nowMs);
   if (!sla) return <span className="text-muted-text text-xs">—</span>;
   const toneClass: Record<SlaTone, string> = {
-    green: "border-success/40 text-success",
-    yellow: "border-amber-400/60 text-amber-700 dark:text-amber-400",
-    red: "border-danger/40 text-danger",
+    green: "bg-success/15 text-success border-success/30",
+    yellow: "bg-amber-400/15 text-amber-700 dark:text-amber-400 border-amber-400/40",
+    red: "bg-danger/10 text-danger border-danger/30",
   };
   const label = sla.live
     ? sla.hoursLeft >= 0
