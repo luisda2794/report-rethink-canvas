@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1039,10 +1039,6 @@ export type Database = {
       dashboard_last_upload: { Args: { _hub_ids: string[] }; Returns: Json }
       dashboard_stats: {
         Args: { _from: string; _hub_ids: string[]; _to: string }
-        Returns: Json
-      }
-      epod_available_dates: {
-        Args: { _hub_id: string }
         Returns: Json
       }
       get_user_role: { Args: { _user_id: string }; Returns: string }

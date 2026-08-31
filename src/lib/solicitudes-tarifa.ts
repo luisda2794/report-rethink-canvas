@@ -94,7 +94,7 @@ export async function aprobarSolicitud(
   actorNombre: string,
 ): Promise<{ error: string | null }> {
   const now = new Date().toISOString();
-  const patch: Record<string, unknown> = {};
+  const patch: import("@/integrations/supabase/types").Database["public"]["Tables"]["solicitudes_tarifa"]["Update"] = {};
 
   if (etapa === "manager") {
     patch.aprobado_manager_por = actorId;
@@ -166,7 +166,7 @@ async function aplicarCambioTarifa(s: SolicitudTarifa): Promise<{ error: string 
     {
       driver_id: s.driver_id,
       hub_id: s.hub_id,
-      fecha: s.fecha,
+      fecha: s.fecha ?? new Date().toISOString().slice(0, 10),
       codigo_postal: s.codigo_postal,
       tarifa_to_door: v.tarifa_to_door ?? null,
       tarifa_pudo_primero: v.tarifa_pudo_primero ?? null,

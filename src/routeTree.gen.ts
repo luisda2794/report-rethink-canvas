@@ -9,22 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AprobacionesRouteImport } from './routes/aprobaciones'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
+import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
 import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
 import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
 import { Route as MapaEntregasRouteImport } from './routes/mapa-entregas'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as FlowMeetingRouteImport } from './routes/flow-meeting'
+import { Route as FacturacionRouteImport } from './routes/facturacion'
 import { Route as EpodRouteImport } from './routes/epod'
 import { Route as DuplicadosRouteImport } from './routes/duplicados'
-import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
 import { Route as DriversRouteImport } from './routes/drivers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as Cd5RouteImport } from './routes/cd5'
 import { Route as BorradoresRouteImport } from './routes/borradores'
+import { Route as AprobacionesRouteImport } from './routes/aprobaciones'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportesSuperReporteRouteImport } from './routes/reportes_.super-reporte'
@@ -35,11 +35,6 @@ import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/repor
 import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
 import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
 
-const AprobacionesRoute = AprobacionesRouteImport.update({
-  id: '/aprobaciones',
-  path: '/aprobaciones',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ReportesRoute = ReportesRouteImport.update({
   id: '/reportes',
   path: '/reportes',
@@ -48,6 +43,11 @@ const ReportesRoute = ReportesRouteImport.update({
 const ReclamacionesRoute = ReclamacionesRouteImport.update({
   id: '/reclamaciones',
   path: '/reclamaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PaquetesEnRiesgoRoute = PaquetesEnRiesgoRouteImport.update({
+  id: '/paquetes-en-riesgo',
+  path: '/paquetes-en-riesgo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MapasProvinciaRoute = MapasProvinciaRouteImport.update({
@@ -70,14 +70,14 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const FacturacionRoute = FacturacionRouteImport.update({
-  id: '/facturacion',
-  path: '/facturacion',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const FlowMeetingRoute = FlowMeetingRouteImport.update({
   id: '/flow-meeting',
   path: '/flow-meeting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FacturacionRoute = FacturacionRouteImport.update({
+  id: '/facturacion',
+  path: '/facturacion',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EpodRoute = EpodRouteImport.update({
@@ -88,11 +88,6 @@ const EpodRoute = EpodRouteImport.update({
 const DuplicadosRoute = DuplicadosRouteImport.update({
   id: '/duplicados',
   path: '/duplicados',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PaquetesEnRiesgoRoute = PaquetesEnRiesgoRouteImport.update({
-  id: '/paquetes-en-riesgo',
-  path: '/paquetes-en-riesgo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DriversRoute = DriversRouteImport.update({
@@ -113,6 +108,11 @@ const Cd5Route = Cd5RouteImport.update({
 const BorradoresRoute = BorradoresRouteImport.update({
   id: '/borradores',
   path: '/borradores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AprobacionesRoute = AprobacionesRouteImport.update({
+  id: '/aprobaciones',
+  path: '/aprobaciones',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -175,11 +175,11 @@ export interface FileRoutesByFullPath {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/flow-meeting': typeof FlowMeetingRoute
-  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/login': typeof LoginRoute
   '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
+  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -202,11 +202,11 @@ export interface FileRoutesByTo {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/flow-meeting': typeof FlowMeetingRoute
-  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/login': typeof LoginRoute
   '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
+  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -230,11 +230,11 @@ export interface FileRoutesById {
   '/epod': typeof EpodRoute
   '/facturacion': typeof FacturacionRoute
   '/flow-meeting': typeof FlowMeetingRoute
-  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/login': typeof LoginRoute
   '/mapa-entregas': typeof MapaEntregasRoute
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
+  '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -259,11 +259,11 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/flow-meeting'
-    | '/paquetes-en-riesgo'
     | '/login'
     | '/mapa-entregas'
     | '/mapas-admin'
     | '/mapas-provincia'
+    | '/paquetes-en-riesgo'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -286,11 +286,11 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/flow-meeting'
-    | '/paquetes-en-riesgo'
     | '/login'
     | '/mapa-entregas'
     | '/mapas-admin'
     | '/mapas-provincia'
+    | '/paquetes-en-riesgo'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -313,11 +313,11 @@ export interface FileRouteTypes {
     | '/epod'
     | '/facturacion'
     | '/flow-meeting'
-    | '/paquetes-en-riesgo'
     | '/login'
     | '/mapa-entregas'
     | '/mapas-admin'
     | '/mapas-provincia'
+    | '/paquetes-en-riesgo'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -358,13 +358,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/aprobaciones': {
-      id: '/aprobaciones'
-      path: '/aprobaciones'
-      fullPath: '/aprobaciones'
-      preLoaderRoute: typeof AprobacionesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/reportes': {
       id: '/reportes'
       path: '/reportes'
@@ -377,6 +370,13 @@ declare module '@tanstack/react-router' {
       path: '/reclamaciones'
       fullPath: '/reclamaciones'
       preLoaderRoute: typeof ReclamacionesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/paquetes-en-riesgo': {
+      id: '/paquetes-en-riesgo'
+      path: '/paquetes-en-riesgo'
+      fullPath: '/paquetes-en-riesgo'
+      preLoaderRoute: typeof PaquetesEnRiesgoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mapas-provincia': {
@@ -407,6 +407,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/flow-meeting': {
+      id: '/flow-meeting'
+      path: '/flow-meeting'
+      fullPath: '/flow-meeting'
+      preLoaderRoute: typeof FlowMeetingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/facturacion': {
       id: '/facturacion'
       path: '/facturacion'
@@ -426,20 +433,6 @@ declare module '@tanstack/react-router' {
       path: '/duplicados'
       fullPath: '/duplicados'
       preLoaderRoute: typeof DuplicadosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/flow-meeting': {
-      id: '/flow-meeting'
-      path: '/flow-meeting'
-      fullPath: '/flow-meeting'
-      preLoaderRoute: typeof FlowMeetingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paquetes-en-riesgo': {
-      id: '/paquetes-en-riesgo'
-      path: '/paquetes-en-riesgo'
-      fullPath: '/paquetes-en-riesgo'
-      preLoaderRoute: typeof PaquetesEnRiesgoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/drivers': {
@@ -468,6 +461,13 @@ declare module '@tanstack/react-router' {
       path: '/borradores'
       fullPath: '/borradores'
       preLoaderRoute: typeof BorradoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aprobaciones': {
+      id: '/aprobaciones'
+      path: '/aprobaciones'
+      fullPath: '/aprobaciones'
+      preLoaderRoute: typeof AprobacionesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
