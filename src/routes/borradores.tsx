@@ -12,6 +12,8 @@ import {
   ChevronUp,
   FileSpreadsheet,
   Calendar as CalendarIcon,
+  Pencil,
+  X,
 } from "lucide-react";
 import XLSXStyle from "xlsx-js-style";
 import { toast } from "sonner";
@@ -19,9 +21,12 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   ESTADO_LABEL,
   ESTADO_COLOR,
+  TIPO_SOLICITUD_LABEL,
   type SolicitudTarifa,
   type ValoresTarifa,
 } from "@/lib/solicitudes-tarifa";
@@ -608,6 +613,7 @@ function BorradoresPage() {
           ) : (
             <>
               <TarifasSection hubId={selectedHub.id} hubNombre={`${selectedHub.marca} · ${selectedHub.nombre}`} />
+              <SituacionesEspecialesSection hubId={selectedHub.id} hubNombre={`${selectedHub.marca} · ${selectedHub.nombre}`} />
               {soloSolicita ? (
                 user && <MisSolicitudesSection userId={user.id} />
               ) : (
@@ -1015,45 +1021,461 @@ function MisSolicitudesSection({ userId }: { userId: string }) {
       {loading ? (
         <p className="text-muted-text font-mono text-xs">Cargando…</p>
       ) : items.length === 0 ? (
-        <div className="px-4 py-6 border-l-2 border-hairline bg-surface-2/40 text-muted-text font-mono text-xs rounded-r">
-          Todavía no enviaste ninguna solicitud de cambio de tarifa.
-        </div>
+        <Card className="shadow-none">
+          <CardContent className="py-6 text-sm text-muted-text">
+            Todavía no enviaste ninguna solicitud de cambio de tarifa.
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-3">
           {items.map((s) => (
-            <div key={s.id} className="bg-surface border border-hairline rounded-lg p-4">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="text-sm font-semibold text-ink">
-                    {s.driver_nombre} <span className="text-muted-text font-normal">· CP {s.codigo_postal}</span>
-                  </p>
-                  <p className="text-[11px] text-muted-text mt-1 font-mono">
-                    Enviada {new Date(s.solicitado_en).toLocaleString("es-ES")}
-                  </p>
-                  <p className="text-xs text-ink mt-2 font-mono">
-                    {(Object.keys(s.valores_propuestos) as (keyof ValoresTarifa)[])
-                      .filter((c) => s.valores_propuestos[c] !== null && s.valores_propuestos[c] !== undefined)
-                      .map((c) => `${CAMPO_LABEL_SOLICITUD[c]}: ${fmtValor(s.valores_propuestos[c])}`)
-                      .join(" · ")}
-                  </p>
+            <Card key={s.id} className="shadow-none">
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">
+                      {s.driver_nombre} <span className="text-muted-text font-normal">· CP {s.codigo_postal}</span>
+                    </p>
+                    <p className="text-[11px] text-muted-text mt-1 font-mono">
+                      {TIPO_SOLICITUD_LABEL[s.tipo]}
+                      {s.fecha ? ` · ${s.fecha}` : ""} · Enviada {new Date(s.solicitado_en).toLocaleString("es-ES")}
+                    </p>
+                    <p className="text-xs text-ink mt-2 font-mono">
+                      {(Object.keys(s.valores_propuestos) as (keyof ValoresTarifa)[])
+                        .filter((c) => s.valores_propuestos[c] !== null && s.valores_propuestos[c] !== undefined)
+                        .map((c) => `${CAMPO_LABEL_SOLICITUD[c]}: ${fmtValor(s.valores_propuestos[c])}`)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-1 rounded border text-[10px] font-mono uppercase tracking-wide ${ESTADO_COLOR[s.estado]}`}>
+                    {ESTADO_LABEL[s.estado]}
+                  </span>
                 </div>
-                <span className={`shrink-0 px-2 py-1 rounded border text-[10px] font-mono uppercase tracking-wide ${ESTADO_COLOR[s.estado]}`}>
-                  {ESTADO_LABEL[s.estado]}
-                </span>
-              </div>
-              {s.estado === "rechazado" && (
-                <div className="mt-3 px-3 py-2 rounded border-l-2 border-danger bg-danger/10 text-xs">
-                  <p className="text-danger font-medium">
-                    Rechazado por {s.rechazado_nombre} (etapa {s.rechazado_en_etapa})
-                  </p>
-                  {s.motivo_rechazo && <p className="text-ink mt-1">{s.motivo_rechazo}</p>}
-                </div>
-              )}
-            </div>
+                {s.estado === "rechazado" && (
+                  <div className="mt-3 px-3 py-2 rounded border-l-2 border-danger bg-danger/10 text-xs">
+                    <p className="text-danger font-medium">
+                      Rechazado por {s.rechazado_nombre} (etapa {s.rechazado_en_etapa})
+                    </p>
+                    {s.motivo_rechazo && <p className="text-ink mt-1">{s.motivo_rechazo}</p>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
     </section>
+  );
+}
+
+// ============================================================
+// SECTION 1B: SITUACIONES ESPECIALES
+// ============================================================
+
+type SituacionEspecial = {
+  id: string;
+  driver_id: string;
+  driver_nombre: string;
+  hub_id: string;
+  fecha: string;
+  codigo_postal: string;
+  tarifa_to_door: number | null;
+  tarifa_pudo_primero: number | null;
+  tarifa_pudo_extra: number | null;
+  precio_salida: number | null;
+  nota: string | null;
+};
+
+function parseOpcional(s: string): number | null {
+  const t = s.trim();
+  return t === "" ? null : Number(t);
+}
+
+function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hubNombre: string }) {
+  const { role, user, profile } = useAuth();
+  const esJefeFlota = role === "jefe_flota";
+
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [items, setItems] = useState<SituacionEspecial[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [filterDriverId, setFilterDriverId] = useState<string>("todos");
+  const [filterDesde, setFilterDesde] = useState<string>("");
+  const [filterHasta, setFilterHasta] = useState<string>("");
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formDriverId, setFormDriverId] = useState("");
+  const [formFecha, setFormFecha] = useState(() => isoToday());
+  const [formCp, setFormCp] = useState("");
+  const [formToDoor, setFormToDoor] = useState("");
+  const [formPudo1, setFormPudo1] = useState("");
+  const [formPudoExtra, setFormPudoExtra] = useState("");
+  const [formSalida, setFormSalida] = useState("");
+  const [formNota, setFormNota] = useState("");
+
+  const loadDrivers = async () => {
+    const { data, error } = await supabase
+      .from("drivers")
+      .select("id, hub_id, nombre")
+      .eq("hub_id", hubId)
+      .order("nombre");
+    if (error) toast.error(error.message);
+    const list = (data ?? []) as Driver[];
+    setDrivers(list);
+    setFormDriverId((prev) => (list.some((d) => d.id === prev) ? prev : list[0]?.id ?? ""));
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("situaciones_especiales")
+      .select(
+        "id, driver_id, hub_id, fecha, codigo_postal, tarifa_to_door, tarifa_pudo_primero, tarifa_pudo_extra, precio_salida, nota, driver:drivers(nombre)",
+      )
+      .eq("hub_id", hubId)
+      .order("fecha", { ascending: false });
+    if (error) toast.error(error.message);
+    const mapped: SituacionEspecial[] = ((data ?? []) as unknown as Array<{
+      id: string;
+      driver_id: string;
+      hub_id: string;
+      fecha: string;
+      codigo_postal: string;
+      tarifa_to_door: number | null;
+      tarifa_pudo_primero: number | null;
+      tarifa_pudo_extra: number | null;
+      precio_salida: number | null;
+      nota: string | null;
+      driver: { nombre: string } | null;
+    }>).map((r) => ({
+      id: r.id,
+      driver_id: r.driver_id,
+      driver_nombre: r.driver?.nombre ?? "—",
+      hub_id: r.hub_id,
+      fecha: r.fecha,
+      codigo_postal: r.codigo_postal,
+      tarifa_to_door: r.tarifa_to_door,
+      tarifa_pudo_primero: r.tarifa_pudo_primero,
+      tarifa_pudo_extra: r.tarifa_pudo_extra,
+      precio_salida: r.precio_salida,
+      nota: r.nota,
+    }));
+    setItems(mapped);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void loadDrivers();
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hubId]);
+
+  const filtered = items.filter((i) => {
+    if (filterDriverId !== "todos" && i.driver_id !== filterDriverId) return false;
+    if (filterDesde && i.fecha < filterDesde) return false;
+    if (filterHasta && i.fecha > filterHasta) return false;
+    return true;
+  });
+
+  const resetForm = () => {
+    setEditingId(null);
+    setFormFecha(isoToday());
+    setFormCp("");
+    setFormToDoor("");
+    setFormPudo1("");
+    setFormPudoExtra("");
+    setFormSalida("");
+    setFormNota("");
+  };
+
+  const startEdit = (item: SituacionEspecial) => {
+    setEditingId(item.id);
+    setFormDriverId(item.driver_id);
+    setFormFecha(item.fecha);
+    setFormCp(item.codigo_postal);
+    setFormToDoor(item.tarifa_to_door?.toString() ?? "");
+    setFormPudo1(item.tarifa_pudo_primero?.toString() ?? "");
+    setFormPudoExtra(item.tarifa_pudo_extra?.toString() ?? "");
+    setFormSalida(item.precio_salida?.toString() ?? "");
+    setFormNota(item.nota ?? "");
+  };
+
+  const submit = async () => {
+    if (!formDriverId || !formFecha || !formCp.trim()) {
+      toast.error("Completa driver, fecha y CP");
+      return;
+    }
+    setSaving(true);
+    const valores: ValoresTarifa = {
+      tarifa_to_door: parseOpcional(formToDoor),
+      tarifa_pudo_primero: parseOpcional(formPudo1),
+      tarifa_pudo_extra: parseOpcional(formPudoExtra),
+      precio_salida: parseOpcional(formSalida),
+      nota: formNota.trim() || null,
+    };
+
+    if (esJefeFlota) {
+      if (!user) { setSaving(false); return; }
+      const driverNombre = drivers.find((d) => d.id === formDriverId)?.nombre ?? "";
+      const actorNombre = profile?.full_name?.trim() || user.email || "—";
+      const editingItem = editingId ? items.find((i) => i.id === editingId) : null;
+      const valoresAnteriores: ValoresTarifa | null = editingItem
+        ? {
+            tarifa_to_door: editingItem.tarifa_to_door,
+            tarifa_pudo_primero: editingItem.tarifa_pudo_primero,
+            tarifa_pudo_extra: editingItem.tarifa_pudo_extra,
+            precio_salida: editingItem.precio_salida,
+            nota: editingItem.nota,
+          }
+        : null;
+      const { error } = await supabase.from("solicitudes_tarifa").insert({
+        hub_id: hubId,
+        hub_nombre: hubNombre,
+        driver_id: formDriverId,
+        driver_nombre: driverNombre,
+        tipo: "situacion_especial",
+        codigo_postal: formCp.trim(),
+        fecha: formFecha,
+        solicitado_por: user.id,
+        solicitado_por_nombre: actorNombre,
+        valores_propuestos: valores,
+        valores_anteriores: valoresAnteriores,
+      });
+      if (error) toast.error(error.message);
+      else {
+        toast.success(`Solicitud enviada a Manager para aprobación`);
+        resetForm();
+      }
+      setSaving(false);
+      return;
+    }
+
+    const { error } = await supabase.from("situaciones_especiales").upsert(
+      {
+        ...(editingId ? { id: editingId } : {}),
+        driver_id: formDriverId,
+        hub_id: hubId,
+        fecha: formFecha,
+        codigo_postal: formCp.trim(),
+        tarifa_to_door: valores.tarifa_to_door,
+        tarifa_pudo_primero: valores.tarifa_pudo_primero,
+        tarifa_pudo_extra: valores.tarifa_pudo_extra,
+        precio_salida: valores.precio_salida,
+        nota: valores.nota,
+      },
+      { onConflict: "driver_id,fecha,codigo_postal" },
+    );
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(editingId ? "Situación especial actualizada" : "Situación especial creada");
+      resetForm();
+      await load();
+    }
+    setSaving(false);
+  };
+
+  const remove = async (item: SituacionEspecial) => {
+    if (esJefeFlota) {
+      toast.error("Los jefes de flota no pueden eliminar situaciones especiales directo — pedile a un Manager o Admin.");
+      return;
+    }
+    if (!confirm(`¿Eliminar la situación especial de ${item.driver_nombre} el ${item.fecha} (CP ${item.codigo_postal})?`)) return;
+    const { error } = await supabase.from("situaciones_especiales").delete().eq("id", item.id);
+    if (error) toast.error(error.message);
+    else {
+      toast.success("Situación especial eliminada");
+      if (editingId === item.id) resetForm();
+      await load();
+    }
+  };
+
+  return (
+    <section className="animate-fade-up space-y-6">
+      <div>
+        <h2 className="text-base font-semibold tracking-tight text-foreground">Situaciones especiales</h2>
+        <p className="text-muted-text text-sm mt-1">
+          Tarifa puntual para un driver en una fecha y CP concretos — sobreescribe la tarifa normal solo ese día.
+          {esJefeFlota && " Los cambios se envían como solicitud de aprobación."}
+        </p>
+      </div>
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">
+            {editingId ? "Editar situación especial" : "Nueva situación especial"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <FieldSE label="Driver">
+              <select
+                value={formDriverId}
+                onChange={(e) => setFormDriverId(e.target.value)}
+                disabled={drivers.length === 0 || !!editingId}
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
+              >
+                {drivers.length === 0 && <option value="">Sin drivers</option>}
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>{d.nombre}</option>
+                ))}
+              </select>
+            </FieldSE>
+            <FieldSE label="Fecha">
+              <input
+                type="date"
+                value={formFecha}
+                onChange={(e) => setFormFecha(e.target.value)}
+                disabled={!!editingId}
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
+              />
+            </FieldSE>
+            <FieldSE label="Código postal">
+              <input
+                value={formCp}
+                onChange={(e) => setFormCp(e.target.value)}
+                disabled={!!editingId}
+                placeholder="28001"
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
+              />
+            </FieldSE>
+            <FieldSE label="Tarifa TO_DOOR (€) · opcional">
+              <input type="number" step="0.0001" value={formToDoor} onChange={(e) => setFormToDoor(e.target.value)} placeholder="Normal del driver"
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+            </FieldSE>
+            <FieldSE label="Tarifa PUDO 1º (€) · opcional">
+              <input type="number" step="0.0001" value={formPudo1} onChange={(e) => setFormPudo1(e.target.value)} placeholder="Normal del driver"
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+            </FieldSE>
+            <FieldSE label="Tarifa PUDO extra (€) · opcional">
+              <input type="number" step="0.0001" value={formPudoExtra} onChange={(e) => setFormPudoExtra(e.target.value)} placeholder="Normal del driver"
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+            </FieldSE>
+            <FieldSE label="Precio de salida (€) · opcional">
+              <input type="number" step="0.01" value={formSalida} onChange={(e) => setFormSalida(e.target.value)} placeholder="Pago fijo extra ese día"
+                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+            </FieldSE>
+            <div className="sm:col-span-2 md:col-span-3">
+              <FieldSE label="Nota">
+                <input value={formNota} onChange={(e) => setFormNota(e.target.value)} placeholder="Ej. Apoyo a Yenifer, ruta 3680"
+                  className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+              </FieldSE>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            {editingId && (
+              <Button variant="outline" onClick={resetForm} disabled={saving} className="font-mono text-xs uppercase tracking-widest">
+                <X className="size-3.5" /> Cancelar edición
+              </Button>
+            )}
+            <Button
+              onClick={submit}
+              disabled={saving || !formDriverId}
+              className="bg-ink font-mono text-xs uppercase tracking-widest hover:bg-electric"
+            >
+              {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+              {esJefeFlota ? "Enviar solicitud" : editingId ? "Guardar cambios" : "Crear situación especial"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none overflow-hidden">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <CardTitle className="text-sm font-semibold">Situaciones especiales vigentes</CardTitle>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select
+                value={filterDriverId}
+                onChange={(e) => setFilterDriverId(e.target.value)}
+                className="border border-hairline rounded px-2 py-1.5 text-xs bg-background font-mono"
+              >
+                <option value="todos">Todos los drivers</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>{d.nombre}</option>
+                ))}
+              </select>
+              <input type="date" value={filterDesde} onChange={(e) => setFilterDesde(e.target.value)}
+                className="border border-hairline rounded px-2 py-1.5 text-xs bg-background font-mono" />
+              <span className="text-muted-text text-xs">a</span>
+              <input type="date" value={filterHasta} onChange={(e) => setFilterHasta(e.target.value)}
+                className="border border-hairline rounded px-2 py-1.5 text-xs bg-background font-mono" />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-surface-2 border-b border-hairline font-mono text-[10px] tracking-widest uppercase text-muted-text">
+                  <th className="text-left px-4 py-3">Fecha</th>
+                  <th className="text-left px-4 py-3">Driver</th>
+                  <th className="text-left px-4 py-3">CP</th>
+                  <th className="text-right px-4 py-3">TO_DOOR</th>
+                  <th className="text-right px-4 py-3">PUDO 1º</th>
+                  <th className="text-right px-4 py-3">PUDO extra</th>
+                  <th className="text-right px-4 py-3">Salida</th>
+                  <th className="text-left px-4 py-3">Nota</th>
+                  <th className="px-4 py-3 w-20" />
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-text font-mono text-xs">Cargando…</td></tr>
+                ) : filtered.length === 0 ? (
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-text font-mono text-xs">Sin situaciones especiales para este filtro</td></tr>
+                ) : (
+                  filtered.map((item) => (
+                    <tr key={item.id} className="border-b border-hairline/50 hover:bg-surface-2/40 transition-colors">
+                      <td className="px-4 py-2.5 font-mono text-xs text-ink whitespace-nowrap">{item.fecha}</td>
+                      <td className="px-4 py-2.5 text-ink">{item.driver_nombre}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-ink">{item.codigo_postal}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.tarifa_to_door ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.tarifa_pudo_primero ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.tarifa_pudo_extra ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.precio_salida ?? "—"}</td>
+                      <td className="px-4 py-2.5 text-xs text-muted-text max-w-[200px] truncate" title={item.nota ?? ""}>{item.nota ?? "—"}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => startEdit(item)}
+                            className="text-muted-text hover:text-electric hover:bg-electric/10"
+                            aria-label="Editar"
+                          >
+                            <Pencil className="size-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => void remove(item)}
+                            className="text-muted-text hover:text-danger hover:bg-danger/10"
+                            aria-label="Eliminar"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function FieldSE({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">{label}</span>
+      {children}
+    </label>
   );
 }
 
