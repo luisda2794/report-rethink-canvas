@@ -32,7 +32,7 @@ export function useDsrTrend(hubId: string | null, windowDays: number = KPIS_TREN
     staleTime: 60_000,
     queryFn: async (): Promise<DsrDayPoint[]> => {
       const { data, error } = await supabase.rpc("dashboard_dsr_stats", {
-        _hub_ids: [hubId],
+        _hub_ids: [hubId as string],
         _include_weekends: false,
         _window_days: windowDays,
       });
