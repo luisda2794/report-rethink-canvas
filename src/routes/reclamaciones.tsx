@@ -17,6 +17,10 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/reclamaciones")({
   component: () => (
@@ -85,13 +89,13 @@ const ESTADO_LABEL: Record<Estado, string> = {
 function estadoClass(e: Estado): string {
   switch (e) {
     case "abierta":
-      return "bg-danger/15 text-danger border border-danger/30";
+      return "border-danger/40 text-danger";
     case "enviada_driver":
-      return "bg-electric/15 text-electric border border-electric/30";
+      return "border-electric/40 text-electric";
     case "respondida_driver":
-      return "bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30";
+      return "border-amber-400/60 text-amber-700 dark:text-amber-400";
     case "cerrada":
-      return "bg-success/15 text-success border border-success/30";
+      return "border-success/40 text-success";
   }
 }
 
@@ -129,10 +133,9 @@ function SlaBadge({ rec, nowMs }: { rec: Reclamacion; nowMs: number }) {
   const sla = computeSla(rec, nowMs);
   if (!sla) return <span className="text-muted-text text-xs">—</span>;
   const toneClass: Record<SlaTone, string> = {
-    green: "bg-success/15 text-success border-success/30",
-    yellow:
-      "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30",
-    red: "bg-danger/15 text-danger border-danger/30",
+    green: "border-success/40 text-success",
+    yellow: "border-amber-400/60 text-amber-700 dark:text-amber-400",
+    red: "border-danger/40 text-danger",
   };
   const label = sla.live
     ? sla.hoursLeft >= 0
@@ -142,12 +145,13 @@ function SlaBadge({ rec, nowMs }: { rec: Reclamacion; nowMs: number }) {
       ? `Respondida en ${formatHours(sla.hoursElapsed)}`
       : `Respondida fuera de plazo (${formatHours(sla.hoursElapsed)})`;
   return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono tracking-wide rounded-full border ${toneClass[sla.tone]}`}
+    <Badge
+      variant="outline"
+      className={`gap-1 font-mono text-[10px] tracking-wide font-normal ${toneClass[sla.tone]}`}
       title={`SLA 40h desde envío al driver. Transcurridas: ${formatHours(sla.hoursElapsed)}`}
     >
       <Clock className="size-3" /> {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -326,13 +330,13 @@ function ReclamacionesPage() {
                 {selectedHub ? `${selectedHub.marca} · ${selectedHub.nombre}` : "Sin hub"}
               </p>
             </div>
-            <button
+            <Button
               onClick={() => setOpenModal({ mode: "create" })}
               disabled={!selectedHub}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-ink text-white font-syne font-semibold text-sm rounded-md hover:bg-ink/90 disabled:opacity-50"
+              className="bg-ink font-syne font-semibold hover:bg-ink/90"
             >
               <Plus className="size-4" /> Nueva reclamación
-            </button>
+            </Button>
           </header>
 
           {/* STATS */}
@@ -381,105 +385,111 @@ function ReclamacionesPage() {
           </div>
 
           {/* TABLE */}
-          <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-surface-2">
-                  <tr className="text-left font-mono text-[10px] tracking-widest uppercase text-muted-text">
-                    <th className="px-4 py-3">ID</th>
-                    <th className="px-4 py-3">Waybill</th>
-                    <th className="px-4 py-3">LP No.</th>
-                    <th className="px-4 py-3">Driver</th>
-                    <th className="px-4 py-3">Fecha</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3 text-right">Importe</th>
-                    <th className="px-4 py-3">Estado</th>
-                    <th className="px-4 py-3">SLA (40h)</th>
-                    <th className="px-4 py-3 text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
+          <Card className="overflow-hidden shadow-none">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-surface-2 hover:bg-surface-2">
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">ID</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Waybill</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">LP No.</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Driver</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Fecha</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Tipo</TableHead>
+                    <TableHead className="px-4 text-right font-mono text-[10px] tracking-widest uppercase text-muted-text">Importe</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Estado</TableHead>
+                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">SLA (40h)</TableHead>
+                    <TableHead className="px-4 text-right font-mono text-[10px] tracking-widest uppercase text-muted-text">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {loading ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
+                    <TableRow>
+                      <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
                         Cargando…
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
+                    <TableRow>
+                      <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
                         Sin reclamaciones
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ) : (
                     filtered.map((r) => (
-                      <tr
+                      <TableRow
                         key={r.id}
                         onClick={() => setSelected(r)}
-                        className="group border-t border-hairline hover:bg-surface-2/60 cursor-pointer"
+                        className="group cursor-pointer"
                       >
-                        <td className="px-4 py-3 font-mono text-xs text-ink">{r.ref}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{r.waybill ?? "—"}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{r.lp_no ?? "—"}</td>
-                        <td className="px-4 py-3">{r.driver_nombre ?? "—"}</td>
-                        <td className="px-4 py-3 font-mono text-xs">{r.fecha_entrega ?? "—"}</td>
-                        <td className="px-4 py-3 truncate max-w-[160px]">{r.tipo}</td>
-                        <td className="px-4 py-3 text-right font-mono">
+                        <TableCell className="px-4 font-mono text-xs text-ink">{r.ref}</TableCell>
+                        <TableCell className="px-4 font-mono text-xs">{r.waybill ?? "—"}</TableCell>
+                        <TableCell className="px-4 font-mono text-xs">{r.lp_no ?? "—"}</TableCell>
+                        <TableCell className="px-4">{r.driver_nombre ?? "—"}</TableCell>
+                        <TableCell className="px-4 font-mono text-xs">{r.fecha_entrega ?? "—"}</TableCell>
+                        <TableCell className="px-4 truncate max-w-[160px]">{r.tipo}</TableCell>
+                        <TableCell className="px-4 text-right font-mono">
                           {r.importe ? `${Number(r.importe).toFixed(2)} €` : "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-block px-2 py-0.5 text-[10px] font-mono tracking-widest uppercase rounded-full ${estadoClass(r.estado)}`}>
+                        </TableCell>
+                        <TableCell className="px-4">
+                          <Badge variant="outline" className={`font-mono text-[10px] tracking-widest uppercase font-normal ${estadoClass(r.estado)}`}>
                             {ESTADO_LABEL[r.estado]}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4">
                           <SlaBadge rec={r} nowMs={nowMs} />
-                        </td>
-                        <td className="px-4 py-3 text-right">
+                        </TableCell>
+                        <TableCell className="px-4 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {r.estado === "abierta" && (
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   void enviarADriver(r);
                                 }}
-                                className="px-2 py-1 text-[11px] font-syne font-semibold text-electric hover:bg-electric/10 rounded"
+                                className="font-syne font-semibold text-electric hover:bg-electric/10 hover:text-electric"
                                 title="Enviar al driver"
                               >
-                                <Send className="size-3.5 inline" /> Enviar
-                              </button>
+                                <Send className="size-3.5" /> Enviar
+                              </Button>
                             )}
                             {r.estado === "respondida_driver" && (
-                              <button
+                              <Button
+                                variant="ghost"
+                                size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setClosing(r);
                                 }}
-                                className="px-2 py-1 text-[11px] font-syne font-semibold text-success hover:bg-success/10 rounded"
+                                className="font-syne font-semibold text-success hover:bg-success/10 hover:text-success"
                                 title="Cerrar"
                               >
-                                <Check className="size-3.5 inline" /> Cerrar
-                              </button>
+                                <Check className="size-3.5" /> Cerrar
+                              </Button>
                             )}
-                            <button
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenModal({ mode: "edit", row: r });
                               }}
-                              className="px-2 py-1 text-[11px] font-syne font-semibold text-ink hover:bg-ink/5 rounded"
+                              className="text-ink hover:bg-ink/5"
                               title="Editar"
                             >
-                              <Pencil className="size-3.5 inline" />
-                            </button>
+                              <Pencil className="size-3.5" />
+                            </Button>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ))
                   )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -539,14 +549,14 @@ function CloseDialog({
     <>
       <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
-        <div className="bg-background border border-hairline rounded-lg shadow-xl w-full max-w-md pointer-events-auto">
-          <div className="px-6 py-4 border-b border-hairline">
+        <Card className="w-full max-w-md pointer-events-auto shadow-xl">
+          <CardHeader className="px-6 py-4 border-b border-hairline">
             <h2 className="font-syne font-bold text-lg">Cerrar {row.ref}</h2>
             <p className="mt-1 text-xs text-muted-text">
               Marca la reclamación como cerrada tras responder a Cainiao en el panel LDS (fuera de este sistema).
             </p>
-          </div>
-          <div className="p-6">
+          </CardHeader>
+          <CardContent className="p-6">
             <Field label="Nota de cierre (opcional) · qué se respondió a Cainiao">
               <textarea
                 value={nota}
@@ -556,23 +566,23 @@ function CloseDialog({
                 className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric resize-y"
               />
             </Field>
-          </div>
-          <div className="px-6 py-4 border-t border-hairline flex justify-end gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-sm font-syne hover:bg-ink/5 rounded">
+          </CardContent>
+          <CardFooter className="px-6 py-4 border-t border-hairline flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose} className="font-syne">
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={() => {
                 setSaving(true);
                 onConfirm(nota);
               }}
               disabled={saving}
-              className="px-4 py-2 bg-success text-white text-sm font-syne font-semibold rounded-md hover:brightness-110 disabled:opacity-50"
+              className="bg-success font-syne font-semibold hover:bg-success/90"
             >
               {saving ? "Cerrando…" : "Cerrar reclamación"}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     </>
   );
@@ -631,16 +641,17 @@ function DetailPanel({
             <div className="font-mono text-[10px] tracking-widest uppercase text-muted-text">Reclamación</div>
             <div className="font-mono text-lg text-ink">{row.ref}</div>
           </div>
-          <button onClick={onClose} className="size-8 grid place-items-center hover:bg-ink/5 rounded">
+          <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="size-4" />
-          </button>
+          </Button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <Card className="border-none shadow-none rounded-none">
+          <CardContent className="space-y-6">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className={`inline-block px-3 py-1 text-[10px] font-mono tracking-widest uppercase rounded-full ${estadoClass(row.estado)}`}>
+            <Badge variant="outline" className={`font-mono text-[10px] tracking-widest uppercase font-normal ${estadoClass(row.estado)}`}>
               {ESTADO_LABEL[row.estado]}
-            </span>
+            </Badge>
             <SlaBadge rec={row} nowMs={nowMs} />
           </div>
 
@@ -693,45 +704,40 @@ function DetailPanel({
               <code className="flex-1 px-3 py-2 bg-surface border border-hairline rounded text-[11px] font-mono break-all">
                 {publicUrl}
               </code>
-              <button onClick={onCopy} className="size-9 grid place-items-center bg-surface border border-hairline rounded hover:bg-surface-2">
+              <Button variant="outline" size="icon" onClick={onCopy} className="bg-surface">
                 <Copy className="size-4" />
-              </button>
+              </Button>
             </div>
           </Section>
 
           <div className="space-y-2 pt-2 border-t border-hairline">
             {row.estado === "abierta" && (
-              <button
+              <Button
                 onClick={onSend}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-electric text-white font-syne font-semibold text-sm rounded-md hover:brightness-110"
+                className="w-full bg-electric font-syne font-semibold hover:bg-electric/90"
               >
                 <Send className="size-4" /> Enviar reclamación al driver
-              </button>
+              </Button>
             )}
             {row.estado === "respondida_driver" && (
-              <button
+              <Button
                 onClick={onCerrar}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-success text-white font-syne font-semibold text-sm rounded-md hover:brightness-110"
+                className="w-full bg-success font-syne font-semibold hover:bg-success/90"
               >
                 <Check className="size-4" /> Cerrar reclamación
-              </button>
+              </Button>
             )}
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={onEdit}
-                className="py-2.5 bg-surface border border-hairline font-syne font-semibold text-sm rounded-md hover:bg-surface-2 inline-flex items-center justify-center gap-2"
-              >
+              <Button variant="outline" onClick={onEdit} className="font-syne font-semibold">
                 <Pencil className="size-3.5" /> Editar
-              </button>
-              <button
-                onClick={onDelete}
-                className="py-2.5 bg-danger/10 text-danger border border-danger/30 font-syne font-semibold text-sm rounded-md hover:bg-danger/20 inline-flex items-center justify-center gap-2"
-              >
+              </Button>
+              <Button variant="outline" onClick={onDelete} className="border-danger/30 bg-danger/10 font-syne font-semibold text-danger hover:bg-danger/20 hover:text-danger">
                 <Trash2 className="size-3.5" /> Eliminar
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </CardContent>
+        </Card>
       </aside>
     </>
   );
@@ -840,16 +846,16 @@ function FormModal({
     <>
       <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-        <div className="bg-background border border-hairline rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto">
-          <div className="sticky top-0 bg-background border-b border-hairline px-6 py-4 flex items-center justify-between">
+        <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto shadow-xl">
+          <CardHeader className="sticky top-0 z-10 bg-background border-b border-hairline px-6 py-4 flex-row items-center justify-between space-y-0">
             <h2 className="font-syne font-bold text-lg">
               {mode === "create" ? "Nueva reclamación" : `Editar ${row?.ref ?? ""}`}
             </h2>
-            <button onClick={onClose} className="size-8 grid place-items-center hover:bg-ink/5 rounded">
+            <Button variant="ghost" size="icon-sm" onClick={onClose}>
               <X className="size-4" />
-            </button>
-          </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            </Button>
+          </CardHeader>
+          <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Waybill"><Input value={waybill} onChange={setWaybill} /></Field>
             <Field label="LP No."><Input value={lpNo} onChange={setLpNo} /></Field>
             <Field label="Driver">
@@ -904,20 +910,20 @@ function FormModal({
                 <Input value={evidencia} onChange={setEvidencia} placeholder="https://..." />
               </Field>
             </div>
-          </div>
-          <div className="sticky bottom-0 bg-background border-t border-hairline px-6 py-4 flex justify-end gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-sm font-syne hover:bg-ink/5 rounded">
+          </CardContent>
+          <CardFooter className="sticky bottom-0 z-10 bg-background border-t border-hairline px-6 py-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose} className="font-syne">
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={save}
               disabled={saving}
-              className="px-4 py-2 bg-ink text-white text-sm font-syne font-semibold rounded-md hover:bg-ink/90 disabled:opacity-50"
+              className="bg-ink font-syne font-semibold hover:bg-ink/90"
             >
               {saving ? "Guardando…" : mode === "create" ? "Crear reclamación" : "Guardar cambios"}
-            </button>
-          </div>
-        </div>
+            </Button>
+          </CardFooter>
+        </Card>
       </div>
     </>
   );

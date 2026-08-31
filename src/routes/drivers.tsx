@@ -6,6 +6,9 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export const Route = createFileRoute("/drivers")({
   component: () => (
@@ -136,33 +139,33 @@ function DriversPage() {
             </div>
           ) : (
             <section className="animate-fade-up">
-              <div className="bg-surface border border-hairline rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-surface-2 border-b border-hairline font-mono text-[10px] tracking-widest uppercase text-muted-text">
-                        <th className="text-left px-4 py-3">Nombre</th>
-                        <th className="text-left px-4 py-3">Teléfono (WhatsApp)</th>
-                        <th className="px-4 py-3 w-24" />
-                      </tr>
-                    </thead>
-                    <tbody>
+              <Card className="overflow-hidden shadow-none">
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-surface-2 hover:bg-surface-2">
+                        <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Nombre</TableHead>
+                        <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Teléfono (WhatsApp)</TableHead>
+                        <TableHead className="px-4 w-24" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
                       {loading ? (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
+                        <TableRow>
+                          <TableCell colSpan={3} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
                             Cargando…
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ) : drivers.length === 0 ? (
-                        <tr>
-                          <td colSpan={3} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
+                        <TableRow>
+                          <TableCell colSpan={3} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
                             Sin drivers configurados para este hub
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ) : (
                         drivers.map((d) => (
-                          <tr key={d.id} className="border-b border-hairline/50 hover:bg-surface-2/40 transition-colors">
-                            <td className="px-4 py-2.5">
+                          <TableRow key={d.id}>
+                            <TableCell className="px-4 py-2.5">
                               {editingId === d.id ? (
                                 <input
                                   value={editingValue}
@@ -174,8 +177,8 @@ function DriversPage() {
                               ) : (
                                 <span className="text-ink font-medium">{d.nombre}</span>
                               )}
-                            </td>
-                            <td className="px-4 py-2.5">
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5">
                               {editingId === d.id ? (
                                 <input
                                   value={editingTelefono}
@@ -187,54 +190,62 @@ function DriversPage() {
                               ) : (
                                 <span className="text-muted-text font-mono text-xs">{d.telefono ?? "—"}</span>
                               )}
-                            </td>
-                            <td className="px-4 py-2.5 text-right">
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-right">
                               <div className="inline-flex items-center gap-1">
                                 {editingId === d.id ? (
                                   <>
-                                    <button
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
                                       onClick={() => saveEdit(d.id)}
                                       disabled={savingEdit}
-                                      className="size-7 rounded grid place-items-center text-muted-text hover:text-success hover:bg-success/10 transition-colors"
+                                      className="text-muted-text hover:text-success hover:bg-success/10"
                                       aria-label="Guardar"
                                     >
                                       {savingEdit ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
                                       onClick={cancelEdit}
-                                      className="size-7 rounded grid place-items-center text-muted-text hover:text-ink hover:bg-ink/5 transition-colors"
+                                      className="text-muted-text hover:text-ink hover:bg-ink/5"
                                       aria-label="Cancelar"
                                     >
                                       <X className="size-3.5" />
-                                    </button>
+                                    </Button>
                                   </>
                                 ) : (
                                   <>
-                                    <button
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
                                       onClick={() => startEdit(d)}
-                                      className="size-7 rounded grid place-items-center text-muted-text hover:text-electric hover:bg-electric/10 transition-colors"
+                                      className="text-muted-text hover:text-electric hover:bg-electric/10"
                                       aria-label="Editar"
                                     >
                                       <Pencil className="size-3.5" />
-                                    </button>
-                                    <button
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon-sm"
                                       onClick={() => remove(d)}
-                                      className="size-7 rounded grid place-items-center text-muted-text hover:text-danger hover:bg-danger/10 transition-colors"
+                                      className="text-muted-text hover:text-danger hover:bg-danger/10"
                                       aria-label="Eliminar"
                                     >
                                       <Trash2 className="size-3.5" />
-                                    </button>
+                                    </Button>
                                   </>
                                 )}
                               </div>
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         ))
                       )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center gap-3 p-4 bg-surface-2/50 border-t border-hairline">
+                    </TableBody>
+                  </Table>
+                </CardContent>
+                <CardFooter className="flex items-center gap-3 p-4 bg-surface-2/50 border-t border-hairline">
                   <input
                     value={newNombre}
                     onChange={(e) => setNewNombre(e.target.value)}
@@ -249,16 +260,16 @@ function DriversPage() {
                     placeholder="Teléfono +34..."
                     className="w-44 border border-hairline rounded px-3 py-1.5 text-sm bg-background font-mono"
                   />
-                  <button
+                  <Button
                     onClick={create}
                     disabled={creating || !newNombre.trim()}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-ink text-white rounded font-mono text-xs tracking-widest uppercase hover:bg-electric transition-colors disabled:opacity-50"
+                    className="bg-ink font-mono text-xs tracking-widest uppercase hover:bg-electric"
                   >
                     {creating ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
                     Añadir driver
-                  </button>
-                </div>
-              </div>
+                  </Button>
+                </CardFooter>
+              </Card>
             </section>
           )}
         </div>
