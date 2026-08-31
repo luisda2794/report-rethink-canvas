@@ -824,6 +824,171 @@ export type Database = {
           },
         ]
       }
+      situaciones_especiales: {
+        Row: {
+          codigo_postal: string
+          created_at: string
+          driver_id: string
+          fecha: string
+          hub_id: string
+          id: string
+          nota: string | null
+          precio_salida: number | null
+          tarifa_pudo_extra: number | null
+          tarifa_pudo_primero: number | null
+          tarifa_to_door: number | null
+        }
+        Insert: {
+          codigo_postal: string
+          created_at?: string
+          driver_id: string
+          fecha: string
+          hub_id: string
+          id?: string
+          nota?: string | null
+          precio_salida?: number | null
+          tarifa_pudo_extra?: number | null
+          tarifa_pudo_primero?: number | null
+          tarifa_to_door?: number | null
+        }
+        Update: {
+          codigo_postal?: string
+          created_at?: string
+          driver_id?: string
+          fecha?: string
+          hub_id?: string
+          id?: string
+          nota?: string | null
+          precio_salida?: number | null
+          tarifa_pudo_extra?: number | null
+          tarifa_pudo_primero?: number | null
+          tarifa_to_door?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "situaciones_especiales_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "situaciones_especiales_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      solicitudes_tarifa: {
+        Row: {
+          aprobado_admin_en: string | null
+          aprobado_admin_nombre: string | null
+          aprobado_admin_por: string | null
+          aprobado_contable_en: string | null
+          aprobado_contable_nombre: string | null
+          aprobado_contable_por: string | null
+          aprobado_manager_en: string | null
+          aprobado_manager_nombre: string | null
+          aprobado_manager_por: string | null
+          codigo_postal: string
+          driver_id: string
+          driver_nombre: string
+          estado: string
+          fecha: string | null
+          hub_id: string
+          hub_nombre: string
+          id: string
+          motivo_rechazo: string | null
+          rechazado_en: string | null
+          rechazado_en_etapa: string | null
+          rechazado_nombre: string | null
+          rechazado_por: string | null
+          solicitado_en: string
+          solicitado_por: string
+          solicitado_por_nombre: string
+          tipo: string
+          valores_anteriores: Json | null
+          valores_propuestos: Json
+        }
+        Insert: {
+          aprobado_admin_en?: string | null
+          aprobado_admin_nombre?: string | null
+          aprobado_admin_por?: string | null
+          aprobado_contable_en?: string | null
+          aprobado_contable_nombre?: string | null
+          aprobado_contable_por?: string | null
+          aprobado_manager_en?: string | null
+          aprobado_manager_nombre?: string | null
+          aprobado_manager_por?: string | null
+          codigo_postal: string
+          driver_id: string
+          driver_nombre: string
+          estado?: string
+          fecha?: string | null
+          hub_id: string
+          hub_nombre: string
+          id?: string
+          motivo_rechazo?: string | null
+          rechazado_en?: string | null
+          rechazado_en_etapa?: string | null
+          rechazado_nombre?: string | null
+          rechazado_por?: string | null
+          solicitado_en?: string
+          solicitado_por: string
+          solicitado_por_nombre: string
+          tipo: string
+          valores_anteriores?: Json | null
+          valores_propuestos: Json
+        }
+        Update: {
+          aprobado_admin_en?: string | null
+          aprobado_admin_nombre?: string | null
+          aprobado_admin_por?: string | null
+          aprobado_contable_en?: string | null
+          aprobado_contable_nombre?: string | null
+          aprobado_contable_por?: string | null
+          aprobado_manager_en?: string | null
+          aprobado_manager_nombre?: string | null
+          aprobado_manager_por?: string | null
+          codigo_postal?: string
+          driver_id?: string
+          driver_nombre?: string
+          estado?: string
+          fecha?: string | null
+          hub_id?: string
+          hub_nombre?: string
+          id?: string
+          motivo_rechazo?: string | null
+          rechazado_en?: string | null
+          rechazado_en_etapa?: string | null
+          rechazado_nombre?: string | null
+          rechazado_por?: string | null
+          solicitado_en?: string
+          solicitado_por?: string
+          solicitado_por_nombre?: string
+          tipo?: string
+          valores_anteriores?: Json | null
+          valores_propuestos?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "solicitudes_tarifa_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitudes_tarifa_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       usuario_hubs: {
         Row: {
           created_at: string

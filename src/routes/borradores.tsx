@@ -19,6 +19,12 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  ESTADO_LABEL,
+  ESTADO_COLOR,
+  type SolicitudTarifa,
+  type ValoresTarifa,
+} from "@/lib/solicitudes-tarifa";
 
 export const Route = createFileRoute("/borradores")({
   component: () => (
@@ -572,7 +578,11 @@ function exportBorradorFacturaExcel(d: DraftResult, hubMarca: string) {
 // ============================================================
 
 function BorradoresPage() {
-  const { selectedHub } = useAuth();
+  const { selectedHub, role, user } = useAuth();
+  // jefe_flota no genera ni confirma facturas — solo puede solicitar cambios
+  // de tarifa (ver TarifasSection, que se pone en "modo solicitud" para este
+  // rol) y hacer seguimiento de sus propias solicitudes.
+  const soloSolicita = role === "jefe_flota";
 
   return (
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
@@ -597,9 +607,15 @@ function BorradoresPage() {
             </div>
           ) : (
             <>
-              <TarifasSection hubId={selectedHub.id} />
-              <GeneradorSection hubId={selectedHub.id} hubMarca={selectedHub.marca} />
-              <SavedBorradoresSection hubId={selectedHub.id} hubMarca={selectedHub.marca} />
+              <TarifasSection hubId={selectedHub.id} hubNombre={`${selectedHub.marca} · ${selectedHub.nombre}`} />
+              {soloSolicita ? (
+                user && <MisSolicitudesSection userId={user.id} />
+              ) : (
+                <>
+                  <GeneradorSection hubId={selectedHub.id} hubMarca={selectedHub.marca} />
+                  <SavedBorradoresSection hubId={selectedHub.id} hubMarca={selectedHub.marca} />
+                </>
+              )}
             </>
           )}
         </div>
@@ -612,10 +628,13 @@ function BorradoresPage() {
 // SECTION 1: TARIFAS
 // ============================================================
 
-function TarifasSection({ hubId }: { hubId: string }) {
+function TarifasSection({ hubId, hubNombre }: { hubId: string; hubNombre: string }) {
+  const { role, user, profile } = useAuth();
+  const esJefeFlota = role === "jefe_flota";
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [driverId, setDriverId] = useState<string>("");
   const [tarifas, setTarifas] = useState<Tarifa[]>([]);
+  const [originalById, setOriginalById] = useState<Record<string, Tarifa>>({});
   const [loadingDrivers, setLoadingDrivers] = useState(true);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -652,17 +671,17 @@ function TarifasSection({ hubId }: { hubId: string }) {
       .eq("driver_id", driverId)
       .order("codigo_postal");
     if (error) toast.error(error.message);
-    setTarifas(
-      (data ?? []).map((t) => ({
-        id: t.id,
-        hub_id: t.hub_id,
-        driver_id: t.driver_id as string,
-        codigo_postal: t.codigo_postal,
-        precio_door: Number(t.precio_door),
-        precio_pudo: Number(t.precio_pudo),
-        precio_aa: Number(t.precio_aa),
-      })),
-    );
+    const mapped: Tarifa[] = (data ?? []).map((t) => ({
+      id: t.id,
+      hub_id: t.hub_id,
+      driver_id: t.driver_id as string,
+      codigo_postal: t.codigo_postal,
+      precio_door: Number(t.precio_door),
+      precio_pudo: Number(t.precio_pudo),
+      precio_aa: Number(t.precio_aa),
+    }));
+    setTarifas(mapped);
+    setOriginalById(Object.fromEntries(mapped.filter((t) => t.id).map((t) => [t.id as string, t])));
     setLoading(false);
   };
 
@@ -722,6 +741,10 @@ function TarifasSection({ hubId }: { hubId: string }) {
   const removeRow = async (idx: number) => {
     const t = tarifas[idx];
     if (t.id) {
+      if (esJefeFlota) {
+        toast.error("Los jefes de flota no pueden eliminar tarifas directo — solo solicitar cambios de precio.");
+        return;
+      }
       const { error } = await supabase.from("driver_tarifas").delete().eq("id", t.id);
       if (error) {
         toast.error(error.message);
@@ -750,6 +773,47 @@ function TarifasSection({ hubId }: { hubId: string }) {
     const byCp = new Map<string, Tarifa>();
     for (const t of dirty) byCp.set(t.codigo_postal.trim(), t);
     const deduped = [...byCp.values()];
+
+    if (esJefeFlota) {
+      if (!user) { setSaving(false); return; }
+      const driverNombre = drivers.find((d) => d.id === driverId)?.nombre ?? "";
+      const actorNombre = profile?.full_name?.trim() || user.email || "—";
+      const rows = deduped.map((t) => {
+        const original = t.id ? originalById[t.id] : undefined;
+        return {
+          hub_id: hubId,
+          hub_nombre: hubNombre,
+          driver_id: driverId,
+          driver_nombre: driverNombre,
+          tipo: "tarifa_normal" as const,
+          codigo_postal: t.codigo_postal.trim(),
+          solicitado_por: user.id,
+          solicitado_por_nombre: actorNombre,
+          valores_propuestos: {
+            tarifa_to_door: t.precio_door,
+            tarifa_pudo_primero: t.precio_pudo,
+            tarifa_pudo_extra: t.precio_aa,
+          },
+          valores_anteriores: original
+            ? {
+                tarifa_to_door: original.precio_door,
+                tarifa_pudo_primero: original.precio_pudo,
+                tarifa_pudo_extra: original.precio_aa,
+              }
+            : null,
+        };
+      });
+      const { error } = await supabase.from("solicitudes_tarifa").insert(rows);
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success(`${rows.length} solicitud(es) enviada(s) a Manager para aprobación`);
+        setTarifas((prev) => prev.map((t) => (t._dirty ? { ...t, _dirty: false } : t)));
+      }
+      setSaving(false);
+      return;
+    }
+
     const payload = deduped.map((t) => ({
       ...(t.id ? { id: t.id } : {}),
       hub_id: hubId,
@@ -782,6 +846,11 @@ function TarifasSection({ hubId }: { hubId: string }) {
             Cada driver tiene su propio precio por código postal. Gestiona los drivers en{" "}
             <Link to="/drivers" className="text-electric hover:underline">/drivers</Link>.
           </p>
+          {esJefeFlota && (
+            <p className="text-amber-700 text-xs mt-1.5 font-mono">
+              Como Jefe de Flota, tus cambios se envían como solicitud y requieren aprobación de Manager → Jefe Contable → Admin antes de aplicarse.
+            </p>
+          )}
         </div>
         <select
           value={driverId}
@@ -886,9 +955,102 @@ function TarifasSection({ hubId }: { hubId: string }) {
               className="inline-flex items-center gap-2 px-4 py-2 bg-ink text-white rounded font-mono text-xs tracking-widest uppercase hover:bg-electric transition-colors disabled:opacity-50"
             >
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-              Guardar cambios
+              {esJefeFlota ? "Enviar solicitud" : "Guardar cambios"}
             </button>
           </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ============================================================
+// SECTION 1B: MIS SOLICITUDES (jefe_flota)
+// ============================================================
+
+const CAMPO_LABEL_SOLICITUD: Record<keyof ValoresTarifa, string> = {
+  tarifa_to_door: "TO_DOOR",
+  tarifa_pudo_primero: "PUDO 1º",
+  tarifa_pudo_extra: "PUDO extra",
+  precio_salida: "Salida",
+  nota: "Nota",
+};
+
+function fmtValor(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "number") return v.toString();
+  return String(v);
+}
+
+function MisSolicitudesSection({ userId }: { userId: string }) {
+  const [items, setItems] = useState<SolicitudTarifa[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("solicitudes_tarifa")
+      .select("*")
+      .eq("solicitado_por", userId)
+      .order("solicitado_en", { ascending: false });
+    if (error) toast.error(error.message);
+    setItems((data ?? []) as SolicitudTarifa[]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
+
+  return (
+    <section className="animate-fade-up">
+      <div className="mb-6">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">Mis solicitudes</h2>
+        <p className="text-muted-text text-sm mt-1">
+          Cambios de tarifa que enviaste, con la etapa de aprobación en la que están.
+        </p>
+      </div>
+
+      {loading ? (
+        <p className="text-muted-text font-mono text-xs">Cargando…</p>
+      ) : items.length === 0 ? (
+        <div className="px-4 py-6 border-l-2 border-hairline bg-surface-2/40 text-muted-text font-mono text-xs rounded-r">
+          Todavía no enviaste ninguna solicitud de cambio de tarifa.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((s) => (
+            <div key={s.id} className="bg-surface border border-hairline rounded-lg p-4">
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="text-sm font-semibold text-ink">
+                    {s.driver_nombre} <span className="text-muted-text font-normal">· CP {s.codigo_postal}</span>
+                  </p>
+                  <p className="text-[11px] text-muted-text mt-1 font-mono">
+                    Enviada {new Date(s.solicitado_en).toLocaleString("es-ES")}
+                  </p>
+                  <p className="text-xs text-ink mt-2 font-mono">
+                    {(Object.keys(s.valores_propuestos) as (keyof ValoresTarifa)[])
+                      .filter((c) => s.valores_propuestos[c] !== null && s.valores_propuestos[c] !== undefined)
+                      .map((c) => `${CAMPO_LABEL_SOLICITUD[c]}: ${fmtValor(s.valores_propuestos[c])}`)
+                      .join(" · ")}
+                  </p>
+                </div>
+                <span className={`shrink-0 px-2 py-1 rounded border text-[10px] font-mono uppercase tracking-wide ${ESTADO_COLOR[s.estado]}`}>
+                  {ESTADO_LABEL[s.estado]}
+                </span>
+              </div>
+              {s.estado === "rechazado" && (
+                <div className="mt-3 px-3 py-2 rounded border-l-2 border-danger bg-danger/10 text-xs">
+                  <p className="text-danger font-medium">
+                    Rechazado por {s.rechazado_nombre} (etapa {s.rechazado_en_etapa})
+                  </p>
+                  {s.motivo_rechazo && <p className="text-ink mt-1">{s.motivo_rechazo}</p>}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </section>

@@ -66,6 +66,7 @@ const ROLE_DESCRIPTIONS: Record<Role, string> = {
   manager: "Dashboard, reportes y reclamaciones. Múltiples hubs",
   jefe_flota: "Dashboard, reportes y reclamaciones. Un solo hub",
   contable: "Solo borradores y facturación. Múltiples hubs",
+  jefe_contable: "Aprueba solicitudes de tarifa (2ª etapa). Sin hub específico",
   customer: "Solo reclamaciones. Múltiples hubs",
 };
 
@@ -74,6 +75,7 @@ const ROLE_COLOR: Record<Role, string> = {
   manager: "bg-electric/10 text-electric border-electric/30",
   jefe_flota: "bg-[#1d7a4a]/10 text-[#1d7a4a] border-[#1d7a4a]/30",
   contable: "bg-[#a16207]/10 text-[#a16207] border-[#a16207]/30",
+  jefe_contable: "bg-[#7c3aed]/10 text-[#7c3aed] border-[#7c3aed]/30",
   customer: "bg-[#b91c1c]/10 text-[#b91c1c] border-[#b91c1c]/30",
 };
 

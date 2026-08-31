@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AprobacionesRouteImport } from './routes/aprobaciones'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
 import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
@@ -34,6 +35,11 @@ import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/repor
 import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
 import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
 
+const AprobacionesRoute = AprobacionesRouteImport.update({
+  id: '/aprobaciones',
+  path: '/aprobaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReportesRoute = ReportesRouteImport.update({
   id: '/reportes',
   path: '/reportes',
@@ -160,6 +166,7 @@ const ApiPublicCd5Route = ApiPublicCd5RouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/aprobaciones': typeof AprobacionesRoute
   '/borradores': typeof BorradoresRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
@@ -186,6 +193,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/aprobaciones': typeof AprobacionesRoute
   '/borradores': typeof BorradoresRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/aprobaciones': typeof AprobacionesRoute
   '/borradores': typeof BorradoresRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
@@ -241,6 +250,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/aprobaciones'
     | '/borradores'
     | '/cd5'
     | '/dashboard'
@@ -267,6 +277,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/aprobaciones'
     | '/borradores'
     | '/cd5'
     | '/dashboard'
@@ -293,6 +304,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/aprobaciones'
     | '/borradores'
     | '/cd5'
     | '/dashboard'
@@ -320,6 +332,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AprobacionesRoute: typeof AprobacionesRoute
   BorradoresRoute: typeof BorradoresRoute
   Cd5Route: typeof Cd5Route
   DashboardRoute: typeof DashboardRoute
@@ -345,6 +358,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/aprobaciones': {
+      id: '/aprobaciones'
+      path: '/aprobaciones'
+      fullPath: '/aprobaciones'
+      preLoaderRoute: typeof AprobacionesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reportes': {
       id: '/reportes'
       path: '/reportes'
@@ -533,6 +553,7 @@ const ReportesClientesLocalesRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AprobacionesRoute: AprobacionesRoute,
   BorradoresRoute: BorradoresRoute,
   Cd5Route: Cd5Route,
   DashboardRoute: DashboardRoute,

@@ -1,12 +1,13 @@
-export type Role = "admin" | "manager" | "jefe_flota" | "contable" | "customer";
+export type Role = "admin" | "manager" | "jefe_flota" | "contable" | "jefe_contable" | "customer";
 
-export const ALL_ROLES: Role[] = ["admin", "manager", "jefe_flota", "contable", "customer"];
+export const ALL_ROLES: Role[] = ["admin", "manager", "jefe_flota", "contable", "jefe_contable", "customer"];
 
 export const ROLE_LABEL: Record<Role, string> = {
   admin: "Admin",
   manager: "Manager",
   jefe_flota: "Jefe de flota",
   contable: "Contable",
+  jefe_contable: "Jefe Contable",
   customer: "Cliente",
 };
 
@@ -20,7 +21,13 @@ export type NavItem = { to: string; label: string };
 // "/drivers" y "/borradores" (Drivers y Facturación por driver+CP) existían
 // antes, se desactivaron al no estar en ROUTE_ACCESS de ningún rol (RequireAuth
 // redirige si canAccess() da false — así es como se "apagó" el módulo, no
-// borrando el código) y se reactivan acá, solo para admin/manager.
+// borrando el código) y se reactivan acá para admin/manager (edición directa)
+// y jefe_flota (solo modo "solicitar cambio" — ver TarifasSection en
+// borradores.tsx, gateado también a nivel RLS, no solo de UI).
+//
+// "/aprobaciones" es nueva: panel de aprobación de solicitudes de tarifa,
+// uno por etapa (manager ve su etapa, jefe_contable la suya, admin ambas +
+// aplica el cambio final). Ver solicitudes_tarifa.
 //
 // "/paquetes-en-riesgo" y "/flow-meeting" eran pestañas dentro de "/reportes"
 // (KPIs) y se movieron a rutas propias en el nav, al mismo nivel que el
@@ -36,6 +43,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
+  { to: "/aprobaciones", label: "Aprobaciones" },
   { to: "/admin", label: "Admin" },
 ];
 
@@ -53,6 +61,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/mapas-admin",
     "/drivers",
     "/borradores",
+    "/aprobaciones",
     "/admin",
   ],
   manager: [
@@ -68,6 +77,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/mapas-admin",
     "/drivers",
     "/borradores",
+    "/aprobaciones",
   ],
   jefe_flota: [
     "/epod",
@@ -79,8 +89,11 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
+    "/drivers",
+    "/borradores",
   ],
   contable: [],
+  jefe_contable: ["/aprobaciones"],
   customer: ["/reclamaciones"],
 };
 
