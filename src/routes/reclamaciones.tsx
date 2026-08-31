@@ -10,6 +10,7 @@ import {
   Trash2,
   ExternalLink,
   Copy,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -30,8 +31,7 @@ type Estado =
   | "abierta"
   | "enviada_driver"
   | "respondida_driver"
-  | "en_proceso"
-  | "resuelta";
+  | "cerrada";
 
 type Reclamacion = {
   id: string;
@@ -39,6 +39,7 @@ type Reclamacion = {
   hub_id: string;
   waybill: string | null;
   lp_no: string | null;
+  driver_id: string | null;
   driver_nombre: string | null;
   driver_telefono: string | null;
   fecha_entrega: string | null;
@@ -54,7 +55,15 @@ type Reclamacion = {
   nombre_driver_resp: string | null;
   fecha_envio_whatsapp: string | null;
   fecha_respuesta: string | null;
+  nota_cierre: string | null;
+  fecha_cierre: string | null;
   created_at: string;
+};
+
+type DriverOption = {
+  id: string;
+  nombre: string;
+  telefono: string | null;
 };
 
 const TIPOS = [
@@ -70,8 +79,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
   abierta: "Abierta",
   enviada_driver: "Enviada al driver",
   respondida_driver: "Respondida",
-  en_proceso: "En proceso",
-  resuelta: "Resuelta",
+  cerrada: "Cerrada",
 };
 
 function estadoClass(e: Estado): string {
@@ -81,36 +89,115 @@ function estadoClass(e: Estado): string {
     case "enviada_driver":
       return "bg-electric/15 text-electric border border-electric/30";
     case "respondida_driver":
-    case "en_proceso":
       return "bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30";
-    case "resuelta":
+    case "cerrada":
       return "bg-success/15 text-success border border-success/30";
   }
+}
+
+// --- SLA: 40h desde "Enviada al Driver" hasta "Respondida por Driver" ---
+const SLA_HOURS = 40;
+const SLA_WARN_MARGIN_HOURS = 8;
+
+type SlaTone = "green" | "yellow" | "red";
+
+type SlaInfo = {
+  tone: SlaTone;
+  hoursElapsed: number;
+  hoursLeft: number;
+  live: boolean; // true si todavía corre el reloj (esperando respuesta)
+};
+
+function computeSla(r: Reclamacion, nowMs: number): SlaInfo | null {
+  if (!r.fecha_envio_whatsapp) return null;
+  const start = new Date(r.fecha_envio_whatsapp).getTime();
+  const waiting = !r.fecha_respuesta;
+  const end = waiting ? nowMs : new Date(r.fecha_respuesta as string).getTime();
+  const hoursElapsed = (end - start) / 3_600_000;
+  const hoursLeft = SLA_HOURS - hoursElapsed;
+  const tone: SlaTone = hoursLeft < 0 ? "red" : hoursLeft <= SLA_WARN_MARGIN_HOURS ? "yellow" : "green";
+  return { tone, hoursElapsed, hoursLeft, live: waiting };
+}
+
+function formatHours(h: number): string {
+  const abs = Math.abs(h);
+  if (abs < 1) return `${Math.round(abs * 60)} min`;
+  return `${abs.toFixed(1)} h`;
+}
+
+function SlaBadge({ rec, nowMs }: { rec: Reclamacion; nowMs: number }) {
+  const sla = computeSla(rec, nowMs);
+  if (!sla) return <span className="text-muted-text text-xs">—</span>;
+  const toneClass: Record<SlaTone, string> = {
+    green: "bg-success/15 text-success border-success/30",
+    yellow:
+      "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30",
+    red: "bg-danger/15 text-danger border-danger/30",
+  };
+  const label = sla.live
+    ? sla.hoursLeft >= 0
+      ? `Quedan ${formatHours(sla.hoursLeft)}`
+      : `Vencida hace ${formatHours(sla.hoursLeft)}`
+    : sla.hoursLeft >= 0
+      ? `Respondida en ${formatHours(sla.hoursElapsed)}`
+      : `Respondida fuera de plazo (${formatHours(sla.hoursElapsed)})`;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono tracking-wide rounded-full border ${toneClass[sla.tone]}`}
+      title={`SLA 40h desde envío al driver. Transcurridas: ${formatHours(sla.hoursElapsed)}`}
+    >
+      <Clock className="size-3" /> {label}
+    </span>
+  );
+}
+
+function buildWhatsAppUrl(telefono: string, message: string): string {
+  const digits = telefono.replace(/[^\d]/g, "");
+  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 
 function ReclamacionesPage() {
   const { selectedHub, user } = useAuth();
   const [rows, setRows] = useState<Reclamacion[]>([]);
+  const [driversList, setDriversList] = useState<DriverOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [estadoFilter, setEstadoFilter] = useState<"todas" | Estado>("todas");
   const [driverFilter, setDriverFilter] = useState<string>("todos");
   const [openModal, setOpenModal] = useState<{ mode: "create" } | { mode: "edit"; row: Reclamacion } | null>(null);
   const [selected, setSelected] = useState<Reclamacion | null>(null);
+  const [closing, setClosing] = useState<Reclamacion | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  // El SLA es dinámico: se re-renderiza solo cada minuto para mover el
+  // semáforo verde/amarillo/rojo sin depender de ninguna acción manual.
+  useEffect(() => {
+    const id = setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const load = async () => {
     if (!selectedHub) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("reclamaciones")
-      .select("*")
-      .eq("hub_id", selectedHub.id)
-      .order("created_at", { ascending: false });
-    if (error) {
-      toast.error(error.message);
+    const [recRes, drvRes] = await Promise.all([
+      supabase
+        .from("reclamaciones")
+        .select("*")
+        .eq("hub_id", selectedHub.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("drivers")
+        .select("id, nombre, telefono")
+        .eq("hub_id", selectedHub.id)
+        .order("nombre"),
+    ]);
+    if (recRes.error) {
+      toast.error(recRes.error.message);
     } else {
-      setRows((data as Reclamacion[]) ?? []);
+      setRows((recRes.data as Reclamacion[]) ?? []);
     }
+    if (drvRes.error) toast.error(drvRes.error.message);
+    else setDriversList((drvRes.data as DriverOption[]) ?? []);
     setLoading(false);
   };
 
@@ -172,8 +259,7 @@ function ReclamacionesPage() {
       abierta: 0,
       enviada_driver: 0,
       respondida_driver: 0,
-      en_proceso: 0,
-      resuelta: 0,
+      cerrada: 0,
     };
     rows.forEach((r) => {
       c[r.estado] = (c[r.estado] ?? 0) + 1;
@@ -188,14 +274,24 @@ function ReclamacionesPage() {
   };
 
   const enviarADriver = async (r: Reclamacion) => {
+    const publicUrl = `${window.location.origin}/rec/${r.token}`;
+    if (!r.driver_telefono) {
+      toast.error("Este driver no tiene teléfono registrado", {
+        description: "Añádelo en la reclamación o en Drivers antes de enviar por WhatsApp.",
+      });
+      return;
+    }
     await updateEstado(r.id, "enviada_driver", { fecha_envio_whatsapp: new Date().toISOString() });
-    toast("WhatsApp: pendiente de configurar GoHighLevel", {
-      description: `Link público: ${window.location.origin}/rec/${r.token}`,
-    });
+    const mensaje = `Hola${r.driver_nombre ? ` ${r.driver_nombre}` : ""}, tienes una reclamación (${r.ref}) pendiente de respuesta. Por favor complétala en las próximas 40h en este link: ${publicUrl}`;
+    window.open(buildWhatsAppUrl(r.driver_telefono, mensaje), "_blank", "noopener,noreferrer");
   };
 
-  const resolver = async (r: Reclamacion) => {
-    await updateEstado(r.id, "resuelta");
+  const cerrar = async (r: Reclamacion, nota: string) => {
+    await updateEstado(r.id, "cerrada", {
+      fecha_cierre: new Date().toISOString(),
+      nota_cierre: nota.trim() || null,
+    });
+    setClosing(null);
   };
 
   const eliminar = async (r: Reclamacion) => {
@@ -243,8 +339,8 @@ function ReclamacionesPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <StatChip label="Abierta" value={counts.abierta} tone="danger" />
             <StatChip label="Enviada al driver" value={counts.enviada_driver} tone="electric" />
-            <StatChip label="Respondida" value={counts.respondida_driver + counts.en_proceso} tone="amber" />
-            <StatChip label="Resuelta" value={counts.resuelta} tone="success" />
+            <StatChip label="Respondida" value={counts.respondida_driver} tone="amber" />
+            <StatChip label="Cerrada" value={counts.cerrada} tone="success" />
           </div>
 
           {/* TOOLBAR */}
@@ -298,19 +394,20 @@ function ReclamacionesPage() {
                     <th className="px-4 py-3">Tipo</th>
                     <th className="px-4 py-3 text-right">Importe</th>
                     <th className="px-4 py-3">Estado</th>
+                    <th className="px-4 py-3">SLA (40h)</th>
                     <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
+                      <td colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
                         Cargando…
                       </td>
                     </tr>
                   ) : filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
+                      <td colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
                         Sin reclamaciones
                       </td>
                     </tr>
@@ -335,6 +432,9 @@ function ReclamacionesPage() {
                             {ESTADO_LABEL[r.estado]}
                           </span>
                         </td>
+                        <td className="px-4 py-3">
+                          <SlaBadge rec={r} nowMs={nowMs} />
+                        </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {r.estado === "abierta" && (
@@ -349,16 +449,16 @@ function ReclamacionesPage() {
                                 <Send className="size-3.5 inline" /> Enviar
                               </button>
                             )}
-                            {r.estado !== "resuelta" && (
+                            {r.estado === "respondida_driver" && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  void resolver(r);
+                                  setClosing(r);
                                 }}
                                 className="px-2 py-1 text-[11px] font-syne font-semibold text-success hover:bg-success/10 rounded"
-                                title="Resolver"
+                                title="Cerrar"
                               >
-                                <Check className="size-3.5 inline" /> Resolver
+                                <Check className="size-3.5 inline" /> Cerrar
                               </button>
                             )}
                             <button
@@ -389,6 +489,7 @@ function ReclamacionesPage() {
           row={openModal.mode === "edit" ? openModal.row : null}
           hubId={selectedHub.id}
           userId={user.id}
+          drivers={driversList}
           onClose={() => setOpenModal(null)}
           onSaved={() => {
             setOpenModal(null);
@@ -399,11 +500,11 @@ function ReclamacionesPage() {
       {selected && (
         <DetailPanel
           row={selected}
+          nowMs={nowMs}
           onClose={() => setSelected(null)}
           onCopy={() => copyLink(selected)}
           onSend={() => void enviarADriver(selected)}
-          onEnProceso={() => void updateEstado(selected.id, "en_proceso")}
-          onResolver={() => void resolver(selected)}
+          onCerrar={() => setClosing(selected)}
           onEdit={() => {
             setOpenModal({ mode: "edit", row: selected });
             setSelected(null);
@@ -411,7 +512,69 @@ function ReclamacionesPage() {
           onDelete={() => void eliminar(selected)}
         />
       )}
+
+      {closing && (
+        <CloseDialog
+          row={closing}
+          onClose={() => setClosing(null)}
+          onConfirm={(nota) => void cerrar(closing, nota)}
+        />
+      )}
     </div>
+  );
+}
+
+function CloseDialog({
+  row,
+  onClose,
+  onConfirm,
+}: {
+  row: Reclamacion;
+  onClose: () => void;
+  onConfirm: (nota: string) => void;
+}) {
+  const [nota, setNota] = useState("");
+  const [saving, setSaving] = useState(false);
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
+      <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
+        <div className="bg-background border border-hairline rounded-lg shadow-xl w-full max-w-md pointer-events-auto">
+          <div className="px-6 py-4 border-b border-hairline">
+            <h2 className="font-syne font-bold text-lg">Cerrar {row.ref}</h2>
+            <p className="mt-1 text-xs text-muted-text">
+              Marca la reclamación como cerrada tras responder a Cainiao en el panel LDS (fuera de este sistema).
+            </p>
+          </div>
+          <div className="p-6">
+            <Field label="Nota de cierre (opcional) · qué se respondió a Cainiao">
+              <textarea
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                rows={4}
+                autoFocus
+                className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric resize-y"
+              />
+            </Field>
+          </div>
+          <div className="px-6 py-4 border-t border-hairline flex justify-end gap-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-syne hover:bg-ink/5 rounded">
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                setSaving(true);
+                onConfirm(nota);
+              }}
+              disabled={saving}
+              className="px-4 py-2 bg-success text-white text-sm font-syne font-semibold rounded-md hover:brightness-110 disabled:opacity-50"
+            >
+              {saving ? "Cerrando…" : "Cerrar reclamación"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -441,20 +604,20 @@ function StatChip({
 
 function DetailPanel({
   row,
+  nowMs,
   onClose,
   onCopy,
   onSend,
-  onEnProceso,
-  onResolver,
+  onCerrar,
   onEdit,
   onDelete,
 }: {
   row: Reclamacion;
+  nowMs: number;
   onClose: () => void;
   onCopy: () => void;
   onSend: () => void;
-  onEnProceso: () => void;
-  onResolver: () => void;
+  onCerrar: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -474,9 +637,12 @@ function DetailPanel({
         </div>
 
         <div className="p-6 space-y-6">
-          <span className={`inline-block px-3 py-1 text-[10px] font-mono tracking-widest uppercase rounded-full ${estadoClass(row.estado)}`}>
-            {ESTADO_LABEL[row.estado]}
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`inline-block px-3 py-1 text-[10px] font-mono tracking-widest uppercase rounded-full ${estadoClass(row.estado)}`}>
+              {ESTADO_LABEL[row.estado]}
+            </span>
+            <SlaBadge rec={row} nowMs={nowMs} />
+          </div>
 
           <DetailGrid
             items={[
@@ -516,6 +682,12 @@ function DetailPanel({
             </Section>
           )}
 
+          {row.nota_cierre && (
+            <Section title={`Nota de cierre${row.fecha_cierre ? ` · ${new Date(row.fecha_cierre).toLocaleString("es-ES")}` : ""}`}>
+              <p className="text-sm text-ink/80 whitespace-pre-wrap">{row.nota_cierre}</p>
+            </Section>
+          )}
+
           <Section title="Link público para el driver">
             <div className="flex items-center gap-2">
               <code className="flex-1 px-3 py-2 bg-surface border border-hairline rounded text-[11px] font-mono break-all">
@@ -536,20 +708,12 @@ function DetailPanel({
                 <Send className="size-4" /> Enviar reclamación al driver
               </button>
             )}
-            {row.estado === "enviada_driver" && (
+            {row.estado === "respondida_driver" && (
               <button
-                onClick={onEnProceso}
-                className="w-full py-2.5 bg-surface border border-hairline font-syne font-semibold text-sm rounded-md hover:bg-surface-2"
-              >
-                Marcar en proceso
-              </button>
-            )}
-            {row.estado !== "resuelta" && (
-              <button
-                onClick={onResolver}
+                onClick={onCerrar}
                 className="w-full inline-flex items-center justify-center gap-2 py-2.5 bg-success text-white font-syne font-semibold text-sm rounded-md hover:brightness-110"
               >
-                <Check className="size-4" /> Marcar como resuelta
+                <Check className="size-4" /> Cerrar reclamación
               </button>
             )}
             <div className="grid grid-cols-2 gap-2">
@@ -600,6 +764,7 @@ function FormModal({
   row,
   hubId,
   userId,
+  drivers,
   onClose,
   onSaved,
 }: {
@@ -607,11 +772,13 @@ function FormModal({
   row: Reclamacion | null;
   hubId: string;
   userId: string;
+  drivers: DriverOption[];
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [waybill, setWaybill] = useState(row?.waybill ?? "");
   const [lpNo, setLpNo] = useState(row?.lp_no ?? "");
+  const [driverId, setDriverId] = useState(row?.driver_id ?? "");
   const [driver, setDriver] = useState(row?.driver_nombre ?? "");
   const [tel, setTel] = useState(row?.driver_telefono ?? "");
   const [fecha, setFecha] = useState(row?.fecha_entrega ?? "");
@@ -621,6 +788,13 @@ function FormModal({
   const [comentarios, setComentarios] = useState(row?.comentarios ?? "");
   const [evidencia, setEvidencia] = useState(row?.evidencia ?? "");
   const [saving, setSaving] = useState(false);
+
+  const selectDriver = (id: string) => {
+    setDriverId(id);
+    const d = drivers.find((x) => x.id === id);
+    setDriver(d?.nombre ?? "");
+    setTel(d?.telefono ?? "");
+  };
 
   const save = async () => {
     if (!tipo) {
@@ -632,6 +806,7 @@ function FormModal({
       hub_id: hubId,
       waybill: waybill || null,
       lp_no: lpNo || null,
+      driver_id: driverId || null,
       driver_nombre: driver || null,
       driver_telefono: tel || null,
       fecha_entrega: fecha || null,
@@ -677,8 +852,23 @@ function FormModal({
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Waybill"><Input value={waybill} onChange={setWaybill} /></Field>
             <Field label="LP No."><Input value={lpNo} onChange={setLpNo} /></Field>
-            <Field label="Driver"><Input value={driver} onChange={setDriver} /></Field>
-            <Field label="Teléfono driver"><Input value={tel} onChange={setTel} placeholder="+34..." /></Field>
+            <Field label="Driver">
+              <select
+                value={driverId}
+                onChange={(e) => selectDriver(e.target.value)}
+                className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+              >
+                <option value="">— Sin asignar —</option>
+                {drivers.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.nombre}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Teléfono driver (WhatsApp)">
+              <Input value={tel} onChange={setTel} placeholder="+34..." />
+            </Field>
             <Field label="Fecha entrega"><Input type="date" value={fecha} onChange={setFecha} /></Field>
             <Field label="Tipo">
               <select

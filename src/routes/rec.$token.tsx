@@ -64,7 +64,7 @@ function PublicRecPage() {
         const res = await fetchByToken({ data: { token } });
         if (res.notFound) return setState({ kind: "notfound" });
         const rec = res.reclamacion as Rec;
-        if (rec.estado === "respondida_driver" || rec.estado === "resuelta") {
+        if (rec.estado === "respondida_driver" || rec.estado === "cerrada") {
           setState({ kind: "already", rec });
         } else {
           setState({ kind: "form", rec });

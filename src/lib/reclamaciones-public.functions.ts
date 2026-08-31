@@ -46,7 +46,7 @@ export const respondReclamacionByToken = createServerFn({ method: "POST" })
       .maybeSingle();
     if (fErr) throw new Error(fErr.message);
     if (!existing) throw new Error("Reclamación no encontrada");
-    if (existing.estado === "respondida_driver" || existing.estado === "resuelta") {
+    if (existing.estado === "respondida_driver" || existing.estado === "cerrada") {
       throw new Error("Esta reclamación ya fue respondida.");
     }
     const respuesta = `[${data.tipo}] ${data.descripcion}`;

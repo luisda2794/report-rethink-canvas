@@ -252,6 +252,7 @@ export type Database = {
           hub_id: string
           id: string
           nombre: string
+          telefono: string | null
           updated_at: string
         }
         Insert: {
@@ -259,6 +260,7 @@ export type Database = {
           hub_id: string
           id?: string
           nombre: string
+          telefono?: string | null
           updated_at?: string
         }
         Update: {
@@ -266,6 +268,7 @@ export type Database = {
           hub_id?: string
           id?: string
           nombre?: string
+          telefono?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -744,11 +747,13 @@ export type Database = {
           cp: string | null
           created_at: string
           created_by: string | null
+          driver_id: string | null
           driver_nombre: string | null
           driver_telefono: string | null
           estado: string
           evidencia: string | null
           evidencia_driver: string | null
+          fecha_cierre: string | null
           fecha_entrega: string | null
           fecha_envio_whatsapp: string | null
           fecha_respuesta: string | null
@@ -757,6 +762,7 @@ export type Database = {
           importe: number | null
           lp_no: string | null
           nombre_driver_resp: string | null
+          nota_cierre: string | null
           ref: string
           respuesta_driver: string | null
           tipo: string
@@ -769,11 +775,13 @@ export type Database = {
           cp?: string | null
           created_at?: string
           created_by?: string | null
+          driver_id?: string | null
           driver_nombre?: string | null
           driver_telefono?: string | null
           estado?: string
           evidencia?: string | null
           evidencia_driver?: string | null
+          fecha_cierre?: string | null
           fecha_entrega?: string | null
           fecha_envio_whatsapp?: string | null
           fecha_respuesta?: string | null
@@ -782,6 +790,7 @@ export type Database = {
           importe?: number | null
           lp_no?: string | null
           nombre_driver_resp?: string | null
+          nota_cierre?: string | null
           ref?: string
           respuesta_driver?: string | null
           tipo: string
@@ -794,11 +803,13 @@ export type Database = {
           cp?: string | null
           created_at?: string
           created_by?: string | null
+          driver_id?: string | null
           driver_nombre?: string | null
           driver_telefono?: string | null
           estado?: string
           evidencia?: string | null
           evidencia_driver?: string | null
+          fecha_cierre?: string | null
           fecha_entrega?: string | null
           fecha_envio_whatsapp?: string | null
           fecha_respuesta?: string | null
@@ -807,6 +818,7 @@ export type Database = {
           importe?: number | null
           lp_no?: string | null
           nombre_driver_resp?: string | null
+          nota_cierre?: string | null
           ref?: string
           respuesta_driver?: string | null
           tipo?: string
@@ -815,6 +827,13 @@ export type Database = {
           waybill?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "reclamaciones_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "reclamaciones_hub_id_fkey"
             columns: ["hub_id"]

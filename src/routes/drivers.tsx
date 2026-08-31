@@ -20,6 +20,7 @@ type Driver = {
   id: string;
   hub_id: string;
   nombre: string;
+  telefono: string | null;
 };
 
 function DriversPage() {
@@ -27,9 +28,11 @@ function DriversPage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [newNombre, setNewNombre] = useState("");
+  const [newTelefono, setNewTelefono] = useState("");
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [editingTelefono, setEditingTelefono] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   const load = async () => {
@@ -37,7 +40,7 @@ function DriversPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("drivers")
-      .select("id, hub_id, nombre")
+      .select("id, hub_id, nombre, telefono")
       .eq("hub_id", selectedHub.id)
       .order("nombre");
     if (error) toast.error(error.message);
@@ -56,12 +59,13 @@ function DriversPage() {
     setCreating(true);
     const { error } = await supabase
       .from("drivers")
-      .insert({ hub_id: selectedHub.id, nombre });
+      .insert({ hub_id: selectedHub.id, nombre, telefono: newTelefono.trim() || null });
     if (error) {
       toast.error(error.message);
     } else {
       toast.success("Driver creado");
       setNewNombre("");
+      setNewTelefono("");
       await load();
     }
     setCreating(false);
@@ -70,18 +74,23 @@ function DriversPage() {
   const startEdit = (d: Driver) => {
     setEditingId(d.id);
     setEditingValue(d.nombre);
+    setEditingTelefono(d.telefono ?? "");
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditingValue("");
+    setEditingTelefono("");
   };
 
   const saveEdit = async (id: string) => {
     const nombre = editingValue.trim();
     if (!nombre) return;
     setSavingEdit(true);
-    const { error } = await supabase.from("drivers").update({ nombre }).eq("id", id);
+    const { error } = await supabase
+      .from("drivers")
+      .update({ nombre, telefono: editingTelefono.trim() || null })
+      .eq("id", id);
     if (error) {
       toast.error(error.message);
     } else {
@@ -133,19 +142,20 @@ function DriversPage() {
                     <thead>
                       <tr className="bg-surface-2 border-b border-hairline font-mono text-[10px] tracking-widest uppercase text-muted-text">
                         <th className="text-left px-4 py-3">Nombre</th>
+                        <th className="text-left px-4 py-3">Teléfono (WhatsApp)</th>
                         <th className="px-4 py-3 w-24" />
                       </tr>
                     </thead>
                     <tbody>
                       {loading ? (
                         <tr>
-                          <td colSpan={2} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
+                          <td colSpan={3} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
                             Cargando…
                           </td>
                         </tr>
                       ) : drivers.length === 0 ? (
                         <tr>
-                          <td colSpan={2} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
+                          <td colSpan={3} className="px-4 py-8 text-center text-muted-text font-mono text-xs">
                             Sin drivers configurados para este hub
                           </td>
                         </tr>
@@ -163,6 +173,19 @@ function DriversPage() {
                                 />
                               ) : (
                                 <span className="text-ink font-medium">{d.nombre}</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {editingId === d.id ? (
+                                <input
+                                  value={editingTelefono}
+                                  onChange={(e) => setEditingTelefono(e.target.value)}
+                                  onKeyDown={(e) => e.key === "Enter" && saveEdit(d.id)}
+                                  placeholder="+34..."
+                                  className="w-full bg-transparent border-b border-electric focus:outline-none text-sm text-ink font-mono"
+                                />
+                              ) : (
+                                <span className="text-muted-text font-mono text-xs">{d.telefono ?? "—"}</span>
                               )}
                             </td>
                             <td className="px-4 py-2.5 text-right">
@@ -218,6 +241,13 @@ function DriversPage() {
                     onKeyDown={(e) => e.key === "Enter" && create()}
                     placeholder="Nombre del driver"
                     className="flex-1 border border-hairline rounded px-3 py-1.5 text-sm bg-background font-mono"
+                  />
+                  <input
+                    value={newTelefono}
+                    onChange={(e) => setNewTelefono(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && create()}
+                    placeholder="Teléfono +34..."
+                    className="w-44 border border-hairline rounded px-3 py-1.5 text-sm bg-background font-mono"
                   />
                   <button
                     onClick={create}
