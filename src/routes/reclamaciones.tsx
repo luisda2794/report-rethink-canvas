@@ -21,6 +21,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Input as InputPrimitive } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/reclamaciones")({
   component: () => (
@@ -89,7 +91,7 @@ const ESTADO_LABEL: Record<Estado, string> = {
 function estadoClass(e: Estado): string {
   switch (e) {
     case "abierta":
-      return "bg-danger/10 text-danger border-danger/30";
+      return "bg-destructive/10 text-destructive border-destructive/30";
     case "enviada_driver":
       return "bg-electric/10 text-electric border-electric/30";
     case "respondida_driver":
@@ -131,11 +133,11 @@ function formatHours(h: number): string {
 
 function SlaBadge({ rec, nowMs }: { rec: Reclamacion; nowMs: number }) {
   const sla = computeSla(rec, nowMs);
-  if (!sla) return <span className="text-muted-text text-xs">—</span>;
+  if (!sla) return <span className="text-muted-foreground text-xs">—</span>;
   const toneClass: Record<SlaTone, string> = {
     green: "bg-success/15 text-success border-success/30",
     yellow: "bg-amber-400/15 text-amber-700 dark:text-amber-400 border-amber-400/40",
-    red: "bg-danger/10 text-danger border-danger/30",
+    red: "bg-destructive/10 text-destructive border-destructive/30",
   };
   const label = sla.live
     ? sla.hoursLeft >= 0
@@ -147,7 +149,7 @@ function SlaBadge({ rec, nowMs }: { rec: Reclamacion; nowMs: number }) {
   return (
     <Badge
       variant="outline"
-      className={`gap-1 font-mono text-[10px] tracking-wide font-normal ${toneClass[sla.tone]}`}
+      className={`gap-1 text-[11px] font-normal ${toneClass[sla.tone]}`}
       title={`SLA 40h desde envío al driver. Transcurridas: ${formatHours(sla.hoursElapsed)}`}
     >
       <Clock className="size-3" /> {label}
@@ -333,7 +335,7 @@ function ReclamacionesPage() {
             <Button
               onClick={() => setOpenModal({ mode: "create" })}
               disabled={!selectedHub}
-              className="bg-ink font-syne font-semibold hover:bg-ink/90"
+              className="bg-ink hover:bg-ink/90"
             >
               <Plus className="size-4" /> Nueva reclamación
             </Button>
@@ -350,18 +352,18 @@ function ReclamacionesPage() {
           {/* TOOLBAR */}
           <div className="flex flex-wrap items-center gap-2 mb-4">
             <div className="relative flex-1 min-w-[220px]">
-              <Search className="size-4 text-muted-text absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
+              <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <InputPrimitive
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por waybill, driver, LP No."
-                className="w-full pl-9 pr-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+                className="pl-9"
               />
             </div>
             <select
               value={estadoFilter}
               onChange={(e) => setEstadoFilter(e.target.value as typeof estadoFilter)}
-              className="px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+              className="appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
             >
               <option value="todas">Todos los estados</option>
               {(Object.keys(ESTADO_LABEL) as Estado[]).map((k) => (
@@ -373,7 +375,7 @@ function ReclamacionesPage() {
             <select
               value={driverFilter}
               onChange={(e) => setDriverFilter(e.target.value)}
-              className="px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+              className="appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
             >
               <option value="todos">Todos los drivers</option>
               {drivers.map((d) => (
@@ -389,29 +391,29 @@ function ReclamacionesPage() {
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-surface-2 hover:bg-surface-2">
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">ID</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Waybill</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">LP No.</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Driver</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Fecha</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Tipo</TableHead>
-                    <TableHead className="px-4 text-right font-mono text-[10px] tracking-widest uppercase text-muted-text">Importe</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">Estado</TableHead>
-                    <TableHead className="px-4 font-mono text-[10px] tracking-widest uppercase text-muted-text">SLA (40h)</TableHead>
-                    <TableHead className="px-4 text-right font-mono text-[10px] tracking-widest uppercase text-muted-text">Acciones</TableHead>
+                  <TableRow className="bg-muted hover:bg-muted">
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">ID</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">Waybill</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">LP No.</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">Driver</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">Fecha</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</TableHead>
+                    <TableHead className="px-4 text-right text-[11px] uppercase tracking-wide text-muted-foreground">Importe</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">Estado</TableHead>
+                    <TableHead className="px-4 text-[11px] uppercase tracking-wide text-muted-foreground">SLA (40h)</TableHead>
+                    <TableHead className="px-4 text-right text-[11px] uppercase tracking-wide text-muted-foreground">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
+                      <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-foreground text-xs">
                         Cargando…
                       </TableCell>
                     </TableRow>
                   ) : filtered.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-text font-mono text-xs">
+                      <TableCell colSpan={10} className="px-4 py-10 text-center text-muted-foreground text-xs">
                         Sin reclamaciones
                       </TableCell>
                     </TableRow>
@@ -422,17 +424,17 @@ function ReclamacionesPage() {
                         onClick={() => setSelected(r)}
                         className="group cursor-pointer"
                       >
-                        <TableCell className="px-4 font-mono text-xs text-ink">{r.ref}</TableCell>
-                        <TableCell className="px-4 font-mono text-xs">{r.waybill ?? "—"}</TableCell>
-                        <TableCell className="px-4 font-mono text-xs">{r.lp_no ?? "—"}</TableCell>
+                        <TableCell className="px-4 text-xs text-foreground">{r.ref}</TableCell>
+                        <TableCell className="px-4 text-xs">{r.waybill ?? "—"}</TableCell>
+                        <TableCell className="px-4 text-xs">{r.lp_no ?? "—"}</TableCell>
                         <TableCell className="px-4">{r.driver_nombre ?? "—"}</TableCell>
-                        <TableCell className="px-4 font-mono text-xs">{r.fecha_entrega ?? "—"}</TableCell>
+                        <TableCell className="px-4 text-xs">{r.fecha_entrega ?? "—"}</TableCell>
                         <TableCell className="px-4 truncate max-w-[160px]">{r.tipo}</TableCell>
-                        <TableCell className="px-4 text-right font-mono">
+                        <TableCell className="px-4 text-right tabular-nums">
                           {r.importe ? `${Number(r.importe).toFixed(2)} €` : "—"}
                         </TableCell>
                         <TableCell className="px-4">
-                          <Badge variant="outline" className={`font-mono text-[10px] tracking-widest uppercase font-normal ${estadoClass(r.estado)}`}>
+                          <Badge variant="outline" className={`text-[10px] uppercase tracking-wide font-normal ${estadoClass(r.estado)}`}>
                             {ESTADO_LABEL[r.estado]}
                           </Badge>
                         </TableCell>
@@ -449,7 +451,7 @@ function ReclamacionesPage() {
                                   e.stopPropagation();
                                   void enviarADriver(r);
                                 }}
-                                className="font-syne font-semibold text-electric hover:bg-electric/10 hover:text-electric"
+                                className="text-electric hover:bg-electric/10 hover:text-electric"
                                 title="Enviar al driver"
                               >
                                 <Send className="size-3.5" /> Enviar
@@ -463,7 +465,7 @@ function ReclamacionesPage() {
                                   e.stopPropagation();
                                   setClosing(r);
                                 }}
-                                className="font-syne font-semibold text-success hover:bg-success/10 hover:text-success"
+                                className="text-success hover:bg-success/10 hover:text-success"
                                 title="Cerrar"
                               >
                                 <Check className="size-3.5" /> Cerrar
@@ -476,7 +478,7 @@ function ReclamacionesPage() {
                                 e.stopPropagation();
                                 setOpenModal({ mode: "edit", row: r });
                               }}
-                              className="text-ink hover:bg-ink/5"
+                              className="text-foreground"
                               title="Editar"
                             >
                               <Pencil className="size-3.5" />
@@ -550,25 +552,24 @@ function CloseDialog({
       <div className="fixed inset-0 bg-black/40 z-[60]" onClick={onClose} />
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 pointer-events-none">
         <Card className="w-full max-w-md pointer-events-auto shadow-xl">
-          <CardHeader className="px-6 py-4 border-b border-hairline">
-            <h2 className="font-syne font-bold text-lg">Cerrar {row.ref}</h2>
-            <p className="mt-1 text-xs text-muted-text">
+          <CardHeader className="px-6 py-4 border-b">
+            <h2 className="text-lg font-semibold">Cerrar {row.ref}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
               Marca la reclamación como cerrada tras responder a Cainiao en el panel LDS (fuera de este sistema).
             </p>
           </CardHeader>
           <CardContent className="p-6">
             <Field label="Nota de cierre (opcional) · qué se respondió a Cainiao">
-              <textarea
+              <Textarea
                 value={nota}
                 onChange={(e) => setNota(e.target.value)}
                 rows={4}
                 autoFocus
-                className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric resize-y"
               />
             </Field>
           </CardContent>
-          <CardFooter className="px-6 py-4 border-t border-hairline flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} className="font-syne">
+          <CardFooter className="px-6 py-4 border-t flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>
             <Button
@@ -577,7 +578,7 @@ function CloseDialog({
                 onConfirm(nota);
               }}
               disabled={saving}
-              className="bg-success font-syne font-semibold hover:bg-success/90"
+              className="bg-success hover:bg-success/90"
             >
               {saving ? "Cerrando…" : "Cerrar reclamación"}
             </Button>
@@ -598,7 +599,7 @@ function StatChip({
   tone: "danger" | "electric" | "amber" | "success";
 }) {
   const cls = {
-    danger: "bg-danger/10 border-danger/30 text-danger",
+    danger: "bg-destructive/10 border-destructive/30 text-destructive",
     electric: "bg-electric/10 border-electric/30 text-electric",
     amber:
       "bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-400",
@@ -606,8 +607,8 @@ function StatChip({
   }[tone];
   return (
     <div className={`flex items-center justify-between px-4 py-3 border rounded-lg ${cls}`}>
-      <span className="font-mono text-[10px] tracking-widest uppercase">{label}</span>
-      <span className="font-syne font-bold text-2xl">{value}</span>
+      <span className="text-[11px] uppercase tracking-wide">{label}</span>
+      <span className="font-semibold text-2xl tabular-nums">{value}</span>
     </div>
   );
 }
@@ -635,11 +636,11 @@ function DetailPanel({
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40 animate-fade-in" onClick={onClose} />
-      <aside className="fixed top-0 right-0 bottom-0 w-full sm:w-[480px] bg-background border-l border-hairline z-50 overflow-y-auto animate-slide-in-right">
-        <div className="sticky top-0 bg-background border-b border-hairline px-6 py-4 flex items-center justify-between">
+      <aside className="fixed top-0 right-0 bottom-0 w-full sm:w-[480px] bg-background border-l z-50 overflow-y-auto animate-slide-in-right">
+        <div className="sticky top-0 bg-background border-b px-6 py-4 flex items-center justify-between">
           <div>
-            <div className="font-mono text-[10px] tracking-widest uppercase text-muted-text">Reclamación</div>
-            <div className="font-mono text-lg text-ink">{row.ref}</div>
+            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Reclamación</div>
+            <div className="text-lg font-semibold text-foreground">{row.ref}</div>
           </div>
           <Button variant="ghost" size="icon-sm" onClick={onClose}>
             <X className="size-4" />
@@ -649,7 +650,7 @@ function DetailPanel({
         <Card className="border-none shadow-none rounded-none">
           <CardContent className="space-y-6">
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="outline" className={`font-mono text-[10px] tracking-widest uppercase font-normal ${estadoClass(row.estado)}`}>
+            <Badge variant="outline" className={`text-[10px] uppercase tracking-wide font-normal ${estadoClass(row.estado)}`}>
               {ESTADO_LABEL[row.estado]}
             </Badge>
             <SlaBadge rec={row} nowMs={nowMs} />
@@ -670,7 +671,7 @@ function DetailPanel({
 
           {row.comentarios && (
             <Section title="Comentarios">
-              <p className="text-sm text-ink/80 whitespace-pre-wrap">{row.comentarios}</p>
+              <p className="text-sm text-foreground/80 whitespace-pre-wrap">{row.comentarios}</p>
             </Section>
           )}
 
@@ -684,7 +685,7 @@ function DetailPanel({
 
           {row.respuesta_driver && (
             <Section title={`Respuesta del driver${row.nombre_driver_resp ? ` · ${row.nombre_driver_resp}` : ""}`}>
-              <p className="text-sm text-ink/80 whitespace-pre-wrap">{row.respuesta_driver}</p>
+              <p className="text-sm text-foreground/80 whitespace-pre-wrap">{row.respuesta_driver}</p>
               {row.evidencia_driver && (
                 <a href={row.evidencia_driver} target="_blank" rel="noreferrer" className="mt-2 text-xs text-electric inline-flex items-center gap-1">
                   Ver evidencia <ExternalLink className="size-3" />
@@ -695,26 +696,26 @@ function DetailPanel({
 
           {row.nota_cierre && (
             <Section title={`Nota de cierre${row.fecha_cierre ? ` · ${new Date(row.fecha_cierre).toLocaleString("es-ES")}` : ""}`}>
-              <p className="text-sm text-ink/80 whitespace-pre-wrap">{row.nota_cierre}</p>
+              <p className="text-sm text-foreground/80 whitespace-pre-wrap">{row.nota_cierre}</p>
             </Section>
           )}
 
           <Section title="Link público para el driver">
             <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-surface border border-hairline rounded text-[11px] font-mono break-all">
+              <code className="flex-1 px-3 py-2 bg-muted border rounded text-[11px] break-all">
                 {publicUrl}
               </code>
-              <Button variant="outline" size="icon" onClick={onCopy} className="bg-surface">
+              <Button variant="outline" size="icon" onClick={onCopy}>
                 <Copy className="size-4" />
               </Button>
             </div>
           </Section>
 
-          <div className="space-y-2 pt-2 border-t border-hairline">
+          <div className="space-y-2 pt-2 border-t">
             {row.estado === "abierta" && (
               <Button
                 onClick={onSend}
-                className="w-full bg-electric font-syne font-semibold hover:bg-electric/90"
+                className="w-full bg-electric hover:bg-electric/90"
               >
                 <Send className="size-4" /> Enviar reclamación al driver
               </Button>
@@ -722,16 +723,16 @@ function DetailPanel({
             {row.estado === "respondida_driver" && (
               <Button
                 onClick={onCerrar}
-                className="w-full bg-success font-syne font-semibold hover:bg-success/90"
+                className="w-full bg-success hover:bg-success/90"
               >
                 <Check className="size-4" /> Cerrar reclamación
               </Button>
             )}
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={onEdit} className="font-syne font-semibold">
+              <Button variant="outline" onClick={onEdit}>
                 <Pencil className="size-3.5" /> Editar
               </Button>
-              <Button variant="outline" onClick={onDelete} className="border-danger/30 bg-danger/10 font-syne font-semibold text-danger hover:bg-danger/20 hover:text-danger">
+              <Button variant="outline" onClick={onDelete} className="border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive">
                 <Trash2 className="size-3.5" /> Eliminar
               </Button>
             </div>
@@ -748,8 +749,8 @@ function DetailGrid({ items }: { items: Array<[string, string | number | null | 
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
       {items.map(([k, v]) => (
         <div key={k}>
-          <dt className="font-mono text-[9px] tracking-widest uppercase text-muted-text mb-0.5">{k}</dt>
-          <dd className="text-sm text-ink">{v ?? "—"}</dd>
+          <dt className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">{k}</dt>
+          <dd className="text-sm text-foreground">{v ?? "—"}</dd>
         </div>
       ))}
     </dl>
@@ -759,7 +760,7 @@ function DetailGrid({ items }: { items: Array<[string, string | number | null | 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="font-mono text-[10px] tracking-widest uppercase text-muted-text mb-2">{title}</div>
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">{title}</div>
       {children}
     </div>
   );
@@ -847,8 +848,8 @@ function FormModal({
       <div className="fixed inset-0 bg-black/40 z-50" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
         <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto pointer-events-auto shadow-xl">
-          <CardHeader className="sticky top-0 z-10 bg-background border-b border-hairline px-6 py-4 flex-row items-center justify-between space-y-0">
-            <h2 className="font-syne font-bold text-lg">
+          <CardHeader className="sticky top-0 z-10 bg-background border-b px-6 py-4 flex-row items-center justify-between space-y-0">
+            <h2 className="text-lg font-semibold">
               {mode === "create" ? "Nueva reclamación" : `Editar ${row?.ref ?? ""}`}
             </h2>
             <Button variant="ghost" size="icon-sm" onClick={onClose}>
@@ -862,7 +863,7 @@ function FormModal({
               <select
                 value={driverId}
                 onChange={(e) => selectDriver(e.target.value)}
-                className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+                className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
               >
                 <option value="">— Sin asignar —</option>
                 {drivers.map((d) => (
@@ -880,7 +881,7 @@ function FormModal({
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value)}
-                className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+                className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
               >
                 {TIPOS.map((t) => (
                   <option key={t} value={t}>
@@ -897,11 +898,10 @@ function FormModal({
             </Field>
             <div className="md:col-span-2">
               <Field label="Comentarios">
-                <textarea
+                <Textarea
                   value={comentarios}
                   onChange={(e) => setComentarios(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric resize-y"
                 />
               </Field>
             </div>
@@ -911,14 +911,14 @@ function FormModal({
               </Field>
             </div>
           </CardContent>
-          <CardFooter className="sticky bottom-0 z-10 bg-background border-t border-hairline px-6 py-4 flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose} className="font-syne">
+          <CardFooter className="sticky bottom-0 z-10 bg-background border-t px-6 py-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
               Cancelar
             </Button>
             <Button
               onClick={save}
               disabled={saving}
-              className="bg-ink font-syne font-semibold hover:bg-ink/90"
+              className="bg-ink hover:bg-ink/90"
             >
               {saving ? "Guardando…" : mode === "create" ? "Crear reclamación" : "Guardar cambios"}
             </Button>
@@ -932,7 +932,7 @@ function FormModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">{label}</span>
+      <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">{label}</span>
       {children}
     </label>
   );
@@ -952,13 +952,12 @@ function Input({
   maxLength?: number;
 }) {
   return (
-    <input
+    <InputPrimitive
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       maxLength={maxLength}
-      className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
     />
   );
 }

@@ -7,6 +7,9 @@ import {
   respondReclamacionByToken,
 } from "@/lib/reclamaciones-public.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/rec/$token")({
   component: PublicRecPage,
@@ -78,7 +81,7 @@ function PublicRecPage() {
   if (state.kind === "loading") {
     return (
       <Shell>
-        <div className="flex items-center gap-2 text-muted-text font-mono text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
           <Loader2 className="size-4 animate-spin" /> Cargando reclamación…
         </div>
       </Shell>
@@ -89,9 +92,9 @@ function PublicRecPage() {
     return (
       <Shell>
         <div className="text-center py-12">
-          <AlertCircle className="size-10 text-danger mx-auto mb-4" />
-          <h1 className="font-syne font-bold text-2xl mb-2">Enlace no válido</h1>
-          <p className="text-muted-text">Esta reclamación no existe o el enlace ha caducado.</p>
+          <AlertCircle className="size-10 text-destructive mx-auto mb-4" />
+          <h1 className="text-2xl font-semibold mb-2">Enlace no válido</h1>
+          <p className="text-muted-foreground">Esta reclamación no existe o el enlace ha caducado.</p>
         </div>
       </Shell>
     );
@@ -104,8 +107,8 @@ function PublicRecPage() {
           <div className="size-14 bg-success/15 border border-success/30 rounded-full grid place-items-center mx-auto mb-4">
             <Check className="size-7 text-success" />
           </div>
-          <h1 className="font-syne font-bold text-2xl mb-2">Respuesta enviada</h1>
-          <p className="text-muted-text">Gracias, hemos recibido tu respuesta.</p>
+          <h1 className="text-2xl font-semibold mb-2">Respuesta enviada</h1>
+          <p className="text-muted-foreground">Gracias, hemos recibido tu respuesta.</p>
         </div>
       </Shell>
     );
@@ -117,10 +120,10 @@ function PublicRecPage() {
       <Shell>
         <RecHeader rec={rec} />
         <div className="mt-6 p-5 bg-success/10 border border-success/30 rounded-lg">
-          <div className="font-mono text-[10px] tracking-widest uppercase text-success mb-2">
+          <div className="text-[11px] uppercase tracking-wide text-success mb-2">
             Ya respondida{rec.nombre_driver_resp ? ` por ${rec.nombre_driver_resp}` : ""}
           </div>
-          <p className="text-sm text-ink whitespace-pre-wrap">{rec.respuesta_driver}</p>
+          <p className="text-sm text-foreground whitespace-pre-wrap">{rec.respuesta_driver}</p>
         </div>
       </Shell>
     );
@@ -143,10 +146,10 @@ function PublicRecPage() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-background text-foreground font-syne">
+    <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-xl mx-auto px-6 py-10">
         <div className="mb-8">
-          <div className="font-mono text-[10px] tracking-[0.25em] text-muted-text uppercase">
+          <div className="text-[11px] tracking-wide text-muted-foreground uppercase">
             Menssajero · Reclamación
           </div>
         </div>
@@ -158,9 +161,9 @@ function Shell({ children }: { children: React.ReactNode }) {
 
 function RecHeader({ rec }: { rec: Rec }) {
   return (
-    <div className="bg-surface border border-hairline rounded-lg p-5">
-      <div className="font-mono text-xs text-electric mb-2">{rec.ref}</div>
-      <h1 className="font-syne font-bold text-xl mb-4">{rec.tipo}</h1>
+    <div className="bg-card border rounded-lg p-5">
+      <div className="text-xs text-electric mb-2">{rec.ref}</div>
+      <h1 className="text-xl font-semibold mb-4">{rec.tipo}</h1>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
         <Item k="Waybill" v={rec.waybill} />
         <Item k="LP No." v={rec.lp_no} />
@@ -169,11 +172,11 @@ function RecHeader({ rec }: { rec: Rec }) {
         <Item k="Importe" v={rec.importe ? `${Number(rec.importe).toFixed(2)} €` : null} />
       </dl>
       {rec.comentarios && (
-        <div className="mt-4 pt-4 border-t border-hairline">
-          <div className="font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1">
+        <div className="mt-4 pt-4 border-t">
+          <div className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
             Comentarios del responsable
           </div>
-          <p className="text-sm text-ink/80 whitespace-pre-wrap">{rec.comentarios}</p>
+          <p className="text-sm text-foreground/80 whitespace-pre-wrap">{rec.comentarios}</p>
         </div>
       )}
     </div>
@@ -183,8 +186,8 @@ function RecHeader({ rec }: { rec: Rec }) {
 function Item({ k, v }: { k: string; v: string | null | undefined }) {
   return (
     <div>
-      <dt className="font-mono text-[9px] tracking-widest uppercase text-muted-text">{k}</dt>
-      <dd className="text-ink">{v ?? "—"}</dd>
+      <dt className="text-[10px] uppercase tracking-wide text-muted-foreground">{k}</dt>
+      <dd className="text-foreground">{v ?? "—"}</dd>
     </div>
   );
 }
@@ -239,17 +242,17 @@ function RespondForm({
   };
 
   return (
-    <form onSubmit={submit} className="mt-6 bg-surface border border-hairline rounded-lg p-5 space-y-4">
-      <h2 className="font-syne font-bold text-lg">Tu respuesta</h2>
+    <form onSubmit={submit} className="mt-6 bg-card border rounded-lg p-5 space-y-4">
+      <h2 className="text-lg font-semibold">Tu respuesta</h2>
 
       <label className="block">
-        <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">
+        <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
           ¿Qué ocurrió?
         </span>
         <select
           value={tipo}
           onChange={(e) => setTipo(e.target.value as (typeof TIPOS)[number])}
-          className="w-full px-3 py-2.5 bg-background border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
+          className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-background border rounded-md text-foreground"
         >
           {TIPOS.map((t) => (
             <option key={t} value={t}>
@@ -260,60 +263,54 @@ function RespondForm({
       </label>
 
       <label className="block">
-        <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">
+        <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
           Descripción detallada (mín. 20 caracteres)
         </span>
-        <textarea
+        <Textarea
           value={descripcion}
           onChange={(e) => setDescripcion(e.target.value)}
           rows={5}
           required
           minLength={20}
-          className="w-full px-3 py-2.5 bg-background border border-hairline rounded-md text-sm focus:outline-none focus:border-electric resize-y"
         />
-        <span className="block font-mono text-[10px] text-muted-text mt-1">
+        <span className="block text-[11px] text-muted-foreground mt-1">
           {descripcion.length}/20
         </span>
       </label>
 
       <label className="block">
-        <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">
+        <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
           Tu nombre
         </span>
-        <input
+        <Input
           value={nombre}
           onChange={(e) => setNombre(e.target.value)}
           required
-          className="w-full px-3 py-2.5 bg-background border border-hairline rounded-md text-sm focus:outline-none focus:border-electric"
         />
       </label>
 
       <label className="block">
-        <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">
+        <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
           Foto (opcional)
         </span>
         <input
           type="file"
           accept="image/*"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-muted-text file:mr-3 file:py-2 file:px-3 file:border-0 file:bg-ink file:text-white file:text-xs file:font-syne file:rounded file:cursor-pointer"
+          className="block w-full text-sm text-muted-foreground file:mr-3 file:py-2 file:px-3 file:border-0 file:bg-ink file:text-white file:text-xs file:rounded file:cursor-pointer"
         />
       </label>
 
       {error && (
-        <div className="px-3 py-2 bg-danger/10 border border-danger/30 text-danger text-sm rounded">
+        <div className="px-3 py-2 bg-destructive/10 border border-destructive/30 text-destructive text-sm rounded">
           {error}
         </div>
       )}
 
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full inline-flex items-center justify-center gap-2 py-3 bg-ink text-white font-syne font-semibold text-sm rounded-md hover:bg-ink/90 disabled:opacity-50"
-      >
+      <Button type="submit" disabled={submitting} className="w-full bg-ink hover:bg-ink/90">
         {submitting && <Loader2 className="size-4 animate-spin" />}
         {submitting ? "Enviando…" : "Enviar respuesta"}
-      </button>
+      </Button>
     </form>
   );
 }
