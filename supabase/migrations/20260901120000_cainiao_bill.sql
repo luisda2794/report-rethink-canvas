@@ -54,27 +54,17 @@ USING (
 );
 
 -- Escritura (subir/borrar el archivo): admin/manager con acceso al hub. No
--- jefe_contable — su rol acá es de revisión, no de carga. jefe_flota tampoco
--- (ni siquiera tiene esta ruta en el nav — ver ROUTE_ACCESS en roles.ts) —
--- se excluye explícitamente por RLS igual que ya se hizo para
--- driver_tarifas/situaciones_especiales, para que el gateo no dependa solo
--- de que la UI no le muestre el botón.
+-- jefe_contable — su rol acá es de revisión, no de carga.
 CREATE POLICY "cainiao_bill_uploads_insert" ON public.cainiao_bill_uploads FOR INSERT TO authenticated
 WITH CHECK (
   is_admin(auth.uid())
-  OR (
-    get_user_role(auth.uid()) <> 'jefe_flota'
-    AND EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_uploads.hub_id)
-  )
+  OR EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_uploads.hub_id)
 );
 
 CREATE POLICY "cainiao_bill_uploads_delete" ON public.cainiao_bill_uploads FOR DELETE TO authenticated
 USING (
   is_admin(auth.uid())
-  OR (
-    get_user_role(auth.uid()) <> 'jefe_flota'
-    AND EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_uploads.hub_id)
-  )
+  OR EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_uploads.hub_id)
 );
 
 CREATE POLICY "cainiao_bill_lineas_read" ON public.cainiao_bill_lineas FOR SELECT TO authenticated
@@ -87,19 +77,13 @@ USING (
 CREATE POLICY "cainiao_bill_lineas_insert" ON public.cainiao_bill_lineas FOR INSERT TO authenticated
 WITH CHECK (
   is_admin(auth.uid())
-  OR (
-    get_user_role(auth.uid()) <> 'jefe_flota'
-    AND EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_lineas.hub_id)
-  )
+  OR EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_lineas.hub_id)
 );
 
 CREATE POLICY "cainiao_bill_lineas_delete" ON public.cainiao_bill_lineas FOR DELETE TO authenticated
 USING (
   is_admin(auth.uid())
-  OR (
-    get_user_role(auth.uid()) <> 'jefe_flota'
-    AND EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_lineas.hub_id)
-  )
+  OR EXISTS (SELECT 1 FROM usuario_hubs WHERE user_id = auth.uid() AND hub_id = cainiao_bill_lineas.hub_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_cainiao_bill_lineas_upload ON public.cainiao_bill_lineas(upload_id);
