@@ -29,6 +29,11 @@ export type NavItem = { to: string; label: string };
 // uno por etapa (manager ve su etapa, jefe_contable la suya, admin ambas +
 // aplica el cambio final). Ver solicitudes_tarifa.
 //
+// "/cainiao-pagos" es nueva: reconciliación de pagos Cainiao (sube el bill
+// quincenal, cruza contra entregas, compara contra lo pagado a drivers).
+// Solo admin/manager/jefe_contable — es un módulo financiero/de auditoría,
+// no operativo del día a día.
+//
 // "/paquetes-en-riesgo" y "/flow-meeting" eran pestañas dentro de "/reportes"
 // (KPIs) y se movieron a rutas propias en el nav, al mismo nivel que el
 // resto — mismo acceso que ya tenía /reportes (admin/manager/jefe_flota),
@@ -44,6 +49,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
   { to: "/aprobaciones", label: "Aprobaciones" },
+  { to: "/cainiao-pagos", label: "Pagos Cainiao" },
   { to: "/admin", label: "Admin" },
 ];
 
@@ -62,6 +68,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/drivers",
     "/borradores",
     "/aprobaciones",
+    "/cainiao-pagos",
     "/admin",
   ],
   manager: [
@@ -78,6 +85,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/drivers",
     "/borradores",
     "/aprobaciones",
+    "/cainiao-pagos",
   ],
   jefe_flota: [
     "/epod",
@@ -93,7 +101,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/borradores",
   ],
   contable: [],
-  jefe_contable: ["/aprobaciones"],
+  jefe_contable: ["/aprobaciones", "/cainiao-pagos"],
   customer: ["/reclamaciones"],
 };
 

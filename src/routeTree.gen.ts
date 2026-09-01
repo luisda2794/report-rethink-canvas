@@ -23,6 +23,7 @@ import { Route as DuplicadosRouteImport } from './routes/duplicados'
 import { Route as DriversRouteImport } from './routes/drivers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as Cd5RouteImport } from './routes/cd5'
+import { Route as CainiaoPagosRouteImport } from './routes/cainiao-pagos'
 import { Route as BorradoresRouteImport } from './routes/borradores'
 import { Route as AprobacionesRouteImport } from './routes/aprobaciones'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -105,6 +106,11 @@ const Cd5Route = Cd5RouteImport.update({
   path: '/cd5',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CainiaoPagosRoute = CainiaoPagosRouteImport.update({
+  id: '/cainiao-pagos',
+  path: '/cainiao-pagos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BorradoresRoute = BorradoresRouteImport.update({
   id: '/borradores',
   path: '/borradores',
@@ -168,6 +174,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/aprobaciones': typeof AprobacionesRoute
   '/borradores': typeof BorradoresRoute
+  '/cainiao-pagos': typeof CainiaoPagosRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
@@ -195,6 +202,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/aprobaciones': typeof AprobacionesRoute
   '/borradores': typeof BorradoresRoute
+  '/cainiao-pagos': typeof CainiaoPagosRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/aprobaciones': typeof AprobacionesRoute
   '/borradores': typeof BorradoresRoute
+  '/cainiao-pagos': typeof CainiaoPagosRoute
   '/cd5': typeof Cd5Route
   '/dashboard': typeof DashboardRoute
   '/drivers': typeof DriversRoute
@@ -252,6 +261,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/aprobaciones'
     | '/borradores'
+    | '/cainiao-pagos'
     | '/cd5'
     | '/dashboard'
     | '/drivers'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/aprobaciones'
     | '/borradores'
+    | '/cainiao-pagos'
     | '/cd5'
     | '/dashboard'
     | '/drivers'
@@ -306,6 +317,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/aprobaciones'
     | '/borradores'
+    | '/cainiao-pagos'
     | '/cd5'
     | '/dashboard'
     | '/drivers'
@@ -334,6 +346,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AprobacionesRoute: typeof AprobacionesRoute
   BorradoresRoute: typeof BorradoresRoute
+  CainiaoPagosRoute: typeof CainiaoPagosRoute
   Cd5Route: typeof Cd5Route
   DashboardRoute: typeof DashboardRoute
   DriversRoute: typeof DriversRoute
@@ -456,6 +469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Cd5RouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cainiao-pagos': {
+      id: '/cainiao-pagos'
+      path: '/cainiao-pagos'
+      fullPath: '/cainiao-pagos'
+      preLoaderRoute: typeof CainiaoPagosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/borradores': {
       id: '/borradores'
       path: '/borradores'
@@ -555,6 +575,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AprobacionesRoute: AprobacionesRoute,
   BorradoresRoute: BorradoresRoute,
+  CainiaoPagosRoute: CainiaoPagosRoute,
   Cd5Route: Cd5Route,
   DashboardRoute: DashboardRoute,
   DriversRoute: DriversRoute,
