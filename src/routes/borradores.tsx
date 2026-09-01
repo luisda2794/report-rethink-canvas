@@ -23,6 +23,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   ESTADO_LABEL,
   ESTADO_COLOR,
@@ -1013,16 +1015,16 @@ function MisSolicitudesSection({ userId }: { userId: string }) {
     <section className="animate-fade-up">
       <div className="mb-6">
         <h2 className="text-base font-semibold tracking-tight text-foreground">Mis solicitudes</h2>
-        <p className="text-muted-text text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           Cambios de tarifa que enviaste, con la etapa de aprobación en la que están.
         </p>
       </div>
 
       {loading ? (
-        <p className="text-muted-text font-mono text-xs">Cargando…</p>
+        <p className="text-muted-foreground text-xs">Cargando…</p>
       ) : items.length === 0 ? (
         <Card className="shadow-none">
-          <CardContent className="py-6 text-sm text-muted-text">
+          <CardContent className="py-6 text-sm text-muted-foreground">
             Todavía no enviaste ninguna solicitud de cambio de tarifa.
           </CardContent>
         </Card>
@@ -1033,30 +1035,30 @@ function MisSolicitudesSection({ userId }: { userId: string }) {
               <CardContent className="py-4">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div>
-                    <p className="text-sm font-semibold text-ink">
-                      {s.driver_nombre} <span className="text-muted-text font-normal">· CP {s.codigo_postal}</span>
+                    <p className="text-sm font-semibold text-foreground">
+                      {s.driver_nombre} <span className="text-muted-foreground font-normal">· CP {s.codigo_postal}</span>
                     </p>
-                    <p className="text-[11px] text-muted-text mt-1 font-mono">
+                    <p className="text-[11px] text-muted-foreground mt-1">
                       {TIPO_SOLICITUD_LABEL[s.tipo]}
                       {s.fecha ? ` · ${s.fecha}` : ""} · Enviada {new Date(s.solicitado_en).toLocaleString("es-ES")}
                     </p>
-                    <p className="text-xs text-ink mt-2 font-mono">
+                    <p className="text-xs text-foreground mt-2">
                       {(Object.keys(s.valores_propuestos) as (keyof ValoresTarifa)[])
                         .filter((c) => s.valores_propuestos[c] !== null && s.valores_propuestos[c] !== undefined)
                         .map((c) => `${CAMPO_LABEL_SOLICITUD[c]}: ${fmtValor(s.valores_propuestos[c])}`)
                         .join(" · ")}
                     </p>
                   </div>
-                  <span className={`shrink-0 px-2 py-1 rounded border text-[10px] font-mono uppercase tracking-wide ${ESTADO_COLOR[s.estado]}`}>
+                  <span className={`shrink-0 px-2 py-1 rounded border text-[10px] uppercase tracking-wide ${ESTADO_COLOR[s.estado]}`}>
                     {ESTADO_LABEL[s.estado]}
                   </span>
                 </div>
                 {s.estado === "rechazado" && (
-                  <div className="mt-3 px-3 py-2 rounded border-l-2 border-danger bg-danger/10 text-xs">
-                    <p className="text-danger font-medium">
+                  <div className="mt-3 px-3 py-2 rounded border-l-2 border-destructive bg-destructive/10 text-xs">
+                    <p className="text-destructive font-medium">
                       Rechazado por {s.rechazado_nombre} (etapa {s.rechazado_en_etapa})
                     </p>
-                    {s.motivo_rechazo && <p className="text-ink mt-1">{s.motivo_rechazo}</p>}
+                    {s.motivo_rechazo && <p className="text-foreground mt-1">{s.motivo_rechazo}</p>}
                   </div>
                 )}
               </CardContent>
@@ -1295,7 +1297,7 @@ function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hub
     <section className="animate-fade-up space-y-6">
       <div>
         <h2 className="text-base font-semibold tracking-tight text-foreground">Situaciones especiales</h2>
-        <p className="text-muted-text text-sm mt-1">
+        <p className="text-muted-foreground text-sm mt-1">
           Tarifa puntual para un driver en una fecha y CP concretos — sobreescribe la tarifa normal solo ese día.
           {esJefeFlota && " Los cambios se envían como solicitud de aprobación."}
         </p>
@@ -1314,7 +1316,7 @@ function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hub
                 value={formDriverId}
                 onChange={(e) => setFormDriverId(e.target.value)}
                 disabled={drivers.length === 0 || !!editingId}
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
+                className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground disabled:opacity-60"
               >
                 {drivers.length === 0 && <option value="">Sin drivers</option>}
                 {drivers.map((d) => (
@@ -1323,57 +1325,36 @@ function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hub
               </select>
             </FieldSE>
             <FieldSE label="Fecha">
-              <input
-                type="date"
-                value={formFecha}
-                onChange={(e) => setFormFecha(e.target.value)}
-                disabled={!!editingId}
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
-              />
+              <Input type="date" value={formFecha} onChange={(e) => setFormFecha(e.target.value)} disabled={!!editingId} />
             </FieldSE>
             <FieldSE label="Código postal">
-              <input
-                value={formCp}
-                onChange={(e) => setFormCp(e.target.value)}
-                disabled={!!editingId}
-                placeholder="28001"
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono disabled:opacity-60"
-              />
+              <Input value={formCp} onChange={(e) => setFormCp(e.target.value)} disabled={!!editingId} placeholder="28001" />
             </FieldSE>
             <FieldSE label="Tarifa TO_DOOR (€) · opcional">
-              <input type="number" step="0.0001" value={formToDoor} onChange={(e) => setFormToDoor(e.target.value)} placeholder="Normal del driver"
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+              <Input type="number" step="0.0001" value={formToDoor} onChange={(e) => setFormToDoor(e.target.value)} placeholder="Normal del driver" />
             </FieldSE>
             <FieldSE label="Tarifa PUDO 1º (€) · opcional">
-              <input type="number" step="0.0001" value={formPudo1} onChange={(e) => setFormPudo1(e.target.value)} placeholder="Normal del driver"
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+              <Input type="number" step="0.0001" value={formPudo1} onChange={(e) => setFormPudo1(e.target.value)} placeholder="Normal del driver" />
             </FieldSE>
             <FieldSE label="Tarifa PUDO extra (€) · opcional">
-              <input type="number" step="0.0001" value={formPudoExtra} onChange={(e) => setFormPudoExtra(e.target.value)} placeholder="Normal del driver"
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+              <Input type="number" step="0.0001" value={formPudoExtra} onChange={(e) => setFormPudoExtra(e.target.value)} placeholder="Normal del driver" />
             </FieldSE>
             <FieldSE label="Precio de salida (€) · opcional">
-              <input type="number" step="0.01" value={formSalida} onChange={(e) => setFormSalida(e.target.value)} placeholder="Pago fijo extra ese día"
-                className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+              <Input type="number" step="0.01" value={formSalida} onChange={(e) => setFormSalida(e.target.value)} placeholder="Pago fijo extra ese día" />
             </FieldSE>
             <div className="sm:col-span-2 md:col-span-3">
               <FieldSE label="Nota">
-                <input value={formNota} onChange={(e) => setFormNota(e.target.value)} placeholder="Ej. Apoyo a Yenifer, ruta 3680"
-                  className="w-full border border-hairline rounded px-3 py-2 text-sm bg-background font-mono" />
+                <Textarea value={formNota} onChange={(e) => setFormNota(e.target.value)} rows={2} placeholder="Ej. Apoyo a Yenifer, ruta 3680" />
               </FieldSE>
             </div>
           </div>
           <div className="flex items-center justify-end gap-2">
             {editingId && (
-              <Button variant="outline" onClick={resetForm} disabled={saving} className="font-mono text-xs uppercase tracking-widest">
+              <Button variant="outline" onClick={resetForm} disabled={saving}>
                 <X className="size-3.5" /> Cancelar edición
               </Button>
             )}
-            <Button
-              onClick={submit}
-              disabled={saving || !formDriverId}
-              className="bg-ink font-mono text-xs uppercase tracking-widest hover:bg-electric"
-            >
+            <Button onClick={submit} disabled={saving || !formDriverId} className="gap-2 bg-ink hover:bg-ink/90">
               {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
               {esJefeFlota ? "Enviar solicitud" : editingId ? "Guardar cambios" : "Crear situación especial"}
             </Button>
@@ -1389,18 +1370,16 @@ function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hub
               <select
                 value={filterDriverId}
                 onChange={(e) => setFilterDriverId(e.target.value)}
-                className="border border-hairline rounded px-2 py-1.5 text-xs bg-background font-mono"
+                className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-card border rounded-md text-foreground"
               >
                 <option value="todos">Todos los drivers</option>
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>{d.nombre}</option>
                 ))}
               </select>
-              <input type="date" value={filterDesde} onChange={(e) => setFilterDesde(e.target.value)}
-                className="border border-hairline rounded px-2 py-1.5 text-xs bg-background font-mono" />
-              <span className="text-muted-text text-xs">a</span>
-              <input type="date" value={filterHasta} onChange={(e) => setFilterHasta(e.target.value)}
-                className="border border-hairline rounded px-2 py-1.5 text-xs bg-background font-mono" />
+              <Input type="date" value={filterDesde} onChange={(e) => setFilterDesde(e.target.value)} className="w-[150px]" />
+              <span className="text-muted-foreground text-xs">a</span>
+              <Input type="date" value={filterHasta} onChange={(e) => setFilterHasta(e.target.value)} className="w-[150px]" />
             </div>
           </div>
         </CardHeader>
@@ -1408,50 +1387,44 @@ function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hub
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-surface-2 border-b border-hairline font-mono text-[10px] tracking-widest uppercase text-muted-text">
-                  <th className="text-left px-4 py-3">Fecha</th>
-                  <th className="text-left px-4 py-3">Driver</th>
-                  <th className="text-left px-4 py-3">CP</th>
-                  <th className="text-right px-4 py-3">TO_DOOR</th>
-                  <th className="text-right px-4 py-3">PUDO 1º</th>
-                  <th className="text-right px-4 py-3">PUDO extra</th>
-                  <th className="text-right px-4 py-3">Salida</th>
-                  <th className="text-left px-4 py-3">Nota</th>
-                  <th className="px-4 py-3 w-20" />
+                <tr className="bg-muted">
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Fecha</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Driver</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">CP</th>
+                  <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">TO_DOOR</th>
+                  <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">PUDO 1º</th>
+                  <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">PUDO extra</th>
+                  <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Salida</th>
+                  <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Nota</th>
+                  <th className="px-4 py-2.5 w-20" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-text font-mono text-xs">Cargando…</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground text-xs">Cargando…</td></tr>
                 ) : filtered.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-text font-mono text-xs">Sin situaciones especiales para este filtro</td></tr>
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground text-xs">Sin situaciones especiales para este filtro</td></tr>
                 ) : (
                   filtered.map((item) => (
-                    <tr key={item.id} className="border-b border-hairline/50 hover:bg-surface-2/40 transition-colors">
-                      <td className="px-4 py-2.5 font-mono text-xs text-ink whitespace-nowrap">{item.fecha}</td>
-                      <td className="px-4 py-2.5 text-ink">{item.driver_nombre}</td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-ink">{item.codigo_postal}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.tarifa_to_door ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.tarifa_pudo_primero ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.tarifa_pudo_extra ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-right font-mono text-xs text-ink">{item.precio_salida ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-xs text-muted-text max-w-[200px] truncate" title={item.nota ?? ""}>{item.nota ?? "—"}</td>
-                      <td className="px-4 py-2.5">
+                    <tr key={item.id} className="border-t border-border">
+                      <td className="px-4 py-2 text-foreground whitespace-nowrap">{item.fecha}</td>
+                      <td className="px-4 py-2 text-foreground">{item.driver_nombre}</td>
+                      <td className="px-4 py-2 text-foreground">{item.codigo_postal}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-foreground">{item.tarifa_to_door ?? "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-foreground">{item.tarifa_pudo_primero ?? "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-foreground">{item.tarifa_pudo_extra ?? "—"}</td>
+                      <td className="px-4 py-2 text-right tabular-nums text-foreground">{item.precio_salida ?? "—"}</td>
+                      <td className="px-4 py-2 text-muted-foreground max-w-[200px] truncate" title={item.nota ?? ""}>{item.nota ?? "—"}</td>
+                      <td className="px-4 py-2">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            onClick={() => startEdit(item)}
-                            className="text-muted-text hover:text-electric hover:bg-electric/10"
-                            aria-label="Editar"
-                          >
+                          <Button variant="ghost" size="icon-sm" onClick={() => startEdit(item)} aria-label="Editar">
                             <Pencil className="size-3.5" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon-sm"
                             onClick={() => void remove(item)}
-                            className="text-muted-text hover:text-danger hover:bg-danger/10"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                             aria-label="Eliminar"
                           >
                             <Trash2 className="size-3.5" />
@@ -1473,7 +1446,7 @@ function SituacionesEspecialesSection({ hubId, hubNombre }: { hubId: string; hub
 function FieldSE({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block font-mono text-[10px] tracking-widest uppercase text-muted-text mb-1.5">{label}</span>
+      <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">{label}</span>
       {children}
     </label>
   );
