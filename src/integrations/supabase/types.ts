@@ -111,6 +111,122 @@ export type Database = {
           },
         ]
       }
+      cainiao_bill_lineas: {
+        Row: {
+          aamodel_code: string | null
+          aamodel_first_order: string | null
+          bill_amount: number
+          bill_item: string
+          bill_item_es: string
+          billing_time: string | null
+          business_node_time: string | null
+          charging_currency: string | null
+          codigo_postal: string | null
+          hub_id: string
+          id: number
+          lp_no: string | null
+          lp_no_raw: string | null
+          raw: Json
+          upload_id: string
+          weight_g: number | null
+        }
+        Insert: {
+          aamodel_code?: string | null
+          aamodel_first_order?: string | null
+          bill_amount: number
+          bill_item: string
+          bill_item_es: string
+          billing_time?: string | null
+          business_node_time?: string | null
+          charging_currency?: string | null
+          codigo_postal?: string | null
+          hub_id: string
+          id?: number
+          lp_no?: string | null
+          lp_no_raw?: string | null
+          raw: Json
+          upload_id: string
+          weight_g?: number | null
+        }
+        Update: {
+          aamodel_code?: string | null
+          aamodel_first_order?: string | null
+          bill_amount?: number
+          bill_item?: string
+          bill_item_es?: string
+          billing_time?: string | null
+          business_node_time?: string | null
+          charging_currency?: string | null
+          codigo_postal?: string | null
+          hub_id?: string
+          id?: number
+          lp_no?: string | null
+          lp_no_raw?: string | null
+          raw?: Json
+          upload_id?: string
+          weight_g?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cainiao_bill_lineas_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cainiao_bill_lineas_upload_id_fkey"
+            columns: ["upload_id"]
+            isOneToOne: false
+            referencedRelation: "cainiao_bill_uploads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cainiao_bill_uploads: {
+        Row: {
+          filename: string
+          hub_id: string
+          id: string
+          periodo_desde: string | null
+          periodo_hasta: string | null
+          total_filas: number | null
+          total_importe: number | null
+          uploaded_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          filename: string
+          hub_id: string
+          id?: string
+          periodo_desde?: string | null
+          periodo_hasta?: string | null
+          total_filas?: number | null
+          total_importe?: number | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          filename?: string
+          hub_id?: string
+          id?: string
+          periodo_desde?: string | null
+          periodo_hasta?: string | null
+          total_filas?: number | null
+          total_importe?: number | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cainiao_bill_uploads_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cd5_snapshots: {
         Row: {
           count: number
