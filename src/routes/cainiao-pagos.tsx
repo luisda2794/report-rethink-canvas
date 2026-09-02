@@ -3,8 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import Papa from "papaparse";
 import XLSXStyle from "xlsx-js-style";
+import { Document, Packer, Paragraph, ImageRun, HeadingLevel } from "docx";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, X, Loader2, AlertCircle, Trash2, Download } from "lucide-react";
+import { Upload, FileSpreadsheet, X, Loader2, AlertCircle, Trash2, Download, FileText } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { StatusIndicator } from "@/components/indicator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { MOTIVOS_APELACION } from "@/lib/motivos-apelacion";
 
 export const Route = createFileRoute("/cainiao-pagos")({
   component: () => (
@@ -365,6 +368,7 @@ function CainiaoPagosPage() {
                 <TabsTrigger value="subida">Subir archivo</TabsTrigger>
                 <TabsTrigger value="matching">Matching</TabsTrigger>
                 <TabsTrigger value="compensaciones">Compensaciones</TabsTrigger>
+                <TabsTrigger value="apelaciones">Apelaciones</TabsTrigger>
               </TabsList>
 
               <TabsContent value="subida" className="space-y-10">
@@ -524,6 +528,10 @@ function CainiaoPagosPage() {
 
               <TabsContent value="compensaciones">
                 <CompensacionesSection hubId={selectedHub.id} />
+              </TabsContent>
+
+              <TabsContent value="apelaciones">
+                <ApelacionesSection hubId={selectedHub.id} />
               </TabsContent>
             </Tabs>
           )}
@@ -1144,6 +1152,400 @@ function CompensacionesSection({ hubId }: { hubId: string }) {
               </div>
             </CardContent>
           </Card>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ============================================================
+// APELACIONES A CAINIAO — cruza penalizaciones con reclamaciones marcadas
+// como apelables, y genera el Excel + Word en el formato exacto que exige
+// Cainiao.
+// ============================================================
+
+type ApelacionRow = {
+  lp_no: string;
+  waybill: string | null;
+  bill_amount: number; // crudo, negativo — se muestra en valor absoluto al exportar
+  billing_time: string | null;
+  motivo_apelacion: string;
+  respuesta_driver: string | null;
+  evidencia_driver: string | null;
+};
+
+function nombreJustificante(r: ApelacionRow): string {
+  return `Adjunto ${r.waybill ?? r.lp_no} (${r.motivo_apelacion})`;
+}
+
+async function fetchApelaciones(hubId: string, uploadId: string): Promise<ApelacionRow[]> {
+  const penalizaciones = await fetchCompensacionesCainiao(uploadId);
+  const { data: reclamacionesData, error } = await supabase
+    .from("reclamaciones")
+    .select("lp_no, waybill, motivo_apelacion, respuesta_driver, evidencia_driver")
+    .eq("hub_id", hubId)
+    .eq("aplica_apelacion", true);
+  if (error) throw error;
+
+  type RecInfo = { waybill: string | null; motivo_apelacion: string | null; respuesta_driver: string | null; evidencia_driver: string | null };
+  const byLp = new Map<string, RecInfo>();
+  const byWaybill = new Map<string, RecInfo>();
+  for (const r of reclamacionesData ?? []) {
+    const info: RecInfo = { waybill: r.waybill, motivo_apelacion: r.motivo_apelacion, respuesta_driver: r.respuesta_driver, evidencia_driver: r.evidencia_driver };
+    if (r.lp_no) byLp.set(r.lp_no, info);
+    if (r.waybill) byWaybill.set(r.waybill, info);
+  }
+
+  const out: ApelacionRow[] = [];
+  for (const p of penalizaciones) {
+    const rec = byLp.get(p.lp_no) ?? byWaybill.get(p.lp_no);
+    if (!rec || !rec.motivo_apelacion) continue; // no está marcada como apelable, o falta elegir el motivo
+    out.push({
+      lp_no: p.lp_no,
+      waybill: rec.waybill,
+      bill_amount: p.bill_amount,
+      billing_time: p.billing_time,
+      motivo_apelacion: rec.motivo_apelacion,
+      respuesta_driver: rec.respuesta_driver,
+      evidencia_driver: rec.evidencia_driver,
+    });
+  }
+  return out;
+}
+
+// Excel en el formato EXACTO que exige Cainiao — 2 hojas: "Modelo principio"
+// con las 9 columnas en el orden pedido, y "Motivo (Borrado no permitido)"
+// con la lista fija de 12 motivos como referencia (sin desplegable nativo —
+// decisión explícita: el dato ya viene validado desde el <select> de
+// Reclamaciones, no hace falta arriesgar corromper el archivo inyectando
+// XML de data validation a mano sin poder probarlo en Excel real).
+function exportApelacionesXlsx(rows: ApelacionRow[], hubMarca: string, periodo: string) {
+  const headers = [
+    "Número de LP",
+    "Número de seguimiento",
+    "Fecha de la factura",
+    "Importe de la deducción",
+    "Confirmación la penalización",
+    "Motivos de la reclamación",
+    "Observacion de DSP",
+    "Hay Justificante",
+    "Nombre de Justificante",
+  ];
+  const aoa: (string | number | Date)[][] = [headers];
+  for (const r of rows) {
+    aoa.push([
+      r.lp_no,
+      r.waybill ?? "",
+      r.billing_time ? new Date(r.billing_time) : "",
+      Number(Math.abs(r.bill_amount).toFixed(2)),
+      "N",
+      r.motivo_apelacion,
+      r.respuesta_driver ?? "",
+      r.evidencia_driver ? "Y" : "N",
+      nombreJustificante(r),
+    ]);
+  }
+  const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
+  // Columna C ("Fecha de la factura"): SheetJS ya detecta el objeto Date y
+  // la guarda como fecha real de Excel — solo le damos formato de despliegue.
+  for (let i = 1; i < aoa.length; i++) {
+    const cell = ws[XLSXStyle.utils.encode_cell({ r: i, c: 2 })];
+    if (cell && cell.t === "d") cell.z = "dd/mm/yyyy";
+  }
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    fill: { patternType: "solid", fgColor: { rgb: "111111" } },
+  };
+  const range = XLSXStyle.utils.decode_range(ws["!ref"] as string);
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSXStyle.utils.encode_cell({ r: 0, c })];
+    if (cell) cell.s = headerStyle;
+  }
+  ws["!cols"] = [
+    { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 20 },
+    { wch: 45 }, { wch: 40 }, { wch: 12 }, { wch: 45 },
+  ];
+
+  const wsMotivo = XLSXStyle.utils.aoa_to_sheet(MOTIVOS_APELACION.map((m) => [m]));
+  wsMotivo["!cols"] = [{ wch: 90 }];
+
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, ws, "Modelo principio");
+  XLSXStyle.utils.book_append_sheet(wb, wsMotivo, "Motivo (Borrado no permitido)");
+  const buf = XLSXStyle.write(wb, { type: "array", bookType: "xlsx", cellDates: true }) as ArrayBuffer;
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Apelacion_Cainiao_${hubMarca.replace(/[^a-z0-9]+/gi, "_")}_${periodo}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function imageTypeFromContentType(ct: string | null): "jpg" | "png" | "gif" | "bmp" {
+  if (ct && ct.includes("jpeg")) return "jpg";
+  if (ct && ct.includes("gif")) return "gif";
+  if (ct && ct.includes("bmp")) return "bmp";
+  return "png";
+}
+
+function loadImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new window.Image();
+    img.onload = () => {
+      resolve({ width: img.naturalWidth || 400, height: img.naturalHeight || 300 });
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("No se pudo leer la imagen"));
+    };
+    img.src = url;
+  });
+}
+
+const WORD_MAX_IMG_WIDTH = 480;
+
+async function exportApelacionesWord(rows: ApelacionRow[], hubMarca: string, periodo: string) {
+  const children: Paragraph[] = [];
+  for (const r of rows) {
+    children.push(
+      new Paragraph({
+        text: nombreJustificante(r),
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 300, after: 150 },
+      }),
+    );
+    if (!r.evidencia_driver) {
+      children.push(new Paragraph({ text: "(sin evidencia adjunta)" }));
+      continue;
+    }
+    try {
+      const resp = await fetch(r.evidencia_driver);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const contentType = resp.headers.get("content-type");
+      const blob = await resp.blob();
+      const buf = await blob.arrayBuffer();
+      const { width, height } = await loadImageDimensions(blob);
+      const scale = width > WORD_MAX_IMG_WIDTH ? WORD_MAX_IMG_WIDTH / width : 1;
+      children.push(
+        new Paragraph({
+          children: [
+            new ImageRun({
+              data: buf,
+              type: imageTypeFromContentType(contentType),
+              transformation: { width: Math.round(width * scale), height: Math.round(height * scale) },
+            }),
+          ],
+        }),
+      );
+    } catch (e) {
+      console.error(`[Apelaciones] No se pudo cargar la evidencia de ${r.lp_no}:`, e);
+      children.push(new Paragraph({ text: "(no se pudo cargar la evidencia — revisa el link manualmente)" }));
+    }
+  }
+  const doc = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Adjuntos_Apelacion_Cainiao_${hubMarca.replace(/[^a-z0-9]+/gi, "_")}_${periodo}.docx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function ApelacionesSection({ hubId }: { hubId: string }) {
+  const { selectedHub } = useAuth();
+  const [uploads, setUploads] = useState<UploadOption[]>([]);
+  const [selectedUploadId, setSelectedUploadId] = useState<string>("");
+  const [loadingUploads, setLoadingUploads] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<ApelacionRow[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [ranOnce, setRanOnce] = useState(false);
+  const [generatingXlsx, setGeneratingXlsx] = useState(false);
+  const [generatingDocx, setGeneratingDocx] = useState(false);
+
+  useEffect(() => {
+    const loadUploads = async () => {
+      setLoadingUploads(true);
+      const { data, error } = await supabase
+        .from("cainiao_bill_uploads")
+        .select("id, filename, periodo_desde, periodo_hasta")
+        .eq("hub_id", hubId)
+        .order("uploaded_at", { ascending: false });
+      if (error) toast.error(error.message);
+      const list = (data ?? []) as UploadOption[];
+      setUploads(list);
+      setSelectedUploadId((prev) => (list.some((u) => u.id === prev) ? prev : list[0]?.id ?? ""));
+      setLoadingUploads(false);
+    };
+    void loadUploads();
+  }, [hubId]);
+
+  const run = async () => {
+    if (!selectedUploadId) return;
+    setLoading(true);
+    setRanOnce(true);
+    try {
+      const out = await fetchApelaciones(hubId, selectedUploadId);
+      out.sort((a, b) => a.lp_no.localeCompare(b.lp_no));
+      setRows(out);
+      setSelected(new Set(out.map((r) => r.lp_no)));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error cargando apelaciones");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleRow = (lp: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(lp)) next.delete(lp);
+      else next.add(lp);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.lp_no))));
+  };
+
+  const selectedRows = rows.filter((r) => selected.has(r.lp_no));
+  const selectedUpload = uploads.find((u) => u.id === selectedUploadId);
+  const periodoLabel = selectedUpload ? `${selectedUpload.periodo_desde}_${selectedUpload.periodo_hasta}` : "periodo";
+
+  const generarXlsx = () => {
+    if (!selectedHub || selectedRows.length === 0) return;
+    setGeneratingXlsx(true);
+    try {
+      exportApelacionesXlsx(selectedRows, selectedHub.marca, periodoLabel);
+    } finally {
+      setGeneratingXlsx(false);
+    }
+  };
+
+  const generarDocx = async () => {
+    if (!selectedHub || selectedRows.length === 0) return;
+    setGeneratingDocx(true);
+    try {
+      await exportApelacionesWord(selectedRows, selectedHub.marca, periodoLabel);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error generando el Word");
+    } finally {
+      setGeneratingDocx(false);
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+            Subida a revisar
+          </span>
+          <select
+            value={selectedUploadId}
+            onChange={(e) => setSelectedUploadId(e.target.value)}
+            disabled={loadingUploads || uploads.length === 0}
+            className="appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground min-w-[320px]"
+          >
+            {uploads.length === 0 && <option value="">Sin subidas para este hub</option>}
+            {uploads.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.filename} ({u.periodo_desde ?? "—"} → {u.periodo_hasta ?? "—"})
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button onClick={() => void run()} disabled={loading || !selectedUploadId} className="gap-2">
+          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+          {loading ? "Cruzando…" : "Cruzar penalizaciones con apelables"}
+        </Button>
+      </div>
+
+      {ranOnce && !loading && (
+        <>
+          {rows.length === 0 ? (
+            <Card className="shadow-none">
+              <CardContent className="py-6 text-sm text-muted-foreground">
+                Ninguna penalización de esta subida tiene una reclamación marcada "Sí aplica" con motivo elegido.
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={generarXlsx}
+                  disabled={generatingXlsx || selectedRows.length === 0}
+                  className="gap-2"
+                >
+                  <Download className="size-3.5" /> Generar informe de apelación ({selectedRows.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void generarDocx()}
+                  disabled={generatingDocx || selectedRows.length === 0}
+                  className="gap-2"
+                >
+                  {generatingDocx ? <Loader2 className="size-3.5 animate-spin" /> : <FileText className="size-3.5" />}
+                  {generatingDocx ? "Generando…" : `Generar Word de adjuntos (${selectedRows.length})`}
+                </Button>
+              </div>
+
+              <Card className="shadow-none overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto max-h-[560px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted">
+                          <th className="px-4 py-2.5 w-10">
+                            <Checkbox checked={selected.size === rows.length} onCheckedChange={toggleAll} aria-label="Seleccionar todas" />
+                          </th>
+                          <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">LP No.</th>
+                          <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Waybill</th>
+                          <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Importe</th>
+                          <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Motivo</th>
+                          <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Evidencia</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.lp_no} className="border-t border-border">
+                            <td className="px-4 py-2">
+                              <Checkbox checked={selected.has(r.lp_no)} onCheckedChange={() => toggleRow(r.lp_no)} aria-label={`Seleccionar ${r.lp_no}`} />
+                            </td>
+                            <td className="px-4 py-2 text-foreground whitespace-nowrap">{r.lp_no}</td>
+                            <td className="px-4 py-2 text-foreground whitespace-nowrap">{r.waybill ?? "—"}</td>
+                            <td className="px-4 py-2 text-right tabular-nums text-foreground">{Math.abs(r.bill_amount).toFixed(2)} €</td>
+                            <td className="px-4 py-2 text-foreground max-w-[320px] truncate" title={r.motivo_apelacion}>{r.motivo_apelacion}</td>
+                            <td className="px-4 py-2">
+                              {r.evidencia_driver ? (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-success">
+                                  <StatusIndicator color="emerald" pulse={false} /> Sí
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                                  <StatusIndicator color="amber" pulse={false} /> No
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </>
       )}
     </section>

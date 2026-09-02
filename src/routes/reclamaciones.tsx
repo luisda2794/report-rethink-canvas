@@ -24,6 +24,7 @@ import { StatusIndicator } from "@/components/indicator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input as InputPrimitive } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MOTIVOS_APELACION } from "@/lib/motivos-apelacion";
 
 export const Route = createFileRoute("/reclamaciones")({
   component: () => (
@@ -65,6 +66,8 @@ type Reclamacion = {
   nota_cierre: string | null;
   fecha_cierre: string | null;
   created_at: string;
+  aplica_apelacion: boolean | null;
+  motivo_apelacion: string | null;
 };
 
 type DriverOption = {
@@ -278,6 +281,25 @@ function ReclamacionesPage() {
     const { error } = await supabase.from("reclamaciones").update({ estado, ...extra }).eq("id", id);
     if (error) toast.error(error.message);
     else toast.success("Estado actualizado");
+  };
+
+  // Se define después de que el driver responde (respondida_driver en
+  // adelante) — quien gestiona el caso marca si aplica apelar la
+  // penalización a Cainiao y, si aplica, con qué motivo exacto.
+  const updateApelacion = async (id: string, aplica: boolean | null, motivo: string | null) => {
+    const { data, error } = await supabase
+      .from("reclamaciones")
+      .update({ aplica_apelacion: aplica, motivo_apelacion: aplica ? motivo : null })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setRows((prev) => prev.map((r) => (r.id === id ? (data as Reclamacion) : r)));
+    setSelected((s) => (s && s.id === id ? (data as Reclamacion) : s));
+    toast.success("Apelación actualizada");
   };
 
   const enviarADriver = async (r: Reclamacion) => {
@@ -524,6 +546,7 @@ function ReclamacionesPage() {
             setSelected(null);
           }}
           onDelete={() => void eliminar(selected)}
+          onUpdateApelacion={(aplica, motivo) => void updateApelacion(selected.id, aplica, motivo)}
         />
       )}
 
@@ -633,6 +656,7 @@ function DetailPanel({
   onCerrar,
   onEdit,
   onDelete,
+  onUpdateApelacion,
 }: {
   row: Reclamacion;
   nowMs: number;
@@ -642,6 +666,7 @@ function DetailPanel({
   onCerrar: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onUpdateApelacion: (aplica: boolean | null, motivo: string | null) => void;
 }) {
   const publicUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/rec/${row.token}`;
   return (
@@ -708,6 +733,41 @@ function DetailPanel({
           {row.nota_cierre && (
             <Section title={`Nota de cierre${row.fecha_cierre ? ` · ${new Date(row.fecha_cierre).toLocaleString("es-ES")}` : ""}`}>
               <p className="text-sm text-foreground/80 whitespace-pre-wrap">{row.nota_cierre}</p>
+            </Section>
+          )}
+
+          {(row.estado === "respondida_driver" || row.estado === "cerrada") && (
+            <Section title="Apelación a Cainiao">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={row.aplica_apelacion === true ? "default" : "outline"}
+                    onClick={() => onUpdateApelacion(true, row.motivo_apelacion)}
+                  >
+                    Sí aplica
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={row.aplica_apelacion === false ? "default" : "outline"}
+                    onClick={() => onUpdateApelacion(false, null)}
+                  >
+                    No aplica
+                  </Button>
+                </div>
+                {row.aplica_apelacion && (
+                  <select
+                    value={row.motivo_apelacion ?? ""}
+                    onChange={(e) => onUpdateApelacion(true, e.target.value || null)}
+                    className="w-full appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground"
+                  >
+                    <option value="">— Elegí un motivo —</option>
+                    {MOTIVOS_APELACION.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </Section>
           )}
 
