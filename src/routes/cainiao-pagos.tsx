@@ -2,14 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
 import Papa from "papaparse";
+import XLSXStyle from "xlsx-js-style";
 import { toast } from "sonner";
-import { Upload, FileSpreadsheet, X, Loader2, AlertCircle, Trash2 } from "lucide-react";
+import { Upload, FileSpreadsheet, X, Loader2, AlertCircle, Trash2, Download } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { StatusIndicator } from "@/components/indicator";
 
 export const Route = createFileRoute("/cainiao-pagos")({
   component: () => (
@@ -340,7 +343,7 @@ function CainiaoPagosPage() {
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
       <Topbar section="Pagos Cainiao" />
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
-        <div className="max-w-4xl mx-auto space-y-10">
+        <div className="max-w-5xl mx-auto space-y-10">
           <header>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">Pagos Cainiao</h1>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -357,7 +360,13 @@ function CainiaoPagosPage() {
               Selecciona un hub en la barra superior para empezar.
             </div>
           ) : (
-            <>
+            <Tabs defaultValue="subida" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="subida">Subir archivo</TabsTrigger>
+                <TabsTrigger value="matching">Matching</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="subida" className="space-y-10">
               <section className="animate-fade-up">
                 {!file ? (
                   <div
@@ -506,10 +515,355 @@ function CainiaoPagosPage() {
                   </Card>
                 )}
               </section>
-            </>
+              </TabsContent>
+
+              <TabsContent value="matching">
+                <MatchingSection hubId={selectedHub.id} />
+              </TabsContent>
+            </Tabs>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+// ============================================================
+// PUNTO 2: MATCHING CONTRA entregas
+// ============================================================
+
+type UploadOption = {
+  id: string;
+  filename: string;
+  periodo_desde: string | null;
+  periodo_hasta: string | null;
+};
+
+type MatchCategoria = "pagado" | "sin_pagar" | "sin_entregar";
+
+const MATCH_CATEGORIA_LABEL: Record<MatchCategoria, string> = {
+  pagado: "Pagado y coincide",
+  sin_pagar: "Entregado sin pagar",
+  sin_entregar: "Pagado sin entregar registrado",
+};
+
+const MATCH_CATEGORIA_DOT: Record<MatchCategoria, "emerald" | "rose" | "amber"> = {
+  pagado: "emerald",
+  sin_pagar: "rose",
+  sin_entregar: "amber",
+};
+
+type MatchRow = {
+  lp_no: string;
+  categoria: MatchCategoria;
+  cainiao_importe: number | null;
+  entregas_cp: string | null;
+  entregas_direccion: string | null;
+  entregas_driver: string | null;
+  entregas_fecha: string | null;
+};
+
+const PAGE_SIZE = 1000;
+
+async function fetchCainiaoNetos(uploadId: string): Promise<Map<string, number>> {
+  const { count, error: countErr } = await supabase
+    .from("cainiao_bill_lineas")
+    .select("id", { count: "exact", head: true })
+    .eq("upload_id", uploadId);
+  if (countErr) throw countErr;
+  const total = count ?? 0;
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, (_, i) => {
+      const from = i * PAGE_SIZE;
+      return supabase
+        .from("cainiao_bill_lineas")
+        .select("lp_no, bill_amount")
+        .eq("upload_id", uploadId)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+    }),
+  );
+  const netos = new Map<string, number>();
+  let sinLp = 0;
+  for (const { data, error: qErr } of pages) {
+    if (qErr) throw qErr;
+    for (const r of data ?? []) {
+      if (!r.lp_no) { sinLp++; continue; }
+      netos.set(r.lp_no, (netos.get(r.lp_no) ?? 0) + Number(r.bill_amount));
+    }
+  }
+  if (sinLp > 0) {
+    toast.info(`${sinLp} línea(s) de Cainiao sin LP real (ajustes generales del hub) — no entran en el matching por paquete.`);
+  }
+  return netos;
+}
+
+async function fetchEntregasEntregadas(
+  hubId: string,
+  desde: string,
+  hasta: string,
+): Promise<Map<string, { cp: string | null; direccion: string | null; driver: string | null; fecha: string | null }>> {
+  const { count, error: countErr } = await supabase
+    .from("entregas")
+    .select("id", { count: "exact", head: true })
+    .eq("hub_id", hubId)
+    .eq("estado", "Entregado")
+    .gte("fecha", desde)
+    .lte("fecha", hasta);
+  if (countErr) throw countErr;
+  const total = count ?? 0;
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, (_, i) => {
+      const from = i * PAGE_SIZE;
+      return supabase
+        .from("entregas")
+        .select("lp_no, cp, direccion, driver, fecha")
+        .eq("hub_id", hubId)
+        .eq("estado", "Entregado")
+        .gte("fecha", desde)
+        .lte("fecha", hasta)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+    }),
+  );
+  const map = new Map<string, { cp: string | null; direccion: string | null; driver: string | null; fecha: string | null }>();
+  for (const { data, error: qErr } of pages) {
+    if (qErr) throw qErr;
+    for (const r of data ?? []) {
+      map.set(r.lp_no, { cp: r.cp, direccion: r.direccion, driver: r.driver, fecha: r.fecha });
+    }
+  }
+  return map;
+}
+
+function exportMatchingXlsx(rows: MatchRow[], hubMarca: string, periodo: string) {
+  const headers = ["LP No.", "Categoría", "Importe Cainiao (€)", "CP", "Dirección", "Driver", "Fecha entrega"];
+  const aoa: (string | number)[][] = [headers];
+  for (const r of rows) {
+    aoa.push([
+      r.lp_no,
+      MATCH_CATEGORIA_LABEL[r.categoria],
+      r.cainiao_importe != null ? Number(r.cainiao_importe.toFixed(2)) : "",
+      r.entregas_cp ?? "",
+      r.entregas_direccion ?? "",
+      r.entregas_driver ?? "",
+      r.entregas_fecha ?? "",
+    ]);
+  }
+  const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    fill: { patternType: "solid", fgColor: { rgb: "111111" } },
+  };
+  const range = XLSXStyle.utils.decode_range(ws["!ref"] as string);
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSXStyle.utils.encode_cell({ r: 0, c })];
+    if (cell) cell.s = headerStyle;
+  }
+  ws["!cols"] = [{ wch: 22 }, { wch: 26 }, { wch: 16 }, { wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 14 }];
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, ws, "Matching Cainiao");
+  const buf = XLSXStyle.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Matching_Cainiao_${hubMarca.replace(/[^a-z0-9]+/gi, "_")}_${periodo}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function MatchingSection({ hubId }: { hubId: string }) {
+  const { selectedHub } = useAuth();
+  const [uploads, setUploads] = useState<UploadOption[]>([]);
+  const [selectedUploadId, setSelectedUploadId] = useState<string>("");
+  const [loadingUploads, setLoadingUploads] = useState(true);
+  const [matching, setMatching] = useState(false);
+  const [rows, setRows] = useState<MatchRow[]>([]);
+  const [filtro, setFiltro] = useState<"todas" | MatchCategoria>("todas");
+  const [ranOnce, setRanOnce] = useState(false);
+
+  useEffect(() => {
+    const loadUploads = async () => {
+      setLoadingUploads(true);
+      const { data, error } = await supabase
+        .from("cainiao_bill_uploads")
+        .select("id, filename, periodo_desde, periodo_hasta")
+        .eq("hub_id", hubId)
+        .order("uploaded_at", { ascending: false });
+      if (error) toast.error(error.message);
+      const list = (data ?? []) as UploadOption[];
+      setUploads(list);
+      setSelectedUploadId((prev) => (list.some((u) => u.id === prev) ? prev : list[0]?.id ?? ""));
+      setLoadingUploads(false);
+    };
+    void loadUploads();
+  }, [hubId]);
+
+  const runMatching = async () => {
+    const upload = uploads.find((u) => u.id === selectedUploadId);
+    if (!upload) return;
+    if (!upload.periodo_desde || !upload.periodo_hasta) {
+      toast.error("Esta subida no tiene periodo detectado — no se puede hacer matching.");
+      return;
+    }
+    setMatching(true);
+    setRanOnce(true);
+    try {
+      const [netos, entregasMap] = await Promise.all([
+        fetchCainiaoNetos(upload.id),
+        fetchEntregasEntregadas(hubId, upload.periodo_desde, upload.periodo_hasta),
+      ]);
+      const lpSet = new Set<string>([...netos.keys(), ...entregasMap.keys()]);
+      const out: MatchRow[] = [];
+      for (const lp of lpSet) {
+        const importe = netos.get(lp) ?? null;
+        const ent = entregasMap.get(lp) ?? null;
+        const categoria: MatchCategoria = importe != null && ent ? "pagado" : ent ? "sin_pagar" : "sin_entregar";
+        out.push({
+          lp_no: lp,
+          categoria,
+          cainiao_importe: importe,
+          entregas_cp: ent?.cp ?? null,
+          entregas_direccion: ent?.direccion ?? null,
+          entregas_driver: ent?.driver ?? null,
+          entregas_fecha: ent?.fecha ?? null,
+        });
+      }
+      out.sort((a, b) => a.lp_no.localeCompare(b.lp_no));
+      setRows(out);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error haciendo el matching");
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  const counts = {
+    pagado: rows.filter((r) => r.categoria === "pagado"),
+    sin_pagar: rows.filter((r) => r.categoria === "sin_pagar"),
+    sin_entregar: rows.filter((r) => r.categoria === "sin_entregar"),
+  };
+  const sum = (list: MatchRow[]) => list.reduce((acc, r) => acc + (r.cainiao_importe ?? 0), 0);
+
+  const filtered = filtro === "todas" ? rows : rows.filter((r) => r.categoria === filtro);
+  const selectedUpload = uploads.find((u) => u.id === selectedUploadId);
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+            Subida a conciliar
+          </span>
+          <select
+            value={selectedUploadId}
+            onChange={(e) => setSelectedUploadId(e.target.value)}
+            disabled={loadingUploads || uploads.length === 0}
+            className="appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground min-w-[320px]"
+          >
+            {uploads.length === 0 && <option value="">Sin subidas para este hub</option>}
+            {uploads.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.filename} ({u.periodo_desde ?? "—"} → {u.periodo_hasta ?? "—"})
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button onClick={() => void runMatching()} disabled={matching || !selectedUploadId} className="gap-2">
+          {matching ? <Loader2 className="size-4 animate-spin" /> : null}
+          {matching ? "Cruzando…" : "Cruzar contra entregas"}
+        </Button>
+        {rows.length > 0 && selectedHub && selectedUpload && (
+          <Button
+            variant="outline"
+            onClick={() => exportMatchingXlsx(filtered, selectedHub.marca, `${selectedUpload.periodo_desde}_${selectedUpload.periodo_hasta}`)}
+            className="gap-2"
+          >
+            <Download className="size-3.5" /> Exportar Excel
+          </Button>
+        )}
+      </div>
+
+      {ranOnce && !matching && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {(["pagado", "sin_pagar", "sin_entregar"] as MatchCategoria[]).map((cat) => (
+              <Card key={cat} className="shadow-none">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 font-normal text-muted-foreground text-xs">
+                    <StatusIndicator color={MATCH_CATEGORIA_DOT[cat]} pulse={false} />
+                    {MATCH_CATEGORIA_LABEL[cat]}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-semibold text-2xl tabular-nums">{counts[cat].length}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{sum(counts[cat]).toFixed(2)} € (Cainiao)</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value as typeof filtro)}
+              className="appearance-none pl-3 pr-8 py-1.5 text-xs bg-card border rounded-md text-foreground"
+            >
+              <option value="todas">Todas las categorías ({rows.length})</option>
+              {(["pagado", "sin_pagar", "sin_entregar"] as MatchCategoria[]).map((cat) => (
+                <option key={cat} value={cat}>{MATCH_CATEGORIA_LABEL[cat]} ({counts[cat].length})</option>
+              ))}
+            </select>
+          </div>
+
+          <Card className="shadow-none overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">LP No.</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Categoría</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Importe Cainiao</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">CP</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Driver</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Fecha</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-xs">Sin filas para este filtro</td></tr>
+                    ) : (
+                      filtered.map((r) => (
+                        <tr key={r.lp_no} className="border-t border-border">
+                          <td className="px-4 py-2 text-foreground whitespace-nowrap">{r.lp_no}</td>
+                          <td className="px-4 py-2">
+                            <span className="inline-flex items-center gap-1.5 text-xs">
+                              <StatusIndicator color={MATCH_CATEGORIA_DOT[r.categoria]} pulse={false} />
+                              {MATCH_CATEGORIA_LABEL[r.categoria]}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-right tabular-nums text-foreground">
+                            {r.cainiao_importe != null ? `${r.cainiao_importe.toFixed(2)} €` : "—"}
+                          </td>
+                          <td className="px-4 py-2 text-foreground">{r.entregas_cp ?? "—"}</td>
+                          <td className="px-4 py-2 text-foreground">{r.entregas_driver ?? "—"}</td>
+                          <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{r.entregas_fecha ?? "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </section>
   );
 }

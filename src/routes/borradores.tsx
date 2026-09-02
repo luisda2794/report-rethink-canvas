@@ -32,6 +32,17 @@ import {
   type SolicitudTarifa,
   type ValoresTarifa,
 } from "@/lib/solicitudes-tarifa";
+import {
+  processEpodLineas,
+  TIPO_LABEL,
+  type Driver,
+  type Tarifa,
+  type DraftLine,
+  type DraftResult,
+  type DetalleRow,
+  type EpodLineaBillingRow,
+  type SituacionEspecialCalc,
+} from "@/lib/facturacion-calc";
 
 export const Route = createFileRoute("/borradores")({
   component: () => (
@@ -42,60 +53,10 @@ export const Route = createFileRoute("/borradores")({
   head: () => ({ meta: [{ title: "Menssajero — Borradores" }] }),
 });
 
-// ============================================================
-// TYPES
-// ============================================================
-
-type Driver = {
-  id: string;
-  hub_id: string;
-  nombre: string;
-};
-
-type Tarifa = {
-  id?: string;
-  hub_id: string;
-  driver_id: string;
-  codigo_postal: string;
-  precio_door: number;
-  precio_pudo: number;
-  precio_aa: number;
-  _dirty?: boolean;
-  _new?: boolean;
-};
-
-// "AA" es internamente el mismo nombre que ya usaba driver_tarifas.precio_aa,
-// pero cambió de significado: antes era el 2º+ intento TO_DOOR a la misma
-// dirección; ahora es el modelo PUDO por punto/día (1er paquete del día en un
-// pop_station_id = PUDO, los siguientes al mismo punto/día = AA). Se muestra
-// con TIPO_LABEL para no confundir con el modelo viejo.
-type DraftLine = {
-  cp: string;
-  tipo: "TO_DOOR" | "PUDO" | "AA";
-  cantidad: number;
-  precio_unitario: number;
-  subtotal: number;
-};
-
-const TIPO_LABEL: Record<DraftLine["tipo"], string> = {
-  TO_DOOR: "TO_DOOR",
-  PUDO: "PUDO (1º del día)",
-  AA: "PUDO (extra, mismo punto/día)",
-};
-
-type DraftResult = {
-  driver_nombre: string;
-  driver_id: string | null;
-  total_paquetes: number;
-  base_imponible: number;
-  iva_21: number;
-  total: number;
-  fecha_desde: string;
-  fecha_hasta: string;
-  lineas: DraftLine[];
-  warnings: string[];
-  detalle?: DetalleRow[];
-};
+// Driver/Tarifa/DraftLine/TIPO_LABEL/DraftResult/DetalleRow/EpodLineaBillingRow
+// y processEpodLineas() viven en @/lib/facturacion-calc (importados arriba)
+// — se extrajeron de acá para poder reusar el mismo cálculo de "lo que
+// pagamos a drivers" desde el dashboard de Reconciliación de Pagos Cainiao.
 
 type SavedBorrador = {
   id: string;
@@ -109,229 +70,6 @@ type SavedBorrador = {
   estado: "borrador" | "confirmado" | "facturado";
   created_at: string;
 };
-
-// ============================================================
-// EPOD_LINEAS PROCESSING (from Supabase)
-// ============================================================
-
-type EpodLineaBillingRow = {
-  lp_no: string;
-  driver: string | null;
-  fecha: string | null;
-  cp: string | null;
-  direccion: string | null;
-  tipo_norm: string | null;
-  pop_station_id: string | null;
-};
-
-// Una fila por paquete facturado, con lo necesario para armar la sección
-// "Detalle por día" del Excel — se calcula además del agregado por CP+tipo
-// (DraftResult.lineas) que ya se usaba para la vista en pantalla y el guardado
-// en borradores/borrador_lineas (eso no cambia). Solo existe para resultados
-// recién generados: un borrador ya guardado en la base no tiene este nivel de
-// detalle (borrador_lineas solo guarda el agregado), así que el Excel de un
-// borrador guardado no puede reconstruir el detalle por día.
-type DetalleRow = {
-  fecha: string;
-  direccion: string;
-  cp: string;
-  tipo: DraftLine["tipo"];
-  precio_unitario: number;
-};
-
-function normalizeName(s: string) {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-// Modelo AA (PUDO): dentro de un mismo driver+CP, se agrupan los paquetes
-// PUDO por (pop_station_id, fecha) — el primero del grupo se factura a
-// precio_pudo, el resto del mismo punto el mismo día a precio_aa (más
-// barato). Si un paquete PUDO no trae pop_station_id no hay forma de saber
-// si comparte punto con otro, así que se factura individualmente a
-// precio_pudo (el precio lleno) en vez de asumir un agrupamiento — y se
-// marca con un warning para que quede visible, no oculto.
-function processEpodLineas(
-  rows: EpodLineaBillingRow[],
-  tarifas: Tarifa[],
-  drivers: Driver[],
-): DraftResult[] {
-  if (rows.length === 0) return [];
-
-  const tarifaByDriverCp = new Map(
-    tarifas.map((t) => [`${t.driver_id}|${t.codigo_postal.trim()}`, t]),
-  );
-  const driverByName = new Map(drivers.map((d) => [normalizeName(d.nombre), d]));
-
-  type Row = {
-    driverKey: string;
-    driverNombre: string;
-    driverId: string | null;
-    cp: string;
-    direccion: string;
-    tipo: "PUDO" | "TO_DOOR";
-    fecha: string;
-    popStationId: string;
-    lp: string;
-  };
-  const filtered: Row[] = [];
-  for (const r of rows) {
-    const rawDriver = (r.driver ?? "").split(" | ")[0].trim();
-    if (!rawDriver) continue;
-    const match = driverByName.get(normalizeName(rawDriver));
-    filtered.push({
-      driverKey: match ? `id:${match.id}` : `name:${normalizeName(rawDriver)}`,
-      driverNombre: match ? match.nombre : rawDriver,
-      driverId: match ? match.id : null,
-      cp: (r.cp ?? "").trim(),
-      direccion: (r.direccion ?? "").trim(),
-      tipo: (r.tipo_norm ?? "").trim().toUpperCase() === "PUDO" ? "PUDO" : "TO_DOOR",
-      fecha: r.fecha ?? "",
-      popStationId: (r.pop_station_id ?? "").trim(),
-      lp: r.lp_no,
-    });
-  }
-
-  const byDriver = new Map<string, Row[]>();
-  for (const r of filtered) {
-    if (!byDriver.has(r.driverKey)) byDriver.set(r.driverKey, []);
-    byDriver.get(r.driverKey)!.push(r);
-  }
-
-  const dates = filtered.map((r) => r.fecha).filter(Boolean).sort();
-  const fecha_desde = dates[0] || new Date().toISOString().slice(0, 10);
-  const fecha_hasta = dates[dates.length - 1] || fecha_desde;
-
-  const results: DraftResult[] = [];
-  for (const [, rs] of byDriver) {
-    const driverId = rs[0].driverId;
-    const driverNombre = rs[0].driverNombre;
-    const warningsSet = new Set<string>();
-
-    if (!driverId) {
-      // Sin driver registrado en /drivers: no hay driver_id con el que
-      // buscar tarifa, así que no se puede calcular nada — se deja
-      // explícito en vez de omitir o cobrar 0€ silenciosamente.
-      warningsSet.add(`"${driverNombre}" no está registrado en /drivers — crea el driver para poder facturarlo`);
-      const cpSet = new Set(rs.map((r) => r.cp || "—"));
-      const lineas: DraftLine[] = [...cpSet].map((cp) => ({
-        cp,
-        tipo: "TO_DOOR" as const,
-        cantidad: rs.filter((r) => (r.cp || "—") === cp).length,
-        precio_unitario: 0,
-        subtotal: 0,
-      }));
-      results.push({
-        driver_nombre: driverNombre,
-        driver_id: null,
-        total_paquetes: rs.length,
-        base_imponible: 0,
-        iva_21: 0,
-        total: 0,
-        fecha_desde,
-        fecha_hasta,
-        lineas,
-        warnings: [...warningsSet],
-      });
-      continue;
-    }
-
-    // TO_DOOR: cantidad simple por CP.
-    const doorAgg = new Map<string, number>();
-    for (const r of rs) {
-      if (r.tipo !== "TO_DOOR") continue;
-      doorAgg.set(r.cp, (doorAgg.get(r.cp) ?? 0) + 1);
-    }
-
-    // PUDO: agrupar por (pop_station_id, fecha) para aplicar el modelo AA.
-    const pudoGroups = new Map<string, Row[]>();
-    let ungroupedPudo = 0;
-    for (const r of rs) {
-      if (r.tipo !== "PUDO") continue;
-      if (!r.popStationId) {
-        ungroupedPudo++;
-        const soloKey = `__solo__${r.lp}`;
-        pudoGroups.set(soloKey, [r]);
-        continue;
-      }
-      const key = `${r.popStationId}|${r.fecha}`;
-      if (!pudoGroups.has(key)) pudoGroups.set(key, []);
-      pudoGroups.get(key)!.push(r);
-    }
-    if (ungroupedPudo > 0) {
-      warningsSet.add(`${ungroupedPudo} paquete(s) PUDO sin punto de recogida identificado — facturados a precio de 1º`);
-    }
-    const pudoAgg = new Map<string, number>(); // cp -> cantidad a precio_pudo
-    const aaAgg = new Map<string, number>(); // cp -> cantidad a precio_aa
-    for (const group of pudoGroups.values()) {
-      const cp = group[0].cp;
-      pudoAgg.set(cp, (pudoAgg.get(cp) ?? 0) + 1);
-      if (group.length > 1) {
-        aaAgg.set(cp, (aaAgg.get(cp) ?? 0) + (group.length - 1));
-      }
-    }
-
-    const priceFor = (cp: string, tipo: DraftLine["tipo"]): number | null => {
-      const tar = tarifaByDriverCp.get(`${driverId}|${cp}`);
-      if (!tar) return null;
-      return tipo === "PUDO" ? Number(tar.precio_pudo) : tipo === "AA" ? Number(tar.precio_aa) : Number(tar.precio_door);
-    };
-
-    const lineas: DraftLine[] = [];
-    let base = 0;
-    let total_paquetes = 0;
-    const cpsWithoutTarifa = new Set<string>();
-    const pushLinea = (cp: string, tipo: DraftLine["tipo"], cantidad: number) => {
-      if (cantidad <= 0) return;
-      const precio = priceFor(cp, tipo);
-      if (precio === null) cpsWithoutTarifa.add(cp || "(sin CP)");
-      const p = precio ?? 0;
-      const subtotal = +(cantidad * p).toFixed(2);
-      lineas.push({ cp: cp || "(sin CP)", tipo, cantidad, precio_unitario: p, subtotal });
-      base += subtotal;
-      total_paquetes += cantidad;
-    };
-    for (const [cp, cantidad] of doorAgg) pushLinea(cp, "TO_DOOR", cantidad);
-    for (const [cp, cantidad] of pudoAgg) pushLinea(cp, "PUDO", cantidad);
-    for (const [cp, cantidad] of aaAgg) pushLinea(cp, "AA", cantidad);
-    for (const cp of cpsWithoutTarifa) warningsSet.add(`CP ${cp} sin tarifa configurada para ${driverNombre}`);
-
-    lineas.sort((a, b) => a.cp.localeCompare(b.cp) || a.tipo.localeCompare(b.tipo));
-    base = +base.toFixed(2);
-    const iva_21 = +(base * 0.21).toFixed(2);
-    const total = +(base + iva_21).toFixed(2);
-
-    // Detalle por paquete (para la sección "Detalle por día" del Excel) —
-    // misma clasificación TO_DOOR/PUDO-1º/PUDO-Nº que ya se usó arriba para
-    // el agregado, pero sin agregar: una fila por paquete.
-    const detalle: DetalleRow[] = [];
-    for (const r of rs) {
-      if (r.tipo !== "TO_DOOR") continue;
-      detalle.push({ fecha: r.fecha, direccion: r.direccion, cp: r.cp, tipo: "TO_DOOR", precio_unitario: priceFor(r.cp, "TO_DOOR") ?? 0 });
-    }
-    for (const group of pudoGroups.values()) {
-      group.forEach((r, i) => {
-        const tipo: DraftLine["tipo"] = i === 0 ? "PUDO" : "AA";
-        detalle.push({ fecha: r.fecha, direccion: r.direccion, cp: r.cp, tipo, precio_unitario: priceFor(r.cp, tipo) ?? 0 });
-      });
-    }
-
-    results.push({
-      driver_nombre: driverNombre,
-      driver_id: driverId,
-      total_paquetes,
-      base_imponible: base,
-      iva_21,
-      total,
-      fecha_desde,
-      fecha_hasta,
-      lineas,
-      warnings: [...warningsSet],
-      detalle,
-    });
-  }
-  results.sort((a, b) => b.total - a.total);
-  return results;
-}
 
 // ============================================================
 // EXCEL EXPORT — formato "Borrador de Factura" (ItaSpain), con colores
@@ -1537,16 +1275,23 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
     setGenerating(true);
     setError(null);
     try {
-      const [{ data: driversData, error: dErr }, { data: tarifasData, error: tErr }] = await Promise.all([
+      const [{ data: driversData, error: dErr }, { data: tarifasData, error: tErr }, { data: situacionesData, error: sErr }] = await Promise.all([
         supabase.from("drivers").select("id, hub_id, nombre").eq("hub_id", hubId),
         supabase
           .from("driver_tarifas")
           .select("id, hub_id, driver_id, codigo_postal, precio_door, precio_pudo, precio_aa")
           .eq("hub_id", hubId)
           .not("driver_id", "is", null),
+        supabase
+          .from("situaciones_especiales")
+          .select("driver_id, fecha, codigo_postal, tarifa_to_door, tarifa_pudo_primero, tarifa_pudo_extra, precio_salida")
+          .eq("hub_id", hubId)
+          .gte("fecha", fromDate)
+          .lte("fecha", toDate),
       ]);
       if (dErr) throw dErr;
       if (tErr) throw tErr;
+      if (sErr) throw sErr;
       const drivers = (driversData ?? []) as Driver[];
       const tarifas: Tarifa[] = (tarifasData ?? []).map((t) => ({
         id: t.id,
@@ -1557,8 +1302,17 @@ function GeneradorSection({ hubId, hubMarca }: { hubId: string; hubMarca: string
         precio_pudo: Number(t.precio_pudo),
         precio_aa: Number(t.precio_aa),
       }));
+      const situaciones: SituacionEspecialCalc[] = (situacionesData ?? []).map((s) => ({
+        driver_id: s.driver_id,
+        fecha: s.fecha,
+        codigo_postal: s.codigo_postal,
+        tarifa_to_door: s.tarifa_to_door,
+        tarifa_pudo_primero: s.tarifa_pudo_primero,
+        tarifa_pudo_extra: s.tarifa_pudo_extra,
+        precio_salida: s.precio_salida,
+      }));
       const rows = await fetchEpodLineas();
-      const res = processEpodLineas(rows, tarifas, drivers);
+      const res = processEpodLineas(rows, tarifas, drivers, situaciones);
       // Override fecha_desde/hasta with chosen period for consistency
       for (const r of res) { r.fecha_desde = fromDate; r.fecha_hasta = toDate; }
       setResults(res);
