@@ -364,6 +364,7 @@ function CainiaoPagosPage() {
               <TabsList>
                 <TabsTrigger value="subida">Subir archivo</TabsTrigger>
                 <TabsTrigger value="matching">Matching</TabsTrigger>
+                <TabsTrigger value="compensaciones">Compensaciones</TabsTrigger>
               </TabsList>
 
               <TabsContent value="subida" className="space-y-10">
@@ -519,6 +520,10 @@ function CainiaoPagosPage() {
 
               <TabsContent value="matching">
                 <MatchingSection hubId={selectedHub.id} />
+              </TabsContent>
+
+              <TabsContent value="compensaciones">
+                <CompensacionesSection hubId={selectedHub.id} />
               </TabsContent>
             </Tabs>
           )}
@@ -854,6 +859,283 @@ function MatchingSection({ hubId }: { hubId: string }) {
                           <td className="px-4 py-2 text-foreground">{r.entregas_cp ?? "—"}</td>
                           <td className="px-4 py-2 text-foreground">{r.entregas_driver ?? "—"}</td>
                           <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{r.entregas_fecha ?? "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </section>
+  );
+}
+
+// ============================================================
+// PUNTO 3: COMPENSACIONES / PENALIZACIONES
+// ============================================================
+
+const BILL_ITEM_COMPENSACION = "货值赔付";
+
+type CompensacionRow = {
+  lp_no: string;
+  bill_amount: number;
+  billing_time: string | null;
+  cp: string | null;
+  direccion: string | null;
+  driver: string | null;
+  fuente: "entregas" | "epod_lineas" | null;
+};
+
+async function fetchCompensacionesCainiao(
+  uploadId: string,
+): Promise<{ lp_no: string; bill_amount: number; billing_time: string | null }[]> {
+  const { count, error: countErr } = await supabase
+    .from("cainiao_bill_lineas")
+    .select("id", { count: "exact", head: true })
+    .eq("upload_id", uploadId)
+    .eq("bill_item", BILL_ITEM_COMPENSACION);
+  if (countErr) throw countErr;
+  const total = count ?? 0;
+  const pageCount = Math.ceil(total / PAGE_SIZE);
+  const pages = await Promise.all(
+    Array.from({ length: pageCount }, (_, i) => {
+      const from = i * PAGE_SIZE;
+      return supabase
+        .from("cainiao_bill_lineas")
+        .select("lp_no, bill_amount, billing_time")
+        .eq("upload_id", uploadId)
+        .eq("bill_item", BILL_ITEM_COMPENSACION)
+        .order("id", { ascending: true })
+        .range(from, from + PAGE_SIZE - 1);
+    }),
+  );
+  const out: { lp_no: string; bill_amount: number; billing_time: string | null }[] = [];
+  for (const { data, error: qErr } of pages) {
+    if (qErr) throw qErr;
+    for (const r of data ?? []) {
+      if (!r.lp_no) continue; // penalización sin LP real — no hay contra qué cruzar
+      out.push({ lp_no: r.lp_no, bill_amount: Number(r.bill_amount), billing_time: r.billing_time });
+    }
+  }
+  return out;
+}
+
+// Cruza cada compensación contra entregas primero (cualquier estado, no solo
+// Entregado — una penalización puede corresponder a un paquete dañado o
+// perdido que no llegó a "Entregado") y, si no aparece ahí, contra
+// epod_lineas (el log crudo) como respaldo — mismo criterio pedido: "cruzada
+// con entregas/epod_lineas".
+async function crossReferenceCompensaciones(
+  hubId: string,
+  lineas: { lp_no: string; bill_amount: number; billing_time: string | null }[],
+): Promise<CompensacionRow[]> {
+  const lpNos = [...new Set(lineas.map((l) => l.lp_no))];
+  const infoByLp = new Map<string, { cp: string | null; direccion: string | null; driver: string | null; fuente: "entregas" | "epod_lineas" }>();
+
+  if (lpNos.length > 0) {
+    const { data: entregasData, error: eErr } = await supabase
+      .from("entregas")
+      .select("lp_no, cp, direccion, driver")
+      .eq("hub_id", hubId)
+      .in("lp_no", lpNos);
+    if (eErr) throw eErr;
+    for (const r of entregasData ?? []) {
+      infoByLp.set(r.lp_no, { cp: r.cp, direccion: r.direccion, driver: r.driver, fuente: "entregas" });
+    }
+
+    const faltantes = lpNos.filter((lp) => !infoByLp.has(lp));
+    if (faltantes.length > 0) {
+      const { data: epodData, error: pErr } = await supabase
+        .from("epod_lineas")
+        .select("lp_no, cp, direccion, driver")
+        .eq("hub_id", hubId)
+        .in("lp_no", faltantes);
+      if (pErr) throw pErr;
+      for (const r of epodData ?? []) {
+        if (!infoByLp.has(r.lp_no)) {
+          infoByLp.set(r.lp_no, { cp: r.cp, direccion: r.direccion, driver: r.driver, fuente: "epod_lineas" });
+        }
+      }
+    }
+  }
+
+  return lineas.map((l) => {
+    const info = infoByLp.get(l.lp_no);
+    return {
+      lp_no: l.lp_no,
+      bill_amount: l.bill_amount,
+      billing_time: l.billing_time,
+      cp: info?.cp ?? null,
+      direccion: info?.direccion ?? null,
+      driver: info?.driver ?? null,
+      fuente: info?.fuente ?? null,
+    };
+  });
+}
+
+function exportCompensacionesXlsx(rows: CompensacionRow[], hubMarca: string, periodo: string) {
+  const headers = ["LP No.", "Importe (€)", "Fecha", "CP", "Dirección", "Driver", "Fuente del cruce"];
+  const aoa: (string | number)[][] = [headers];
+  for (const r of rows) {
+    aoa.push([
+      r.lp_no,
+      Number(r.bill_amount.toFixed(2)),
+      r.billing_time ? r.billing_time.slice(0, 10) : "",
+      r.cp ?? "",
+      r.direccion ?? "",
+      r.driver ?? "",
+      r.fuente === "entregas" ? "entregas" : r.fuente === "epod_lineas" ? "epod_lineas" : "sin cruce",
+    ]);
+  }
+  const ws = XLSXStyle.utils.aoa_to_sheet(aoa);
+  const headerStyle = {
+    font: { bold: true, color: { rgb: "FFFFFF" } },
+    fill: { patternType: "solid", fgColor: { rgb: "B91C1C" } },
+  };
+  const range = XLSXStyle.utils.decode_range(ws["!ref"] as string);
+  for (let c = range.s.c; c <= range.e.c; c++) {
+    const cell = ws[XLSXStyle.utils.encode_cell({ r: 0, c })];
+    if (cell) cell.s = headerStyle;
+  }
+  ws["!cols"] = [{ wch: 22 }, { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 32 }, { wch: 20 }, { wch: 14 }];
+  const wb = XLSXStyle.utils.book_new();
+  XLSXStyle.utils.book_append_sheet(wb, ws, "Compensaciones Cainiao");
+  const buf = XLSXStyle.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `Compensaciones_Cainiao_${hubMarca.replace(/[^a-z0-9]+/gi, "_")}_${periodo}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function CompensacionesSection({ hubId }: { hubId: string }) {
+  const { selectedHub } = useAuth();
+  const [uploads, setUploads] = useState<UploadOption[]>([]);
+  const [selectedUploadId, setSelectedUploadId] = useState<string>("");
+  const [loadingUploads, setLoadingUploads] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [rows, setRows] = useState<CompensacionRow[]>([]);
+  const [ranOnce, setRanOnce] = useState(false);
+
+  useEffect(() => {
+    const loadUploads = async () => {
+      setLoadingUploads(true);
+      const { data, error } = await supabase
+        .from("cainiao_bill_uploads")
+        .select("id, filename, periodo_desde, periodo_hasta")
+        .eq("hub_id", hubId)
+        .order("uploaded_at", { ascending: false });
+      if (error) toast.error(error.message);
+      const list = (data ?? []) as UploadOption[];
+      setUploads(list);
+      setSelectedUploadId((prev) => (list.some((u) => u.id === prev) ? prev : list[0]?.id ?? ""));
+      setLoadingUploads(false);
+    };
+    void loadUploads();
+  }, [hubId]);
+
+  const run = async () => {
+    if (!selectedUploadId) return;
+    setLoading(true);
+    setRanOnce(true);
+    try {
+      const lineas = await fetchCompensacionesCainiao(selectedUploadId);
+      const cruzadas = await crossReferenceCompensaciones(hubId, lineas);
+      cruzadas.sort((a, b) => (a.billing_time ?? "").localeCompare(b.billing_time ?? ""));
+      setRows(cruzadas);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Error cargando compensaciones");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const total = rows.reduce((acc, r) => acc + r.bill_amount, 0);
+  const selectedUpload = uploads.find((u) => u.id === selectedUploadId);
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="block">
+          <span className="block text-[11px] uppercase tracking-wide text-muted-foreground mb-1.5">
+            Subida a revisar
+          </span>
+          <select
+            value={selectedUploadId}
+            onChange={(e) => setSelectedUploadId(e.target.value)}
+            disabled={loadingUploads || uploads.length === 0}
+            className="appearance-none pl-3 pr-8 py-2 text-sm bg-card border rounded-md text-foreground min-w-[320px]"
+          >
+            {uploads.length === 0 && <option value="">Sin subidas para este hub</option>}
+            {uploads.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.filename} ({u.periodo_desde ?? "—"} → {u.periodo_hasta ?? "—"})
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button onClick={() => void run()} disabled={loading || !selectedUploadId} className="gap-2">
+          {loading ? <Loader2 className="size-4 animate-spin" /> : null}
+          {loading ? "Cargando…" : "Ver compensaciones"}
+        </Button>
+        {rows.length > 0 && selectedHub && selectedUpload && (
+          <Button
+            variant="outline"
+            onClick={() => exportCompensacionesXlsx(rows, selectedHub.marca, `${selectedUpload.periodo_desde}_${selectedUpload.periodo_hasta}`)}
+            className="gap-2"
+          >
+            <Download className="size-3.5" /> Exportar Excel
+          </Button>
+        )}
+      </div>
+
+      {ranOnce && !loading && (
+        <>
+          <Card className="shadow-none">
+            <CardHeader>
+              <CardTitle className="font-normal text-muted-foreground text-xs">
+                Total de compensaciones/penalizaciones del periodo
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="font-semibold text-2xl tabular-nums">{total.toFixed(2)} €</p>
+              <p className="text-xs text-muted-foreground mt-1">{rows.length} línea(s)</p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-none overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto max-h-[520px] overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-muted">
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">LP No.</th>
+                      <th className="text-right px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Importe</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Fecha</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">CP</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Dirección</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase tracking-wide text-muted-foreground">Driver</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-xs">Sin compensaciones/penalizaciones en esta subida</td></tr>
+                    ) : (
+                      rows.map((r, i) => (
+                        <tr key={`${r.lp_no}-${i}`} className="border-t border-border">
+                          <td className="px-4 py-2 text-foreground whitespace-nowrap">{r.lp_no}</td>
+                          <td className="px-4 py-2 text-right tabular-nums text-destructive font-medium">{r.bill_amount.toFixed(2)} €</td>
+                          <td className="px-4 py-2 text-muted-foreground whitespace-nowrap">{r.billing_time ? r.billing_time.slice(0, 10) : "—"}</td>
+                          <td className="px-4 py-2 text-foreground">{r.cp ?? "—"}</td>
+                          <td className="px-4 py-2 text-foreground max-w-[240px] truncate" title={r.direccion ?? ""}>{r.direccion ?? "—"}</td>
+                          <td className="px-4 py-2 text-foreground">{r.driver ?? "—"}</td>
                         </tr>
                       ))
                     )}
