@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
+import { Route as PudosRouteImport } from './routes/pudos'
 import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
 import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
 import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
@@ -44,6 +45,11 @@ const ReportesRoute = ReportesRouteImport.update({
 const ReclamacionesRoute = ReclamacionesRouteImport.update({
   id: '/reclamaciones',
   path: '/reclamaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PudosRoute = PudosRouteImport.update({
+  id: '/pudos',
+  path: '/pudos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PaquetesEnRiesgoRoute = PaquetesEnRiesgoRouteImport.update({
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
+  '/pudos': typeof PudosRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -215,6 +222,7 @@ export interface FileRoutesByTo {
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
+  '/pudos': typeof PudosRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/mapas-admin': typeof MapasAdminRoute
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
+  '/pudos': typeof PudosRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/mapas-admin'
     | '/mapas-provincia'
     | '/paquetes-en-riesgo'
+    | '/pudos'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -302,6 +312,7 @@ export interface FileRouteTypes {
     | '/mapas-admin'
     | '/mapas-provincia'
     | '/paquetes-en-riesgo'
+    | '/pudos'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/mapas-admin'
     | '/mapas-provincia'
     | '/paquetes-en-riesgo'
+    | '/pudos'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -359,6 +371,7 @@ export interface RootRouteChildren {
   MapasAdminRoute: typeof MapasAdminRoute
   MapasProvinciaRoute: typeof MapasProvinciaRoute
   PaquetesEnRiesgoRoute: typeof PaquetesEnRiesgoRoute
+  PudosRoute: typeof PudosRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       path: '/paquetes-en-riesgo'
       fullPath: '/paquetes-en-riesgo'
       preLoaderRoute: typeof PaquetesEnRiesgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pudos': {
+      id: '/pudos'
+      path: '/pudos'
+      fullPath: '/pudos'
+      preLoaderRoute: typeof PudosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mapas-provincia': {
@@ -588,6 +608,7 @@ const rootRouteChildren: RootRouteChildren = {
   MapasAdminRoute: MapasAdminRoute,
   MapasProvinciaRoute: MapasProvinciaRoute,
   PaquetesEnRiesgoRoute: PaquetesEnRiesgoRoute,
+  PudosRoute: PudosRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,

@@ -38,6 +38,10 @@ export type NavItem = { to: string; label: string };
 // (KPIs) y se movieron a rutas propias en el nav, al mismo nivel que el
 // resto — mismo acceso que ya tenía /reportes (admin/manager/jefe_flota),
 // ya que son herramientas operativas del día a día, no financieras.
+//
+// "/pudos" es nueva: gap de distancia GPS en entregas PUDO, se revisa a
+// diario — mismo acceso operativo que /paquetes-en-riesgo/flow-meeting
+// (admin/manager/jefe_flota), no es un módulo financiero.
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
@@ -45,6 +49,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/reportes", label: "KPIs" },
   { to: "/paquetes-en-riesgo", label: "Paquetes en Riesgo" },
   { to: "/flow-meeting", label: "Flow Meeting" },
+  { to: "/pudos", label: "PUDOs" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
@@ -61,6 +66,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/reportes",
     "/paquetes-en-riesgo",
     "/flow-meeting",
+    "/pudos",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
@@ -78,6 +84,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/reportes",
     "/paquetes-en-riesgo",
     "/flow-meeting",
+    "/pudos",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
@@ -94,6 +101,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/reportes",
     "/paquetes-en-riesgo",
     "/flow-meeting",
+    "/pudos",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",

@@ -68,6 +68,14 @@ const COL = {
   // que no hace falta copiar el espacio raro tal cual para que matchee.
   latitud: ["Receptor a latitud", "Receiver to Latitude", "Latitud", "Latitude"],
   longitud: ["Receptor a longitud", "Receiver to Longitude", "Longitud", "Longitude"],
+  // Ubicación GPS real donde el driver marcó la entrega — distinta de
+  // latitud/longitud (la ubicación registrada del punto/destino). Usada por
+  // /pudos para el gap de distancia. Header ES confirmado contra ePODs
+  // reales (con el doble espacio real "Entrega real  latitud" — normalizeKey()
+  // ya lo colapsa); el alias EN no está confirmado todavía, queda como
+  // respaldo — si no matchea, el campo cae a null sin bloquear el resto.
+  entregaRealLat: ["Entrega real latitud", "Actual delivery Latitude"],
+  entregaRealLon: ["Entrega real longitud", "Actual delivery Longitude"],
   excepcion: ["Detalles de la Excepción", "Exception Detail"],
   // Fecha REAL del evento (entrega/fallo) — distinta de "Fecha de la tarea".
   // El Dashboard (DSR) las necesita para no medir contra la fecha de
@@ -177,6 +185,8 @@ type ParsedRow = {
   seller_name: string | null;
   latitude: number | null;
   longitude: number | null;
+  entrega_real_latitude: number | null;
+  entrega_real_longitude: number | null;
   exception_detail: string | null;
   tiempo_entrega: string | null;
   tiempo_fracaso: string | null;
@@ -218,6 +228,8 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
       seller_name: pickField(r, COL.vendedor) || null,
       latitude: pickNumber(r, COL.latitud),
       longitude: pickNumber(r, COL.longitud),
+      entrega_real_latitude: pickNumber(r, COL.entregaRealLat),
+      entrega_real_longitude: pickNumber(r, COL.entregaRealLon),
       exception_detail: pickField(r, COL.excepcion) || null,
       tiempo_entrega: parseDate(rawField(r, COL.tiempoEntrega)),
       tiempo_fracaso: parseDate(rawField(r, COL.tiempoFracaso)),
@@ -446,6 +458,8 @@ function EpodPage() {
         seller_name: r.seller_name,
         latitude: r.latitude,
         longitude: r.longitude,
+        entrega_real_latitude: r.entrega_real_latitude,
+        entrega_real_longitude: r.entrega_real_longitude,
         exception_detail: r.exception_detail,
         tiempo_entrega: r.tiempo_entrega,
         tiempo_fracaso: r.tiempo_fracaso,
