@@ -52,6 +52,7 @@ const ICONS: Record<string, ReactNode> = {
   "/cainiao-pagos": <ReceiptIcon />,
   "/pudos": <MapPinIcon />,
   "/leads": <UsersIcon />,
+  "/agentes": <ClipboardListIcon />,
   "/admin": <ShieldIcon />,
 };
 
@@ -73,6 +74,7 @@ const GROUP_OF: Record<string, string> = {
   "/borradores": "Facturación",
   "/aprobaciones": "Facturación",
   "/cainiao-pagos": "Facturación",
+  "/agentes": "Administración",
   "/admin": "Administración",
 };
 

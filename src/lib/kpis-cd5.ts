@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { isDireccionIncorrecta } from "@/lib/direccion-incorrecta";
 import { isoAddDays, lastNBusinessDays } from "@/lib/business-days";
@@ -87,8 +88,13 @@ export type Cd5TrendResult = {
 const PAGE_SIZE = 1000;
 const LOOKBACK_BUFFER_DAYS = 100;
 
-async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd5Row[]> {
-  const { count, error: countErr } = await supabase
+export async function fetchCd5Rows(
+  client: SupabaseClient,
+  hubId: string,
+  from: string,
+  to: string,
+): Promise<Cd5Row[]> {
+  const { count, error: countErr } = await client
     .from("epod_lineas")
     .select("id", { count: "exact", head: true })
     .eq("hub_id", hubId)
@@ -101,7 +107,7 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
   const pages = await Promise.all(
     Array.from({ length: pageCount }, (_, i) => {
       const start = i * PAGE_SIZE;
-      return supabase
+      return client
         .from("epod_lineas")
         .select("waybill, lp_no, fecha, estado, exception_detail, row_index")
         .eq("hub_id", hubId)
@@ -132,7 +138,7 @@ async function fetchCd5Rows(hubId: string, from: string, to: string): Promise<Cd
 // después en el checkpoint "eval" correspondiente. Complejidad: ordenar
 // todos los eventos (O(N log N)) + un barrido lineal con dos punteros — ya
 // no son 20 recorridas independientes del historial completo.
-function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
+export function computeCd5Trend(rows: Cd5Row[], trendDays: string[]): Cd5TrendResult {
   let earliestFecha: string | null = null;
   let latestFecha: string | null = null;
 
@@ -228,7 +234,7 @@ export function useCd5Trend(hubId: string | null, businessDays: number) {
       const oldest = trendDays[0];
       const newest = trendDays[trendDays.length - 1];
       const from = isoAddDays(oldest, -5 - LOOKBACK_BUFFER_DAYS);
-      const rows = await fetchCd5Rows(hubId, from, newest);
+      const rows = await fetchCd5Rows(supabase, hubId, from, newest);
       return computeCd5Trend(rows, trendDays);
     },
     staleTime: 5 * 60 * 1000,

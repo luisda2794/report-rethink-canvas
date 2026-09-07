@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
+import { Route as AgentesRouteImport } from './routes/agentes'
 import { Route as ReclutamientoRouteImport } from './routes/reclutamiento'
 import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as PudosRouteImport } from './routes/pudos'
@@ -47,6 +48,11 @@ const ReportesRoute = ReportesRouteImport.update({
 const ReclamacionesRoute = ReclamacionesRouteImport.update({
   id: '/reclamaciones',
   path: '/reclamaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentesRoute = AgentesRouteImport.update({
+  id: '/agentes',
+  path: '/agentes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReclutamientoRoute = ReclutamientoRouteImport.update({
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/pudos': typeof PudosRoute
   '/leads': typeof LeadsRoute
+  '/agentes': typeof AgentesRoute
   '/reclutamiento': typeof ReclutamientoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
@@ -238,6 +245,7 @@ export interface FileRoutesByTo {
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/pudos': typeof PudosRoute
   '/leads': typeof LeadsRoute
+  '/agentes': typeof AgentesRoute
   '/reclutamiento': typeof ReclutamientoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
@@ -270,6 +278,7 @@ export interface FileRoutesById {
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/pudos': typeof PudosRoute
   '/leads': typeof LeadsRoute
+  '/agentes': typeof AgentesRoute
   '/reclutamiento': typeof ReclutamientoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
@@ -303,6 +312,7 @@ export interface FileRouteTypes {
     | '/paquetes-en-riesgo'
     | '/pudos'
     | '/leads'
+    | '/agentes'
     | '/reclutamiento'
     | '/reclamaciones'
     | '/reportes'
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/paquetes-en-riesgo'
     | '/pudos'
     | '/leads'
+    | '/agentes'
     | '/reclutamiento'
     | '/reclamaciones'
     | '/reportes'
@@ -365,6 +376,7 @@ export interface FileRouteTypes {
     | '/paquetes-en-riesgo'
     | '/pudos'
     | '/leads'
+    | '/agentes'
     | '/reclutamiento'
     | '/reclamaciones'
     | '/reportes'
@@ -397,6 +409,7 @@ export interface RootRouteChildren {
   PaquetesEnRiesgoRoute: typeof PaquetesEnRiesgoRoute
   PudosRoute: typeof PudosRoute
   LeadsRoute: typeof LeadsRoute
+  AgentesRoute: typeof AgentesRoute
   ReclutamientoRoute: typeof ReclutamientoRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
@@ -443,6 +456,13 @@ declare module '@tanstack/react-router' {
       path: '/leads'
       fullPath: '/leads'
       preLoaderRoute: typeof LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agentes': {
+      id: '/agentes'
+      path: '/agentes'
+      fullPath: '/agentes'
+      preLoaderRoute: typeof AgentesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reclutamiento': {
@@ -650,6 +670,7 @@ const rootRouteChildren: RootRouteChildren = {
   PaquetesEnRiesgoRoute: PaquetesEnRiesgoRoute,
   PudosRoute: PudosRoute,
   LeadsRoute: LeadsRoute,
+  AgentesRoute: AgentesRoute,
   ReclutamientoRoute: ReclutamientoRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
