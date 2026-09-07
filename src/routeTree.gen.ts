@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportesRouteImport } from './routes/reportes'
 import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
+import { Route as ReclutamientoRouteImport } from './routes/reclutamiento'
+import { Route as LeadsRouteImport } from './routes/leads'
 import { Route as PudosRouteImport } from './routes/pudos'
 import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
 import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
@@ -45,6 +47,16 @@ const ReportesRoute = ReportesRouteImport.update({
 const ReclamacionesRoute = ReclamacionesRouteImport.update({
   id: '/reclamaciones',
   path: '/reclamaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReclutamientoRoute = ReclutamientoRouteImport.update({
+  id: '/reclutamiento',
+  path: '/reclutamiento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadsRoute = LeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PudosRoute = PudosRouteImport.update({
@@ -194,6 +206,8 @@ export interface FileRoutesByFullPath {
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/pudos': typeof PudosRoute
+  '/leads': typeof LeadsRoute
+  '/reclutamiento': typeof ReclutamientoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -223,6 +237,8 @@ export interface FileRoutesByTo {
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/pudos': typeof PudosRoute
+  '/leads': typeof LeadsRoute
+  '/reclutamiento': typeof ReclutamientoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -253,6 +269,8 @@ export interface FileRoutesById {
   '/mapas-provincia': typeof MapasProvinciaRoute
   '/paquetes-en-riesgo': typeof PaquetesEnRiesgoRoute
   '/pudos': typeof PudosRoute
+  '/leads': typeof LeadsRoute
+  '/reclutamiento': typeof ReclutamientoRoute
   '/reclamaciones': typeof ReclamacionesRoute
   '/reportes': typeof ReportesRoute
   '/rec/$token': typeof RecTokenRoute
@@ -284,6 +302,8 @@ export interface FileRouteTypes {
     | '/mapas-provincia'
     | '/paquetes-en-riesgo'
     | '/pudos'
+    | '/leads'
+    | '/reclutamiento'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -313,6 +333,8 @@ export interface FileRouteTypes {
     | '/mapas-provincia'
     | '/paquetes-en-riesgo'
     | '/pudos'
+    | '/leads'
+    | '/reclutamiento'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -342,6 +364,8 @@ export interface FileRouteTypes {
     | '/mapas-provincia'
     | '/paquetes-en-riesgo'
     | '/pudos'
+    | '/leads'
+    | '/reclutamiento'
     | '/reclamaciones'
     | '/reportes'
     | '/rec/$token'
@@ -372,6 +396,8 @@ export interface RootRouteChildren {
   MapasProvinciaRoute: typeof MapasProvinciaRoute
   PaquetesEnRiesgoRoute: typeof PaquetesEnRiesgoRoute
   PudosRoute: typeof PudosRoute
+  LeadsRoute: typeof LeadsRoute
+  ReclutamientoRoute: typeof ReclutamientoRoute
   ReclamacionesRoute: typeof ReclamacionesRoute
   ReportesRoute: typeof ReportesRoute
   RecTokenRoute: typeof RecTokenRoute
@@ -410,6 +436,20 @@ declare module '@tanstack/react-router' {
       path: '/pudos'
       fullPath: '/pudos'
       preLoaderRoute: typeof PudosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leads': {
+      id: '/leads'
+      path: '/leads'
+      fullPath: '/leads'
+      preLoaderRoute: typeof LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reclutamiento': {
+      id: '/reclutamiento'
+      path: '/reclutamiento'
+      fullPath: '/reclutamiento'
+      preLoaderRoute: typeof ReclutamientoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mapas-provincia': {
@@ -609,6 +649,8 @@ const rootRouteChildren: RootRouteChildren = {
   MapasProvinciaRoute: MapasProvinciaRoute,
   PaquetesEnRiesgoRoute: PaquetesEnRiesgoRoute,
   PudosRoute: PudosRoute,
+  LeadsRoute: LeadsRoute,
+  ReclutamientoRoute: ReclutamientoRoute,
   ReclamacionesRoute: ReclamacionesRoute,
   ReportesRoute: ReportesRoute,
   RecTokenRoute: RecTokenRoute,

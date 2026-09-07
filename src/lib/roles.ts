@@ -42,6 +42,11 @@ export type NavItem = { to: string; label: string };
 // "/pudos" es nueva: gap de distancia GPS en entregas PUDO, se revisa a
 // diario — mismo acceso operativo que /paquetes-en-riesgo/flow-meeting
 // (admin/manager/jefe_flota), no es un módulo financiero.
+//
+// "/leads" es nueva: Reclutamiento de Repartidores. admin/manager ven todos
+// los leads (incluidos los "sin asignar" por CP), jefe_flota ve solo los de
+// su hub. "/reclutamiento" (el formulario público para Milanuncios) NO va
+// acá — es una ruta pública sin RequireAuth, como "/rec/$token".
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
@@ -50,6 +55,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/paquetes-en-riesgo", label: "Paquetes en Riesgo" },
   { to: "/flow-meeting", label: "Flow Meeting" },
   { to: "/pudos", label: "PUDOs" },
+  { to: "/leads", label: "Leads" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
@@ -67,6 +73,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/paquetes-en-riesgo",
     "/flow-meeting",
     "/pudos",
+    "/leads",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
@@ -85,6 +92,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/paquetes-en-riesgo",
     "/flow-meeting",
     "/pudos",
+    "/leads",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
@@ -102,6 +110,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/paquetes-en-riesgo",
     "/flow-meeting",
     "/pudos",
+    "/leads",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",
