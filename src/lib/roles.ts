@@ -48,11 +48,9 @@ export type NavItem = { to: string; label: string };
 // su hub. "/reclutamiento" (el formulario público para Milanuncios) NO va
 // acá — es una ruta pública sin RequireAuth, como "/rec/$token".
 //
-// "/agentes" es nueva: panel del Equipo Operativo (los 6 agentes
-// trabajadores, fase 1). Solo admin/manager — son quienes disparan cada
-// agente manualmente y ven los hallazgos; jefe_flota no lo necesita todavía
-// (nada de esto le llega directo a él en esta fase, eso es del Agente Jefe
-// más adelante).
+// "/agentes" (Equipo Operativo, los 6 agentes trabajadores) es solo admin —
+// decisión explícita del usuario: se le quitó el acceso a manager (lo tenía
+// en la fase 1) para mantener ese panel restringido a administradores.
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
@@ -101,7 +99,6 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/flow-meeting",
     "/pudos",
     "/leads",
-    "/agentes",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",

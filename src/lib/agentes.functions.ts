@@ -35,31 +35,15 @@ export type ResultadoAgente = {
   urgencia: Urgencia;
 };
 
-// A diferencia de mapas.functions.ts (un recurso único, no por hub), acá los
-// datos SÍ son por hub — mismo criterio que el resto de la app (confirmado
-// varias veces esta sesión, ej. fix_manager_hub_access.sql): manager se
-// comporta igual que jefe_flota, solo ve los hubs de su usuario_hubs; SOLO
-// admin ve todos. Si hubId es null (vista agregada, ej. el historial sin
-// filtrar), únicamente admin puede pedirla.
+// Decisión explícita del usuario: el Equipo Operativo queda restringido a
+// admin únicamente — manager tenía acceso (limitado a sus hubs vía
+// usuario_hubs) en la fase 1, pero se le quitó. hubId ya no se usa acá; se
+// mantiene el parámetro para no tocar las 7 firmas de los call sites.
 async function assertAccesoAgente(supabase: any, userId: string, hubId: string | null): Promise<void> {
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
   const role = profile?.role as string | undefined;
   if (role === "admin") return;
-  if (role !== "manager") {
-    throw new Error("Solo administradores o managers pueden ejecutar agentes.");
-  }
-  if (!hubId) {
-    throw new Error("Un manager tiene que elegir un hub — la vista sin filtrar es solo para admin.");
-  }
-  const { data: uh } = await supabase
-    .from("usuario_hubs")
-    .select("hub_id")
-    .eq("user_id", userId)
-    .eq("hub_id", hubId)
-    .maybeSingle();
-  if (!uh) {
-    throw new Error("No tenés acceso a este hub.");
-  }
+  throw new Error("Solo administradores pueden ejecutar agentes.");
 }
 
 async function registrarEjecucion(params: {

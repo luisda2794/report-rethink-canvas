@@ -23,7 +23,7 @@ import {
 
 export const Route = createFileRoute("/agentes")({
   component: () => (
-    <RequireAuth path="/agentes">
+    <RequireAuth adminOnly>
       <AgentesPage />
     </RequireAuth>
   ),
