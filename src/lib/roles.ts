@@ -51,6 +51,13 @@ export type NavItem = { to: string; label: string };
 // "/agentes" (Equipo Operativo, los 6 agentes trabajadores) es solo admin —
 // decisión explícita del usuario: se le quitó el acceso a manager (lo tenía
 // en la fase 1) para mantener ese panel restringido a administradores.
+//
+// "/helm" es nueva: Helm, orquestación de agentes de NEGOCIO (ventas/
+// comunicaciones/finanzas) — módulo separado del Equipo Operativo (que es
+// operativo/logístico, por hub). Fase 1 = shell de control, sin LLM ni
+// integraciones reales todavía. Solo admin, mismo criterio que /agentes;
+// posible candidato a exportarse como producto separado más adelante (de
+// ahí el prefijo helm_ en sus tablas).
 export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
@@ -61,6 +68,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/pudos", label: "PUDOs" },
   { to: "/leads", label: "Leads" },
   { to: "/agentes", label: "Equipo Operativo" },
+  { to: "/helm", label: "Helm" },
   { to: "/reclamaciones", label: "Reclamaciones" },
   { to: "/drivers", label: "Drivers" },
   { to: "/borradores", label: "Facturación" },
@@ -80,6 +88,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/pudos",
     "/leads",
     "/agentes",
+    "/helm",
     "/duplicados",
     "/reclamaciones",
     "/mapas-provincia",

@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      agente_ejecuciones: {
+        Row: {
+          agente: string
+          duracion_ms: number | null
+          ejecutado_en: string
+          ejecutado_por: string | null
+          error: string | null
+          exito: boolean
+          hallazgos: Json
+          hub_id: string | null
+          id: string
+          urgencia: string | null
+        }
+        Insert: {
+          agente: string
+          duracion_ms?: number | null
+          ejecutado_en?: string
+          ejecutado_por?: string | null
+          error?: string | null
+          exito?: boolean
+          hallazgos?: Json
+          hub_id?: string | null
+          id?: string
+          urgencia?: string | null
+        }
+        Update: {
+          agente?: string
+          duracion_ms?: number | null
+          ejecutado_en?: string
+          ejecutado_por?: string | null
+          error?: string | null
+          exito?: boolean
+          hallazgos?: Json
+          hub_id?: string | null
+          id?: string
+          urgencia?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agente_ejecuciones_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       borrador_lineas: {
         Row: {
           borrador_id: string
@@ -679,6 +726,158 @@ export type Database = {
           },
         ]
       }
+      helm_agentes: {
+        Row: {
+          categoria: string
+          creado_en: string
+          creado_por: string | null
+          cron_programado: string | null
+          descripcion: string | null
+          estado: string
+          id: string
+          nombre: string
+          tipo_disparo: string
+          ultima_ejecucion_en: string | null
+        }
+        Insert: {
+          categoria: string
+          creado_en?: string
+          creado_por?: string | null
+          cron_programado?: string | null
+          descripcion?: string | null
+          estado?: string
+          id?: string
+          nombre: string
+          tipo_disparo?: string
+          ultima_ejecucion_en?: string | null
+        }
+        Update: {
+          categoria?: string
+          creado_en?: string
+          creado_por?: string | null
+          cron_programado?: string | null
+          descripcion?: string | null
+          estado?: string
+          id?: string
+          nombre?: string
+          tipo_disparo?: string
+          ultima_ejecucion_en?: string | null
+        }
+        Relationships: []
+      }
+      helm_aprobaciones: {
+        Row: {
+          agente_id: string
+          decidido_en: string | null
+          decidido_por: string | null
+          descripcion_accion: string
+          ejecucion_id: string | null
+          estado: string
+          id: string
+          solicitado_en: string
+        }
+        Insert: {
+          agente_id: string
+          decidido_en?: string | null
+          decidido_por?: string | null
+          descripcion_accion: string
+          ejecucion_id?: string | null
+          estado?: string
+          id?: string
+          solicitado_en?: string
+        }
+        Update: {
+          agente_id?: string
+          decidido_en?: string | null
+          decidido_por?: string | null
+          descripcion_accion?: string
+          ejecucion_id?: string | null
+          estado?: string
+          id?: string
+          solicitado_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "helm_aprobaciones_agente_id_fkey"
+            columns: ["agente_id"]
+            isOneToOne: false
+            referencedRelation: "helm_agentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "helm_aprobaciones_ejecucion_id_fkey"
+            columns: ["ejecucion_id"]
+            isOneToOne: false
+            referencedRelation: "helm_ejecuciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      helm_ejecuciones: {
+        Row: {
+          agente_id: string
+          ejecutado_por: string | null
+          estado: string
+          finalizado_en: string | null
+          id: string
+          iniciado_en: string
+          resumen: string | null
+          tareas_completadas: number
+        }
+        Insert: {
+          agente_id: string
+          ejecutado_por?: string | null
+          estado?: string
+          finalizado_en?: string | null
+          id?: string
+          iniciado_en?: string
+          resumen?: string | null
+          tareas_completadas?: number
+        }
+        Update: {
+          agente_id?: string
+          ejecutado_por?: string | null
+          estado?: string
+          finalizado_en?: string | null
+          id?: string
+          iniciado_en?: string
+          resumen?: string | null
+          tareas_completadas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "helm_ejecuciones_agente_id_fkey"
+            columns: ["agente_id"]
+            isOneToOne: false
+            referencedRelation: "helm_agentes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      helm_integraciones: {
+        Row: {
+          categoria: string
+          creado_en: string
+          estado: string
+          id: string
+          nombre: string
+        }
+        Insert: {
+          categoria: string
+          creado_en?: string
+          estado?: string
+          id?: string
+          nombre: string
+        }
+        Update: {
+          categoria?: string
+          creado_en?: string
+          estado?: string
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
       hub_daily_cache: {
         Row: {
           calculado_en: string
@@ -740,6 +939,62 @@ export type Database = {
           nombre?: string
         }
         Relationships: []
+      }
+      leads_reclutamiento: {
+        Row: {
+          actualizado_en: string
+          codigo_postal: string | null
+          creado_en: string
+          estado: string
+          estado_actualizado_en: string
+          fuente: string
+          hub_id: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          proxima_llamada: string | null
+          raw: Json | null
+          telefono: string
+        }
+        Insert: {
+          actualizado_en?: string
+          codigo_postal?: string | null
+          creado_en?: string
+          estado?: string
+          estado_actualizado_en?: string
+          fuente: string
+          hub_id?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          proxima_llamada?: string | null
+          raw?: Json | null
+          telefono: string
+        }
+        Update: {
+          actualizado_en?: string
+          codigo_postal?: string | null
+          creado_en?: string
+          estado?: string
+          estado_actualizado_en?: string
+          fuente?: string
+          hub_id?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          proxima_llamada?: string | null
+          raw?: Json | null
+          telefono?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_reclutamiento_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mapa_cp_data: {
         Row: {
