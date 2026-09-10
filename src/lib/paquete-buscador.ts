@@ -191,9 +191,52 @@ function ordenarEventos(a: PaqueteLineaRaw, b: PaqueteLineaRaw): number {
   return a.row_index - b.row_index;
 }
 
+// epod_lineas no tiene UNIQUE constraint (ver comentario en epod.tsx junto al
+// insert): si el mismo archivo de ePOD se sube dos veces, o el mismo
+// waybill/lp_no aparece repetido dentro del mismo archivo con datos
+// idénticos, quedan filas duplicadas byte-a-byte salvo por id/
+// epod_upload_id/row_index. Sin filtrarlas, cada re-subida duplicaría
+// también las entregas, los intentos fallidos y las incidencias en la
+// trayectoria. Se compara TODO el contenido del evento (no solo fecha+
+// estado) para no fusionar dos intentos reales y distintos del mismo día.
+function fingerprintLinea(r: PaqueteLineaRaw): string {
+  return [
+    r.estado,
+    r.fecha ?? "",
+    r.driver ?? "",
+    r.cp ?? "",
+    r.direccion ?? "",
+    r.contacto ?? "",
+    r.tipo ?? "",
+    r.tipo_norm ?? "",
+    r.exception_detail ?? "",
+    r.tiempo_entrega ?? "",
+    r.tiempo_fracaso ?? "",
+    r.pop_station_id ?? "",
+    r.market_place_name ?? "",
+    r.seller_name ?? "",
+    r.latitude ?? "",
+    r.longitude ?? "",
+    r.entrega_real_latitude ?? "",
+    r.entrega_real_longitude ?? "",
+  ].join("|");
+}
+
+function dedupeLineas(lineas: PaqueteLineaRaw[]): PaqueteLineaRaw[] {
+  const vistos = new Set<string>();
+  const resultado: PaqueteLineaRaw[] = [];
+  for (const r of lineas) {
+    const key = fingerprintLinea(r);
+    if (vistos.has(key)) continue;
+    vistos.add(key);
+    resultado.push(r);
+  }
+  return resultado;
+}
+
 export function buildResultado(lineas: PaqueteLineaRaw[], reclamaciones: ReclamacionRaw[]): PaqueteResultado | null {
   if (lineas.length === 0) return null;
-  const ordenadas = [...lineas].sort(ordenarEventos);
+  const ordenadas = [...dedupeLineas(lineas)].sort(ordenarEventos);
   const eventos = ordenadas.map(toEvento);
   const last = ordenadas[ordenadas.length - 1];
 
