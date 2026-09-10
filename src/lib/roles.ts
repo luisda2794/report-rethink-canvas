@@ -43,6 +43,13 @@ export type NavItem = { to: string; label: string };
 // diario — mismo acceso operativo que /paquetes-en-riesgo/flow-meeting
 // (admin/manager/jefe_flota), no es un módulo financiero.
 //
+// "/buscador" es nueva: Buscador de Paquetes por Waybill/LP (trayectoria,
+// intentos de entrega, incidencias, gap de distancia, CD actual). Mismo
+// acceso operativo del día a día que /paquetes-en-riesgo y /pudos
+// (admin/manager/jefe_flota) — no filtra por hub seleccionado, encuentra el
+// paquete en cualquier hub al que el usuario tenga acceso (RLS de
+// epod_lineas ya lo restringe).
+//
 // "/leads" es nueva: Reclutamiento de Repartidores. admin/manager ven todos
 // los leads (incluidos los "sin asignar" por CP), jefe_flota ve solo los de
 // su hub. "/reclutamiento" (el formulario público para Milanuncios) NO va
@@ -62,6 +69,7 @@ export const ALL_NAV: NavItem[] = [
   { to: "/epod", label: "ePOD" },
   { to: "/dashboard", label: "Dashboard" },
   { to: "/mapa-entregas", label: "Mapa de Entregas" },
+  { to: "/buscador", label: "Buscador de Paquetes" },
   { to: "/reportes", label: "KPIs" },
   { to: "/paquetes-en-riesgo", label: "Paquetes en Riesgo" },
   { to: "/flow-meeting", label: "Flow Meeting" },
@@ -82,6 +90,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/epod",
     "/dashboard",
     "/mapa-entregas",
+    "/buscador",
     "/reportes",
     "/paquetes-en-riesgo",
     "/flow-meeting",
@@ -103,6 +112,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/epod",
     "/dashboard",
     "/mapa-entregas",
+    "/buscador",
     "/reportes",
     "/paquetes-en-riesgo",
     "/flow-meeting",
@@ -121,6 +131,7 @@ export const ROUTE_ACCESS: Record<Role, string[]> = {
     "/epod",
     "/dashboard",
     "/mapa-entregas",
+    "/buscador",
     "/reportes",
     "/paquetes-en-riesgo",
     "/flow-meeting",
