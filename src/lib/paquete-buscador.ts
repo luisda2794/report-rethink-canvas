@@ -184,10 +184,28 @@ function toEvento(r: PaqueteLineaRaw): EventoTrayectoria {
   };
 }
 
+// "fecha" es la fecha de la TAREA/batch, no cuándo ocurrió el evento de
+// verdad (ver resolve-event-date.ts) — y row_index es solo la posición de la
+// fila dentro del archivo ePOD que la subió, sin relación cronológica entre
+// archivos distintos. Ordenar por row_index como antes podía dejar una
+// "Entregado" con hora real más tardía ANTES que un "Attempt Failure" del
+// mismo día. Se ordena por el timestamp real resuelto (tiempo_entrega/
+// tiempo_fracaso, con fecha de tarea como respaldo) y solo se usa row_index
+// como último desempate si dos filas resuelven al mismo instante.
+function timestampDeFila(r: PaqueteLineaRaw): number {
+  const resuelta = resolveEventDate({
+    estado: r.estado,
+    fechaTarea: r.fecha ? new Date(r.fecha) : null,
+    tiempoEntrega: r.tiempo_entrega ? new Date(r.tiempo_entrega) : null,
+    tiempoFracaso: r.tiempo_fracaso ? new Date(r.tiempo_fracaso) : null,
+  });
+  return resuelta ? resuelta.getTime() : 0;
+}
+
 function ordenarEventos(a: PaqueteLineaRaw, b: PaqueteLineaRaw): number {
-  const fa = a.fecha ?? "";
-  const fb = b.fecha ?? "";
-  if (fa !== fb) return fa < fb ? -1 : 1;
+  const ta = timestampDeFila(a);
+  const tb = timestampDeFila(b);
+  if (ta !== tb) return ta - tb;
   return a.row_index - b.row_index;
 }
 
