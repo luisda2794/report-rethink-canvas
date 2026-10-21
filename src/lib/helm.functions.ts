@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { canAccess, type Role } from "@/lib/roles";
 
 // ============================================================
 // Helm — Fase 1: el "shell" de control del panel de orquestación de
@@ -78,6 +79,51 @@ async function assertEsAdmin(supabase: any, userId: string): Promise<void> {
   if (role === "admin") return;
   throw new Error("Solo administradores pueden acceder a Helm.");
 }
+
+// ============================================================
+// CENTRO DE MANDO (pestaña de /dashboard)
+// ============================================================
+
+export type HelmCentroDeMando = {
+  agentes: HelmAgente[];
+  ejecucionesRecientes: Array<{ iniciado_en: string; tareas_completadas: number }>;
+  aprobacionesPendientes: number;
+};
+
+// Única lectura de Helm abierta a no-admins: el Centro de Mando vive como
+// pestaña de /dashboard, así que lo ve quien puede entrar a /dashboard
+// (hoy admin/manager/jefe_flota, ver ROUTE_ACCESS). Devuelve solo lo que
+// la vista pinta — agentes + conteos — y no los resúmenes de ejecución ni
+// los textos de aprobaciones. Ejecutar/decidir/integraciones siguen solo
+// admin (assertEsAdmin).
+export const obtenerCentroDeMandoHelm = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<HelmCentroDeMando> => {
+    const { data: profile } = await context.supabase.from("profiles").select("role").eq("id", context.userId).maybeSingle();
+    const role = (profile?.role ?? null) as Role | null;
+    if (!canAccess(role, "/dashboard")) throw new Error("No tienes acceso al Centro de Mando.");
+
+    // 48h hacia atrás: el cliente filtra "hoy" con su zona horaria local.
+    const desde = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const [agentesRes, ejecucionesRes, pendientesRes] = await Promise.all([
+      supabaseAdmin
+        .from("helm_agentes")
+        .select("id, nombre, categoria, descripcion, estado, tipo_disparo, cron_programado, ultima_ejecucion_en, creado_en")
+        .order("categoria")
+        .order("nombre"),
+      supabaseAdmin.from("helm_ejecuciones").select("iniciado_en, tareas_completadas").gte("iniciado_en", desde),
+      supabaseAdmin.from("helm_aprobaciones").select("id", { count: "exact", head: true }).eq("estado", "pendiente"),
+    ]);
+    if (agentesRes.error) throw new Error(agentesRes.error.message);
+    if (ejecucionesRes.error) throw new Error(ejecucionesRes.error.message);
+    if (pendientesRes.error) throw new Error(pendientesRes.error.message);
+
+    return {
+      agentes: (agentesRes.data ?? []) as HelmAgente[],
+      ejecucionesRecientes: ejecucionesRes.data ?? [],
+      aprobacionesPendientes: pendientesRes.count ?? 0,
+    };
+  });
 
 // ============================================================
 // AGENTES

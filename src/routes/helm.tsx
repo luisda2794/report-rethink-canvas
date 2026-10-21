@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Play, Loader2, Check, X, Link2, Maximize2 } from "lucide-react";
+import { Play, Loader2, Check, X, Link2 } from "lucide-react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { Topbar } from "@/components/Topbar";
 import { StatusIndicator } from "@/components/indicator";
@@ -23,6 +23,17 @@ import {
   type HelmAprobacionRow,
   type HelmIntegracion,
 } from "@/lib/helm.functions";
+import {
+  CATEGORIA_LABEL,
+  CATEGORIA_LINE_STROKE,
+  ESTADO_AGENTE_COLOR,
+  ESTADO_AGENTE_DOT_FILL,
+  GRAFO_CX,
+  GRAFO_CY,
+  agruparPorCategoria,
+  computeGrafoLayout,
+  isHoy,
+} from "@/lib/helm-grafo";
 
 export const Route = createFileRoute("/helm")({
   component: () => (
@@ -38,22 +49,10 @@ export const Route = createFileRoute("/helm")({
 // (emerald/rose/amber/sky), reutilizada acá como pill de texto+fondo suave
 // para categoría — no se inventa una paleta nueva.
 // ============================================================
-const CATEGORIA_LABEL: Record<HelmCategoria, string> = {
-  ventas: "Ventas",
-  comunicaciones: "Comunicaciones",
-  finanzas: "Finanzas",
-};
-
 const CATEGORIA_PILL: Record<HelmCategoria, string> = {
   ventas: "bg-rose-500/10 text-rose-600",
   comunicaciones: "bg-sky-500/10 text-sky-600",
   finanzas: "bg-emerald-500/10 text-emerald-600",
-};
-
-const ESTADO_AGENTE_COLOR: Record<HelmAgenteEstado, "emerald" | "amber" | "rose"> = {
-  activo: "emerald",
-  pausado: "amber",
-  error: "rose",
 };
 
 const ESTADO_AGENTE_LABEL: Record<HelmAgenteEstado, string> = {
@@ -80,38 +79,13 @@ const TIPO_DISPARO_LABEL: Record<HelmAgente["tipo_disparo"], string> = {
   evento: "Evento",
 };
 
-// ============================================================
-// Grafo radial del Dashboard: hub central "Helm" -> 3 hubs de categoría
-// (a radio GRAFO_R1, ángulos fijos) -> agentes de cada categoría (a radio
-// GRAFO_R2 desde SU hub de categoría, en abanico hacia afuera del centro).
-// Todo calculado a partir de los agentes reales, nada hardcodeado salvo
-// los ángulos/radios del layout.
-//
-// Convención de ángulo: 0° = arriba, sentido horario.
-// x = cx + r*sin(ángulo), y = cy - r*cos(ángulo).
-// ============================================================
-const GRAFO_CX = 500;
-const GRAFO_CY = 300;
-const GRAFO_R1 = 170; // centro -> hub de categoría
-const GRAFO_R2 = 95; // hub de categoría -> agente
-const GRAFO_SPREAD_DEG = 35; // apertura del abanico de agentes a cada lado del ángulo base
-
-const CATEGORIA_ANGLE: Record<HelmCategoria, number> = {
-  comunicaciones: 0,
-  finanzas: 120,
-  ventas: 240,
-};
-
+// Colores del grafo radial en tema claro. La geometría (posiciones de hubs y
+// agentes) vive en lib/helm-grafo.ts, compartida con el Centro de Mando de
+// /dashboard.
 const CATEGORIA_HUB_FILL: Record<HelmCategoria, string> = {
   ventas: "fill-rose-500",
   comunicaciones: "fill-sky-500",
   finanzas: "fill-emerald-500",
-};
-
-const CATEGORIA_LINE_STROKE: Record<HelmCategoria, string> = {
-  ventas: "stroke-rose-400",
-  comunicaciones: "stroke-sky-400",
-  finanzas: "stroke-emerald-400",
 };
 
 const CATEGORIA_NODE_FILL: Record<HelmCategoria, string> = {
@@ -125,83 +99,6 @@ const CATEGORIA_LABEL_FILL: Record<HelmCategoria, string> = {
   comunicaciones: "fill-sky-600",
   finanzas: "fill-emerald-600",
 };
-
-const ESTADO_AGENTE_DOT_FILL: Record<HelmAgenteEstado, string> = {
-  activo: "fill-emerald-500",
-  pausado: "fill-amber-500",
-  error: "fill-rose-500",
-};
-
-function toRad(deg: number): number {
-  return (deg * Math.PI) / 180;
-}
-
-function pointOnCircle(cx: number, cy: number, r: number, angleDeg: number): { x: number; y: number } {
-  const rad = toRad(angleDeg);
-  return { x: cx + r * Math.sin(rad), y: cy - r * Math.cos(rad) };
-}
-
-// Reparte los agentes de una categoría en abanico alrededor de hubAngle,
-// entre -GRAFO_SPREAD_DEG y +GRAFO_SPREAD_DEG (un solo agente va justo en
-// hubAngle).
-function anguloAgente(hubAngle: number, index: number, total: number): number {
-  if (total <= 1) return hubAngle;
-  return hubAngle - GRAFO_SPREAD_DEG + (2 * GRAFO_SPREAD_DEG * index) / (total - 1);
-}
-
-// Corta el nombre del agente en líneas de ~14 caracteres por palabras
-// completas — nunca corta una palabra a la mitad, así el label queda
-// legible sin recortar el nombre.
-function wrapLabel(nombre: string, maxCharsPerLine = 14): string[] {
-  const palabras = nombre.split(" ");
-  const lineas: string[] = [];
-  let actual = "";
-  for (const palabra of palabras) {
-    const candidata = actual ? `${actual} ${palabra}` : palabra;
-    if (candidata.length > maxCharsPerLine && actual) {
-      lineas.push(actual);
-      actual = palabra;
-    } else {
-      actual = candidata;
-    }
-  }
-  if (actual) lineas.push(actual);
-  return lineas;
-}
-
-type GrafoAgenteNodo = {
-  agente: HelmAgente;
-  x: number;
-  y: number;
-  lineas: string[];
-};
-
-type GrafoCategoriaNodo = {
-  categoria: HelmCategoria;
-  hubAngle: number;
-  hub: { x: number; y: number };
-  labelPos: { x: number; y: number };
-  agentes: GrafoAgenteNodo[];
-};
-
-// Única fuente de verdad de la geometría del grafo: la usan tanto HelmGraph
-// (claro) como HelmGraphDark (Centro de Mando) para garantizar que ambas
-// vistas dibujan exactamente los mismos datos en las mismas posiciones.
-function computeGrafoLayout(agentesPorCategoria: Record<HelmCategoria, HelmAgente[]>): GrafoCategoriaNodo[] {
-  const categorias: HelmCategoria[] = ["comunicaciones", "finanzas", "ventas"];
-  return categorias.map((categoria) => {
-    const hubAngle = CATEGORIA_ANGLE[categoria];
-    const hub = pointOnCircle(GRAFO_CX, GRAFO_CY, GRAFO_R1, hubAngle);
-    const labelPos = pointOnCircle(GRAFO_CX, GRAFO_CY, GRAFO_R1 - 55, hubAngle);
-    const agentesRaw = agentesPorCategoria[categoria];
-    const agentes = agentesRaw.map((agente, i) => {
-      const agenteAngle = anguloAgente(hubAngle, i, agentesRaw.length);
-      const pos = pointOnCircle(hub.x, hub.y, GRAFO_R2, agenteAngle);
-      return { agente, x: pos.x, y: pos.y, lineas: wrapLabel(agente.nombre) };
-    });
-    return { categoria, hubAngle, hub, labelPos, agentes };
-  });
-}
 
 function HelmGraph({
   agentesPorCategoria,
@@ -294,136 +191,9 @@ function HelmGraph({
   );
 }
 
-// ============================================================
-// Centro de Mando: misma geometría (computeGrafoLayout) re-temáticamente
-// oscura, con brillo pulsante y líneas de energía animadas. Capa 100%
-// visual — no altera datos ni lógica.
-// ============================================================
-const CATEGORIA_HUB_GLOW_FILL: Record<HelmCategoria, string> = {
-  ventas: "fill-rose-400",
-  comunicaciones: "fill-sky-400",
-  finanzas: "fill-emerald-400",
-};
-
-const CATEGORIA_PILL_DARK: Record<HelmCategoria, string> = {
-  ventas: "bg-rose-400/10 text-rose-300",
-  comunicaciones: "bg-sky-400/10 text-sky-300",
-  finanzas: "bg-emerald-400/10 text-emerald-300",
-};
-
-function HelmGraphDark({
-  agentesPorCategoria,
-  selectedId,
-  onSelect,
-}: {
-  agentesPorCategoria: Record<HelmCategoria, HelmAgente[]>;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const layout = useMemo(() => computeGrafoLayout(agentesPorCategoria), [agentesPorCategoria]);
-
+function CategoriaPill({ categoria }: { categoria: HelmCategoria }) {
   return (
-    <svg viewBox="0 0 1000 560" className="w-full h-auto" role="img" aria-label="Centro de mando: mapa de agentes Helm">
-      <defs>
-        <filter id="helm-cdm-glow" x="-150%" y="-150%" width="400%" height="400%">
-          <feGaussianBlur stdDeviation="9" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {layout.map(({ categoria, hub, labelPos, agentes }) => (
-        <g key={categoria}>
-          <line
-            x1={GRAFO_CX}
-            y1={GRAFO_CY}
-            x2={hub.x}
-            y2={hub.y}
-            className={`${CATEGORIA_LINE_STROKE[categoria]} helm-cdm-flow`}
-            strokeWidth={2}
-            opacity={0.8}
-          />
-
-          {agentes.map(({ agente, x, y, lineas }) => {
-            const isSelected = selectedId === agente.id;
-            return (
-              <g key={agente.id}>
-                <line
-                  x1={hub.x}
-                  y1={hub.y}
-                  x2={x}
-                  y2={y}
-                  className={`${CATEGORIA_LINE_STROKE[categoria]} helm-cdm-flow`}
-                  strokeWidth={1.5}
-                  opacity={0.5}
-                />
-                <g
-                  className="cursor-pointer"
-                  onClick={() => onSelect(agente.id)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelect(agente.id); }}
-                >
-                  <circle
-                    cx={x}
-                    cy={y}
-                    r={isSelected ? 23 : 20}
-                    className={`fill-[#05070b] ${CATEGORIA_LINE_STROKE[categoria]}`}
-                    fillOpacity={0.75}
-                    strokeWidth={isSelected ? 2 : 1.25}
-                  />
-                  <circle
-                    cx={x + 14}
-                    cy={y - 14}
-                    r={4.5}
-                    className={`${ESTADO_AGENTE_DOT_FILL[agente.estado]} helm-cdm-pulse`}
-                    filter="url(#helm-cdm-glow)"
-                  />
-                  <text x={x} y={y + 35} textAnchor="middle" className="fill-slate-200 font-mono text-[10px]">
-                    {lineas.map((linea, li) => (
-                      <tspan key={li} x={x} dy={li === 0 ? 0 : "1.15em"}>
-                        {linea}
-                      </tspan>
-                    ))}
-                  </text>
-                </g>
-              </g>
-            );
-          })}
-
-          <circle
-            cx={hub.x}
-            cy={hub.y}
-            r={24}
-            className={`${CATEGORIA_HUB_GLOW_FILL[categoria]} helm-cdm-pulse`}
-            filter="url(#helm-cdm-glow)"
-          />
-          <circle cx={hub.x} cy={hub.y} r={20} className={CATEGORIA_HUB_GLOW_FILL[categoria]} />
-          <text
-            x={labelPos.x}
-            y={labelPos.y}
-            textAnchor="middle"
-            className="fill-slate-300 font-mono text-[11px] font-semibold uppercase tracking-wide"
-          >
-            {CATEGORIA_LABEL[categoria]}
-          </text>
-        </g>
-      ))}
-
-      <circle cx={GRAFO_CX} cy={GRAFO_CY} r={42} className="fill-electric helm-cdm-pulse" filter="url(#helm-cdm-glow)" />
-      <circle cx={GRAFO_CX} cy={GRAFO_CY} r={36} className="fill-electric" />
-      <text x={GRAFO_CX} y={GRAFO_CY + 5} textAnchor="middle" className="fill-white font-mono text-sm font-bold uppercase tracking-wide">
-        Helm
-      </text>
-    </svg>
-  );
-}
-
-function CategoriaPill({ categoria, dark = false }: { categoria: HelmCategoria; dark?: boolean }) {
-  return (
-    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${dark ? CATEGORIA_PILL_DARK[categoria] : CATEGORIA_PILL[categoria]}`}>
+    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-medium ${CATEGORIA_PILL[categoria]}`}>
       {CATEGORIA_LABEL[categoria]}
     </span>
   );
@@ -434,180 +204,6 @@ function StatChip({ label, value }: { label: string; value: number }) {
     <div className="bg-surface border border-hairline rounded-lg p-4">
       <p className="text-[11px] font-mono uppercase tracking-wide text-muted-text">{label}</p>
       <p className="text-2xl font-semibold text-ink mt-1">{value}</p>
-    </div>
-  );
-}
-
-function isHoy(iso: string): boolean {
-  const d = new Date(iso);
-  const hoy = new Date();
-  return d.getFullYear() === hoy.getFullYear() && d.getMonth() === hoy.getMonth() && d.getDate() === hoy.getDate();
-}
-
-function CentroDeMandoOverlay({
-  agentesPorCategoria,
-  stats,
-  agentes,
-  selectedAgenteId,
-  onSelect,
-  selectedAgente,
-  ejecutando,
-  onRunAgente,
-  onClose,
-}: {
-  agentesPorCategoria: Record<HelmCategoria, HelmAgente[]>;
-  stats: { agentesActivos: number; ejecucionesHoy: number; tareasHoy: number; aprobacionesPendientes: number };
-  agentes: HelmAgente[];
-  selectedAgenteId: string | null;
-  onSelect: (id: string) => void;
-  selectedAgente: HelmAgente | null;
-  ejecutando: Set<string>;
-  onRunAgente: (agente: HelmAgente) => void;
-  onClose: () => void;
-}) {
-  const [ahora, setAhora] = useState(() => new Date());
-
-  useEffect(() => {
-    const t = setInterval(() => setAhora(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[100] bg-[#05070b] overflow-hidden">
-      <style>{`
-        @keyframes helm-cdm-pulse-glow {
-          0%, 100% { opacity: 0.55; }
-          50% { opacity: 1; }
-        }
-        @keyframes helm-cdm-dash {
-          to { stroke-dashoffset: -20; }
-        }
-        @keyframes helm-cdm-blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.25; }
-        }
-        .helm-cdm-pulse {
-          animation: helm-cdm-pulse-glow 2.4s ease-in-out infinite;
-        }
-        .helm-cdm-flow {
-          stroke-dasharray: 4 6;
-          animation: helm-cdm-dash 1s linear infinite;
-        }
-        .helm-cdm-live-dot {
-          animation: helm-cdm-blink 1.4s ease-in-out infinite;
-        }
-      `}</style>
-
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: "radial-gradient(circle at 50% 45%, rgba(56,189,248,0.10), transparent 60%)" }}
-      />
-
-      <div className="relative h-full w-full flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="helm-cdm-live-dot absolute inline-flex h-full w-full rounded-full bg-emerald-400" />
-            </span>
-            <span className="text-[11px] font-mono uppercase tracking-widest text-emerald-400">En vivo</span>
-            <span className="text-[11px] font-mono text-slate-500">{ahora.toLocaleTimeString("es-ES")}</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded border border-white/10 text-slate-300 text-xs font-mono uppercase tracking-wide hover:bg-white/10"
-          >
-            <X className="size-3.5" />
-            Cerrar
-          </button>
-        </div>
-
-        <div className="relative flex-1 min-h-0">
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="w-full max-w-5xl">
-              <HelmGraphDark
-                agentesPorCategoria={agentesPorCategoria}
-                selectedId={selectedAgenteId}
-                onSelect={onSelect}
-              />
-            </div>
-          </div>
-
-          <div className="absolute left-6 top-6 bottom-6 w-56 hidden lg:flex flex-col pointer-events-none">
-            <div className="bg-white/5 backdrop-blur border border-white/10 rounded-lg p-4 pointer-events-auto">
-              <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 mb-3">Estado general</p>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wide text-slate-500">Agentes activos</p>
-                  <p className="text-xl font-semibold text-slate-100">{stats.agentesActivos}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wide text-slate-500">Ejecuciones hoy</p>
-                  <p className="text-xl font-semibold text-slate-100">{stats.ejecucionesHoy}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wide text-slate-500">Tareas hoy</p>
-                  <p className="text-xl font-semibold text-slate-100">{stats.tareasHoy}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-mono uppercase tracking-wide text-slate-500">Aprobaciones pendientes</p>
-                  <p className="text-xl font-semibold text-slate-100">{stats.aprobacionesPendientes}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute right-6 top-6 bottom-6 w-64 hidden lg:flex flex-col pointer-events-none">
-            <div className="bg-white/5 backdrop-blur border border-white/10 rounded-lg p-3 flex-1 min-h-0 flex flex-col pointer-events-auto">
-              <p className="text-[10px] font-mono uppercase tracking-widest text-slate-400 px-1 pb-2 shrink-0">Agentes</p>
-              <div className="flex-1 min-h-0 overflow-y-auto space-y-1">
-                {agentes.map((agente) => (
-                  <button
-                    key={agente.id}
-                    onClick={() => onSelect(agente.id)}
-                    className={`w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors ${
-                      selectedAgenteId === agente.id ? "bg-white/10" : "hover:bg-white/5"
-                    }`}
-                  >
-                    <StatusIndicator color={ESTADO_AGENTE_COLOR[agente.estado]} pulse={agente.estado === "activo"} />
-                    <span className="text-xs text-slate-200 truncate">{agente.nombre}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {selectedAgente && (
-            <div className="absolute left-1/2 -translate-x-1/2 bottom-6 w-[min(90vw,32rem)]">
-              <div className="bg-white/5 backdrop-blur border border-white/10 rounded-lg p-4 flex items-start justify-between gap-4 flex-wrap">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <StatusIndicator color={ESTADO_AGENTE_COLOR[selectedAgente.estado]} pulse={selectedAgente.estado === "activo"} />
-                    <p className="text-sm font-semibold text-slate-100">{selectedAgente.nombre}</p>
-                    <CategoriaPill categoria={selectedAgente.categoria} dark />
-                  </div>
-                  <p className="text-xs text-slate-400 mt-1.5">{selectedAgente.descripcion}</p>
-                </div>
-                <button
-                  onClick={() => onRunAgente(selectedAgente)}
-                  disabled={ejecutando.has(selectedAgente.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-electric text-white rounded text-xs font-mono uppercase tracking-wide hover:opacity-90 disabled:opacity-50 shrink-0"
-                >
-                  {ejecutando.has(selectedAgente.id) ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
-                  {ejecutando.has(selectedAgente.id) ? "Ejecutando…" : "Ejecutar ahora"}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
@@ -625,7 +221,6 @@ function HelmPage() {
   const [loadingAgentes, setLoadingAgentes] = useState(true);
   const [ejecutando, setEjecutando] = useState<Set<string>>(new Set());
   const [selectedAgenteId, setSelectedAgenteId] = useState<string | null>(null);
-  const [centroDeMandoAbierto, setCentroDeMandoAbierto] = useState(false);
 
   const [ejecuciones, setEjecuciones] = useState<HelmEjecucionRow[]>([]);
   const [loadingEjecuciones, setLoadingEjecuciones] = useState(true);
@@ -748,11 +343,7 @@ function HelmPage() {
     };
   }, [agentes, ejecuciones, pendientes]);
 
-  const agentesPorCategoria = useMemo(() => {
-    const grupos: Record<HelmCategoria, HelmAgente[]> = { ventas: [], comunicaciones: [], finanzas: [] };
-    for (const a of agentes) grupos[a.categoria].push(a);
-    return grupos;
-  }, [agentes]);
+  const agentesPorCategoria = useMemo(() => agruparPorCategoria(agentes), [agentes]);
 
   const selectedAgente = useMemo(
     () => agentes.find((a) => a.id === selectedAgenteId) ?? null,
@@ -760,7 +351,6 @@ function HelmPage() {
   );
 
   return (
-    <>
     <div className="min-h-screen bg-background text-foreground font-syne flex flex-col">
       <Topbar section="Helm" />
       <div className="flex-1 px-6 lg:px-12 py-10 lg:py-14">
@@ -782,16 +372,6 @@ function HelmPage() {
 
             {/* ==================== DASHBOARD ==================== */}
             <TabsContent value="dashboard" className="space-y-8">
-              <div className="flex items-center justify-end">
-                <button
-                  onClick={() => setCentroDeMandoAbierto(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-hairline rounded text-xs font-mono uppercase tracking-wide text-ink hover:bg-surface-2"
-                >
-                  <Maximize2 className="size-3.5" />
-                  Pantalla completa
-                </button>
-              </div>
-
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <StatChip label="Agentes activos" value={stats.agentesActivos} />
                 <StatChip label="Ejecuciones hoy" value={stats.ejecucionesHoy} />
@@ -1051,19 +631,5 @@ function HelmPage() {
         </div>
       </div>
     </div>
-    {centroDeMandoAbierto && (
-      <CentroDeMandoOverlay
-        agentesPorCategoria={agentesPorCategoria}
-        stats={stats}
-        agentes={agentes}
-        selectedAgenteId={selectedAgenteId}
-        onSelect={setSelectedAgenteId}
-        selectedAgente={selectedAgente}
-        ejecutando={ejecutando}
-        onRunAgente={runAgente}
-        onClose={() => setCentroDeMandoAbierto(false)}
-      />
-    )}
-    </>
   );
 }
