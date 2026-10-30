@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clasificarOrigen, esDireccionIncorrecta, limiteHoras, metrica } from "./riesgo-origen";
+import { clasificarOrigen, esDireccionIncorrecta, esEstadoRepartoHoy, limiteHoras, metrica } from "./riesgo-origen";
 
 describe("origen del cliente", () => {
   it("marketplace Yun Express es China", () => expect(clasificarOrigen("Tienda X", "Yun Express")).toBe("China"));

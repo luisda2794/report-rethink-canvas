@@ -39,3 +39,21 @@ export function limiteHoras(origen: Origen): number {
 export function metrica(origen: Origen, horasDesdeInbound: number): "CD5" | "CD9" {
   return origen === "China" || horasDesdeInbound > CD9_HORAS ? "CD9" : "CD5";
 }
+
+// Estados que cuentan como "en reparto hoy": el paquete solo entra en la
+// lista si tiene hoy un evento con uno de estos estados (recibido por el
+// repartidor, fallado, entregado o cancelado). Espejo de riesgo_cd_stats.
+export const ESTADOS_REPARTO_HOY = [
+  "driver_received",
+  "driver_received_incidencias",
+  "attempt failure",
+  "delivered",
+  "entregado",
+  "cancel",
+  "cancelar",
+  "cancelled",
+] as const;
+
+export function esEstadoRepartoHoy(status: string | null | undefined): boolean {
+  return (ESTADOS_REPARTO_HOY as readonly string[]).includes((status ?? "").toLowerCase());
+}
