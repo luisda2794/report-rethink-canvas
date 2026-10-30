@@ -14,7 +14,7 @@ export const Route = createFileRoute("/paquetes-en-riesgo")({
       { title: "Menssajero — Paquetes en Riesgo" },
       {
         name: "description",
-        content: "Paquetes en reparto hoy (recibidos, fallados, entregados o cancelados) con su riesgo CD5/CD9 por horas.",
+        content: "Paquetes en reparto hoy (recibidos, fallados o cancelados, sin entregados) con su riesgo CD5/CD9 por horas.",
       },
     ],
   }),
