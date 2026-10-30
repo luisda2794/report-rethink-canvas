@@ -762,6 +762,158 @@ export type Database = {
           },
         ]
       }
+      helm_agentes: {
+        Row: {
+          categoria: string
+          creado_en: string
+          creado_por: string | null
+          cron_programado: string | null
+          descripcion: string | null
+          estado: string
+          id: string
+          nombre: string
+          tipo_disparo: string
+          ultima_ejecucion_en: string | null
+        }
+        Insert: {
+          categoria: string
+          creado_en?: string
+          creado_por?: string | null
+          cron_programado?: string | null
+          descripcion?: string | null
+          estado?: string
+          id?: string
+          nombre: string
+          tipo_disparo?: string
+          ultima_ejecucion_en?: string | null
+        }
+        Update: {
+          categoria?: string
+          creado_en?: string
+          creado_por?: string | null
+          cron_programado?: string | null
+          descripcion?: string | null
+          estado?: string
+          id?: string
+          nombre?: string
+          tipo_disparo?: string
+          ultima_ejecucion_en?: string | null
+        }
+        Relationships: []
+      }
+      helm_aprobaciones: {
+        Row: {
+          agente_id: string
+          decidido_en: string | null
+          decidido_por: string | null
+          descripcion_accion: string
+          ejecucion_id: string | null
+          estado: string
+          id: string
+          solicitado_en: string
+        }
+        Insert: {
+          agente_id: string
+          decidido_en?: string | null
+          decidido_por?: string | null
+          descripcion_accion: string
+          ejecucion_id?: string | null
+          estado?: string
+          id?: string
+          solicitado_en?: string
+        }
+        Update: {
+          agente_id?: string
+          decidido_en?: string | null
+          decidido_por?: string | null
+          descripcion_accion?: string
+          ejecucion_id?: string | null
+          estado?: string
+          id?: string
+          solicitado_en?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "helm_aprobaciones_agente_id_fkey"
+            columns: ["agente_id"]
+            isOneToOne: false
+            referencedRelation: "helm_agentes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "helm_aprobaciones_ejecucion_id_fkey"
+            columns: ["ejecucion_id"]
+            isOneToOne: false
+            referencedRelation: "helm_ejecuciones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      helm_ejecuciones: {
+        Row: {
+          agente_id: string
+          ejecutado_por: string | null
+          estado: string
+          finalizado_en: string | null
+          id: string
+          iniciado_en: string
+          resumen: string | null
+          tareas_completadas: number
+        }
+        Insert: {
+          agente_id: string
+          ejecutado_por?: string | null
+          estado?: string
+          finalizado_en?: string | null
+          id?: string
+          iniciado_en?: string
+          resumen?: string | null
+          tareas_completadas?: number
+        }
+        Update: {
+          agente_id?: string
+          ejecutado_por?: string | null
+          estado?: string
+          finalizado_en?: string | null
+          id?: string
+          iniciado_en?: string
+          resumen?: string | null
+          tareas_completadas?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "helm_ejecuciones_agente_id_fkey"
+            columns: ["agente_id"]
+            isOneToOne: false
+            referencedRelation: "helm_agentes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      helm_integraciones: {
+        Row: {
+          categoria: string
+          creado_en: string
+          estado: string
+          id: string
+          nombre: string
+        }
+        Insert: {
+          categoria: string
+          creado_en?: string
+          estado?: string
+          id?: string
+          nombre: string
+        }
+        Update: {
+          categoria?: string
+          creado_en?: string
+          estado?: string
+          id?: string
+          nombre?: string
+        }
+        Relationships: []
+      }
       hub_cp_excluidos: {
         Row: {
           cp: string
