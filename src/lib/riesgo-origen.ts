@@ -47,6 +47,9 @@ export function metrica(origen: Origen, horasDesdeInbound: number): "CD5" | "CD9
 export const ESTADOS_REPARTO_HOY = [
   "driver_received",
   "driver_received_incidencias",
+  "driver_received_incidence",
+  "driver received incidence",
+  "driver pick up",
   "attempt failure",
   "cancel",
   "cancelar",
