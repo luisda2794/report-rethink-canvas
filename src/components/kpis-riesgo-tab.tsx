@@ -68,7 +68,7 @@ export function KpisRiesgoTab({ hubId, hubMarca }: { hubId: string | null; hubMa
   return (
     <div className="flex flex-col gap-6">
       <p className="text-sm text-muted-foreground">
-        Solo paquetes en reparto hoy: recibidos por el repartidor, fallados, entregados o cancelados en el día de hoy.
+        Solo paquetes en reparto hoy: recibidos por el repartidor, fallados o cancelados en el día de hoy. Los entregados no aparecen.
       </p>
       {data.sin_horas && (
         <div className="flex items-center gap-2 rounded-md border border-warn/40 bg-warn/10 px-4 py-3 text-sm">
