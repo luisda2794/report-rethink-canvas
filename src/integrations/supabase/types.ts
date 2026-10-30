@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -527,16 +527,26 @@ export type Database = {
           contacto: string | null
           cp: string | null
           created_at: string
+          creation_at: string | null
+          delivered_at: string | null
+          delivery_type_raw: string | null
           direccion: string | null
           driver: string | null
+          entrega_real_latitude: number | null
+          entrega_real_longitude: number | null
           epod_upload_id: string | null
           estado: string
           exception_detail: string | null
+          export_at: string | null
+          fail_detail: string | null
+          failed_at: string | null
           fecha: string | null
           fecha_inbound: string | null
           hub_id: string
           id: string
+          inbound_at: string | null
           latitude: number | null
+          locker_pudo_id: string | null
           longitude: number | null
           lp_no: string
           market_place_name: string | null
@@ -545,6 +555,8 @@ export type Database = {
           row_index: number
           seller_name: string | null
           source: string | null
+          task_code: string | null
+          task_status_raw: string | null
           tiempo_entrega: string | null
           tiempo_fracaso: string | null
           tipo: string | null
@@ -556,16 +568,26 @@ export type Database = {
           contacto?: string | null
           cp?: string | null
           created_at?: string
+          creation_at?: string | null
+          delivered_at?: string | null
+          delivery_type_raw?: string | null
           direccion?: string | null
           driver?: string | null
+          entrega_real_latitude?: number | null
+          entrega_real_longitude?: number | null
           epod_upload_id?: string | null
           estado?: string
           exception_detail?: string | null
+          export_at?: string | null
+          fail_detail?: string | null
+          failed_at?: string | null
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id: string
           id?: string
+          inbound_at?: string | null
           latitude?: number | null
+          locker_pudo_id?: string | null
           longitude?: number | null
           lp_no: string
           market_place_name?: string | null
@@ -574,6 +596,8 @@ export type Database = {
           row_index: number
           seller_name?: string | null
           source?: string | null
+          task_code?: string | null
+          task_status_raw?: string | null
           tiempo_entrega?: string | null
           tiempo_fracaso?: string | null
           tipo?: string | null
@@ -585,16 +609,26 @@ export type Database = {
           contacto?: string | null
           cp?: string | null
           created_at?: string
+          creation_at?: string | null
+          delivered_at?: string | null
+          delivery_type_raw?: string | null
           direccion?: string | null
           driver?: string | null
+          entrega_real_latitude?: number | null
+          entrega_real_longitude?: number | null
           epod_upload_id?: string | null
           estado?: string
           exception_detail?: string | null
+          export_at?: string | null
+          fail_detail?: string | null
+          failed_at?: string | null
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id?: string
           id?: string
+          inbound_at?: string | null
           latitude?: number | null
+          locker_pudo_id?: string | null
           longitude?: number | null
           lp_no?: string
           market_place_name?: string | null
@@ -603,6 +637,8 @@ export type Database = {
           row_index?: number
           seller_name?: string | null
           source?: string | null
+          task_code?: string | null
+          task_status_raw?: string | null
           tiempo_entrega?: string | null
           tiempo_fracaso?: string | null
           tipo?: string | null
@@ -878,6 +914,35 @@ export type Database = {
         }
         Relationships: []
       }
+      hub_cp_excluidos: {
+        Row: {
+          cp: string
+          created_at: string
+          hub_id: string
+          id: string
+        }
+        Insert: {
+          cp: string
+          created_at?: string
+          hub_id: string
+          id?: string
+        }
+        Update: {
+          cp?: string
+          created_at?: string
+          hub_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hub_cp_excluidos_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hub_daily_cache: {
         Row: {
           calculado_en: string
@@ -1114,6 +1179,7 @@ export type Database = {
       }
       reclamaciones: {
         Row: {
+          aplica_apelacion: boolean | null
           comentarios: string | null
           cp: string | null
           created_at: string
@@ -1132,6 +1198,7 @@ export type Database = {
           id: string
           importe: number | null
           lp_no: string | null
+          motivo_apelacion: string | null
           nombre_driver_resp: string | null
           nota_cierre: string | null
           ref: string
@@ -1142,6 +1209,7 @@ export type Database = {
           waybill: string | null
         }
         Insert: {
+          aplica_apelacion?: boolean | null
           comentarios?: string | null
           cp?: string | null
           created_at?: string
@@ -1160,6 +1228,7 @@ export type Database = {
           id?: string
           importe?: number | null
           lp_no?: string | null
+          motivo_apelacion?: string | null
           nombre_driver_resp?: string | null
           nota_cierre?: string | null
           ref?: string
@@ -1170,6 +1239,7 @@ export type Database = {
           waybill?: string | null
         }
         Update: {
+          aplica_apelacion?: boolean | null
           comentarios?: string | null
           cp?: string | null
           created_at?: string
@@ -1188,6 +1258,7 @@ export type Database = {
           id?: string
           importe?: number | null
           lp_no?: string | null
+          motivo_apelacion?: string | null
           nombre_driver_resp?: string | null
           nota_cierre?: string | null
           ref?: string
@@ -1213,6 +1284,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      seller_origen: {
+        Row: {
+          id: string
+          market_place_name: string
+          motivo: string | null
+          origen: string
+          seller_name: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          market_place_name?: string
+          motivo?: string | null
+          origen: string
+          seller_name: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          market_place_name?: string
+          motivo?: string | null
+          origen?: string
+          seller_name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       situaciones_especiales: {
         Row: {
@@ -1413,6 +1511,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clasificar_origen: {
+        Args: { _market: string; _seller: string }
+        Returns: string
+      }
       dashboard_dsr_stats: {
         Args: {
           _hub_ids: string[]
@@ -1434,11 +1536,17 @@ export type Database = {
       get_user_role: { Args: { _user_id: string }; Returns: string }
       has_all_hub_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      norm_txt: { Args: { _s: string }; Returns: string }
       paquetes_en_riesgo_stats: {
         Args: { _fecha: string; _hub_id: string; _umbral_dias?: number }
         Returns: Json
       }
       refresh_cd5_snapshots: { Args: never; Returns: undefined }
+      riesgo_cd_stats: {
+        Args: { _hub_id: string; _now?: string }
+        Returns: Json
+      }
+      upsert_epod_lineas: { Args: { _rows: Json }; Returns: number }
     }
     Enums: {
       [_ in never]: never
@@ -1457,12 +1565,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1486,11 +1594,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1511,11 +1619,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1536,11 +1644,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1553,11 +1661,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

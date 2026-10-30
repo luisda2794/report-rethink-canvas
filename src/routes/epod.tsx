@@ -84,6 +84,14 @@ const COL = {
   tiempoEntrega: ["Tiempo de Entrega", "Delivery Time"],
   tiempoFracaso: ["Tiempo del Fracaso de la Entrega", "Delivery Failure Time"],
   ciudad: ["La ciudad de destino", "The destination city"],
+  // Columnas con fecha+hora (CD5/CD9 por horas). Horas del ePOD = Europe/Madrid.
+  inboundTime: ["Inbound Time", "Hora de entrada", "Hora de Inbound"],
+  creationTime: ["Creation time", "Hora de creación", "Tiempo de creación"],
+  taskCode: ["Task Code", "Código de tarea", "Código de la tarea"],
+  taskStatusRaw: ["Task Status", "Estado de la Tarea"],
+  deliveryTypeRaw: ["Delivery Type", "Tipo de Entrega"],
+  failDetail: ["Delivery Fail Detail", "Detalle del fallo de entrega", "Detalle de fallo de entrega"],
+  lockerPudo: ["Locker/PUDO ID", "Locker PUDO ID", "ID Locker/PUDO"],
 };
 
 function normalizeKey(k: string) {
@@ -125,6 +133,42 @@ function parseDate(v: unknown): string | null {
   if (m2) return m2[0];
   return null;
 }
+
+// Devuelve "YYYY-MM-DDTHH:mm:ss" (hora local de Madrid, sin zona); la función
+// SQL upsert_epod_lineas la convierte a timestamptz con AT TIME ZONE.
+function parseDateTime(v: unknown): string | null {
+  if (v == null || v === "") return null;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (v instanceof Date) {
+    if (Number.isNaN(v.getTime())) return null;
+    return `${v.getFullYear()}-${pad(v.getMonth() + 1)}-${pad(v.getDate())}T${pad(v.getHours())}:${pad(v.getMinutes())}:${pad(v.getSeconds())}`;
+  }
+  if (typeof v === "number") {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (d) return `${d.y}-${pad(d.m)}-${pad(d.d)}T${pad(d.H)}:${pad(d.M)}:${pad(Math.floor(d.S))}`;
+  }
+  const s = String(v).trim();
+  const m = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
+  if (m) {
+    const yr = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${yr}-${pad(+m[2])}-${pad(+m[1])}T${pad(+(m[4] ?? 0))}:${m[5] ?? "00"}:${m[6] ?? "00"}`;
+  }
+  const m2 = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/.exec(s);
+  if (m2) return `${m2[1]}-${m2[2]}-${m2[3]}T${pad(+(m2[4] ?? 0))}:${m2[5] ?? "00"}:${m2[6] ?? "00"}`;
+  return null;
+}
+
+// "EPOD_TASK_LIST_V2 20261022031011.xlsx" → "2026-10-22T03:10:11"
+export function exportAtFromFilename(name: string): string | null {
+  const m = /(20\d{2})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/.exec(name);
+  if (!m) return null;
+  return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}`;
+}
+function nowMadridNaive(): string {
+  const f = new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" });
+  return f.format(new Date()).replace(" ", "T");
+}
+const cleanText = (s: string) => s.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
 
 function normalizeEstado(s: string): string {
   const v = (s || "").trim();
@@ -191,6 +235,15 @@ type ParsedRow = {
   tiempo_entrega: string | null;
   tiempo_fracaso: string | null;
   ciudad: string | null;
+  inbound_at: string | null;
+  creation_at: string | null;
+  delivered_at: string | null;
+  failed_at: string | null;
+  task_status_raw: string | null;
+  delivery_type_raw: string | null;
+  fail_detail: string | null;
+  locker_pudo_id: string | null;
+  task_code: string | null;
 };
 
 function rawField(row: Record<string, unknown>, candidates: string[]): unknown {
@@ -234,6 +287,15 @@ function processEpod(rows: Record<string, unknown>[]): ParsedRow[] {
       tiempo_entrega: parseDate(rawField(r, COL.tiempoEntrega)),
       tiempo_fracaso: parseDate(rawField(r, COL.tiempoFracaso)),
       ciudad: pickField(r, COL.ciudad) || null,
+      inbound_at: parseDateTime(rawField(r, COL.inboundTime)),
+      creation_at: parseDateTime(rawField(r, COL.creationTime)),
+      delivered_at: parseDateTime(rawField(r, COL.tiempoEntrega)),
+      failed_at: parseDateTime(rawField(r, COL.tiempoFracaso)),
+      task_status_raw: pickField(r, COL.taskStatusRaw) || null,
+      delivery_type_raw: rawTipo ? rawTipo.toUpperCase() : null,
+      fail_detail: cleanText(pickField(r, COL.failDetail)) || null,
+      locker_pudo_id: pickField(r, COL.lockerPudo) || null,
+      task_code: pickField(r, COL.taskCode) || null,
     });
   }
 
@@ -286,13 +348,16 @@ type ProcessResult = {
 
 function EpodPage() {
   const { selectedHub, user } = useAuth();
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const file = files[0] ?? null;
+  const setFile = (f: File | null) => setFiles(f ? [f] : []);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<ProcessResult | null>(null);
   const [history, setHistory] = useState<UploadHistory[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [currentFile, setCurrentFile] = useState<{ name: string; index: number; total: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const loadHistory = async () => {
@@ -316,7 +381,7 @@ function EpodPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const deleteUpload = async (u: UploadHistory) => {
     if (!selectedHub) return;
-    if (!confirm(`¿Eliminar ePOD "${u.filename}" y todas sus entregas asociadas? Esta acción no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar ePOD "${u.filename}" y todas sus entregas asociadas? Se borrarán las tareas cuya versión más reciente vino de este archivo (si una exportación posterior las actualizó, se conservan). Esta acción no se puede deshacer.`)) return;
     setDeletingId(u.id);
     try {
       const { error: eErr } = await supabase
@@ -340,15 +405,16 @@ function EpodPage() {
     }
   };
 
-  const handleFile = (f: File | null | undefined) => {
-    if (!f) return;
-    if (!/\.(xlsx|xls)$/i.test(f.name)) {
-      setError("Por favor sube un archivo Excel (.xlsx)");
+  const handleFile = (list: FileList | null | undefined) => {
+    const arr = Array.from(list ?? []);
+    if (arr.length === 0) return;
+    if (arr.some((f) => !/\.(xlsx|xls)$/i.test(f.name))) {
+      setError("Por favor sube solo archivos Excel (.xlsx)");
       return;
     }
     setError(null);
     setResult(null);
-    setFile(f);
+    setFiles(arr);
   };
 
   const clearFile = () => {
@@ -358,11 +424,32 @@ function EpodPage() {
   };
 
   const procesar = async () => {
-    if (!file || !selectedHub) return;
+    if (files.length === 0 || !selectedHub) return;
     setProcessing(true);
     setError(null);
     setResult(null);
+    // Orden por export_at ascendente: la más reciente se aplica al final
+    // (igual el upsert ignora exportaciones más antiguas).
+    const ordered = [...files].sort((a, b) =>
+      (exportAtFromFilename(a.name) ?? "").localeCompare(exportAtFromFilename(b.name) ?? ""),
+    );
+    let ok = 0;
+    for (let i = 0; i < ordered.length; i++) {
+      setCurrentFile({ name: ordered[i].name, index: i + 1, total: ordered.length });
+      if (await procesarUno(ordered[i])) ok++;
+    }
+    setCurrentFile(null);
+    setProcessing(false);
+    if (ok === ordered.length) {
+      setFiles([]);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const procesarUno = async (file: File): Promise<boolean> => {
+    if (!selectedHub) return false;
     setProgress(null);
+    const exportAt = exportAtFromFilename(file.name) ?? nowMadridNaive();
     // Si el upload se registra pero el resto del proceso falla (p.ej. un
     // batch de epod_lineas o entregas), lo limpiamos en el catch para no
     // dejar un registro "fantasma" en el historial (procesado, con
@@ -464,7 +551,22 @@ function EpodPage() {
         tiempo_entrega: r.tiempo_entrega,
         tiempo_fracaso: r.tiempo_fracaso,
         ciudad: r.ciudad,
+        inbound_at: r.inbound_at,
+        creation_at: r.creation_at,
+        delivered_at: r.delivered_at,
+        failed_at: r.failed_at,
+        export_at: exportAt,
+        task_status_raw: r.task_status_raw,
+        delivery_type_raw: r.delivery_type_raw,
+        fail_detail: r.fail_detail,
+        locker_pudo_id: r.locker_pudo_id,
+        task_code: r.task_code,
       }));
+      // Un mismo Task Code repetido dentro del archivo rompería el ON
+      // CONFLICT; nos quedamos con su última aparición.
+      const byTask = new Map<string, number>();
+      linePayload.forEach((l, i) => { if (l.task_code) byTask.set(l.task_code, i); });
+      const lineasFinal = linePayload.filter((l, i) => !l.task_code || byTask.get(l.task_code) === i);
 
       // Lotes de 1000 filas (no un solo insert gigante). epod_lineas no tiene
       // ningún UNIQUE constraint (a diferencia de entregas), así que los
@@ -474,10 +576,10 @@ function EpodPage() {
       // llega al catch de abajo vía describeError().
       const chunk = 1000;
       const concurrency = 4;
-      for (let i = 0; i < linePayload.length; i += chunk) {
-        const { error: lineErr } = await supabase
-          .from("epod_lineas")
-          .insert(linePayload.slice(i, i + chunk));
+      for (let i = 0; i < lineasFinal.length; i += chunk) {
+        const { error: lineErr } = await supabase.rpc("upsert_epod_lineas", {
+          _rows: lineasFinal.slice(i, i + chunk) as never,
+        });
         if (lineErr) throw lineErr;
       }
 
@@ -527,8 +629,7 @@ function EpodPage() {
         console.error("[ePOD] Error recalculando caché de reportes:", e),
       );
       await loadHistory();
-      setFile(null);
-      if (inputRef.current) inputRef.current.value = "";
+      return true;
     } catch (e) {
       console.error("[ePOD] Error procesando el archivo:", e);
       if (e instanceof Error && e.stack) console.error("[ePOD] Stack:", e.stack);
@@ -552,8 +653,7 @@ function EpodPage() {
           .eq("id", failedUploadId);
         if (cleanupUploadErr) console.error("[ePOD] No se pudo limpiar el registro de upload fallido:", cleanupUploadErr);
       }
-    } finally {
-      setProcessing(false);
+      return false;
     }
   };
 
@@ -595,7 +695,7 @@ function EpodPage() {
                     onDrop={(e) => {
                       e.preventDefault();
                       setDragOver(false);
-                      handleFile(e.dataTransfer.files?.[0]);
+                      handleFile(e.dataTransfer.files);
                     }}
                     onClick={() => inputRef.current?.click()}
                     className={`group relative border-2 border-dashed transition-colors p-14 flex flex-col items-center justify-center rounded-lg cursor-pointer ${
@@ -608,8 +708,9 @@ function EpodPage() {
                       ref={inputRef}
                       type="file"
                       accept=".xlsx,.xls"
+                      multiple
                       className="sr-only"
-                      onChange={(e) => handleFile(e.target.files?.[0])}
+                      onChange={(e) => handleFile(e.target.files)}
                     />
                     <div className="size-14 bg-surface-2 rounded-md flex items-center justify-center mb-4 ring-1 ring-hairline">
                       <Upload className="size-6 text-electric" strokeWidth={1.75} />
@@ -627,9 +728,9 @@ function EpodPage() {
                       <FileSpreadsheet className="size-5 text-electric" strokeWidth={2} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-mono text-sm text-ink truncate">{file.name}</div>
+                      <div className="font-mono text-sm text-ink truncate">{files.length > 1 ? `${files.length} archivos: ${files.map((f) => f.name).join(", ")}` : file.name}</div>
                       <div className="font-mono text-[10px] text-muted-text tracking-widest uppercase mt-0.5">
-                        {formatSize(file.size)} · LISTO PARA PROCESAR
+                        {formatSize(files.reduce((n, f) => n + f.size, 0))} · {currentFile ? `PROCESANDO ${currentFile.index}/${currentFile.total}` : "LISTO PARA PROCESAR"}
                       </div>
                     </div>
                     <button
