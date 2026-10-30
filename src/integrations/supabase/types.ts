@@ -527,6 +527,9 @@ export type Database = {
           contacto: string | null
           cp: string | null
           created_at: string
+          creation_at: string | null
+          delivered_at: string | null
+          delivery_type_raw: string | null
           direccion: string | null
           driver: string | null
           entrega_real_latitude: number | null
@@ -534,11 +537,16 @@ export type Database = {
           epod_upload_id: string | null
           estado: string
           exception_detail: string | null
+          export_at: string | null
+          fail_detail: string | null
+          failed_at: string | null
           fecha: string | null
           fecha_inbound: string | null
           hub_id: string
           id: string
+          inbound_at: string | null
           latitude: number | null
+          locker_pudo_id: string | null
           longitude: number | null
           lp_no: string
           market_place_name: string | null
@@ -547,6 +555,8 @@ export type Database = {
           row_index: number
           seller_name: string | null
           source: string | null
+          task_code: string | null
+          task_status_raw: string | null
           tiempo_entrega: string | null
           tiempo_fracaso: string | null
           tipo: string | null
@@ -558,6 +568,9 @@ export type Database = {
           contacto?: string | null
           cp?: string | null
           created_at?: string
+          creation_at?: string | null
+          delivered_at?: string | null
+          delivery_type_raw?: string | null
           direccion?: string | null
           driver?: string | null
           entrega_real_latitude?: number | null
@@ -565,11 +578,16 @@ export type Database = {
           epod_upload_id?: string | null
           estado?: string
           exception_detail?: string | null
+          export_at?: string | null
+          fail_detail?: string | null
+          failed_at?: string | null
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id: string
           id?: string
+          inbound_at?: string | null
           latitude?: number | null
+          locker_pudo_id?: string | null
           longitude?: number | null
           lp_no: string
           market_place_name?: string | null
@@ -578,6 +596,8 @@ export type Database = {
           row_index: number
           seller_name?: string | null
           source?: string | null
+          task_code?: string | null
+          task_status_raw?: string | null
           tiempo_entrega?: string | null
           tiempo_fracaso?: string | null
           tipo?: string | null
@@ -589,6 +609,9 @@ export type Database = {
           contacto?: string | null
           cp?: string | null
           created_at?: string
+          creation_at?: string | null
+          delivered_at?: string | null
+          delivery_type_raw?: string | null
           direccion?: string | null
           driver?: string | null
           entrega_real_latitude?: number | null
@@ -596,11 +619,16 @@ export type Database = {
           epod_upload_id?: string | null
           estado?: string
           exception_detail?: string | null
+          export_at?: string | null
+          fail_detail?: string | null
+          failed_at?: string | null
           fecha?: string | null
           fecha_inbound?: string | null
           hub_id?: string
           id?: string
+          inbound_at?: string | null
           latitude?: number | null
+          locker_pudo_id?: string | null
           longitude?: number | null
           lp_no?: string
           market_place_name?: string | null
@@ -609,6 +637,8 @@ export type Database = {
           row_index?: number
           seller_name?: string | null
           source?: string | null
+          task_code?: string | null
+          task_status_raw?: string | null
           tiempo_entrega?: string | null
           tiempo_fracaso?: string | null
           tipo?: string | null
@@ -725,6 +755,35 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "facturas_cainiao_hub_id_fkey"
+            columns: ["hub_id"]
+            isOneToOne: false
+            referencedRelation: "hubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hub_cp_excluidos: {
+        Row: {
+          cp: string
+          created_at: string
+          hub_id: string
+          id: string
+        }
+        Insert: {
+          cp: string
+          created_at?: string
+          hub_id: string
+          id?: string
+        }
+        Update: {
+          cp?: string
+          created_at?: string
+          hub_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hub_cp_excluidos_hub_id_fkey"
             columns: ["hub_id"]
             isOneToOne: false
             referencedRelation: "hubs"
@@ -1074,6 +1133,33 @@ export type Database = {
           },
         ]
       }
+      seller_origen: {
+        Row: {
+          id: string
+          market_place_name: string
+          motivo: string | null
+          origen: string
+          seller_name: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          market_place_name?: string
+          motivo?: string | null
+          origen: string
+          seller_name: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          market_place_name?: string
+          motivo?: string | null
+          origen?: string
+          seller_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       situaciones_especiales: {
         Row: {
           codigo_postal: string
@@ -1273,6 +1359,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clasificar_origen: {
+        Args: { _market: string; _seller: string }
+        Returns: string
+      }
       dashboard_dsr_stats: {
         Args: {
           _hub_ids: string[]
@@ -1294,11 +1384,17 @@ export type Database = {
       get_user_role: { Args: { _user_id: string }; Returns: string }
       has_all_hub_access: { Args: { _user_id: string }; Returns: boolean }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
+      norm_txt: { Args: { _s: string }; Returns: string }
       paquetes_en_riesgo_stats: {
         Args: { _fecha: string; _hub_id: string; _umbral_dias?: number }
         Returns: Json
       }
       refresh_cd5_snapshots: { Args: never; Returns: undefined }
+      riesgo_cd_stats: {
+        Args: { _hub_id: string; _now?: string }
+        Returns: Json
+      }
+      upsert_epod_lineas: { Args: { _rows: Json }; Returns: number }
     }
     Enums: {
       [_ in never]: never
