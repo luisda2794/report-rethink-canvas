@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clasificarOrigen, esDireccionIncorrecta, limiteHoras, metrica } from "./riesgo-origen";
+import { clasificarOrigen, esDireccionIncorrecta, esEstadoRepartoHoy, limiteHoras, metrica } from "./riesgo-origen";
 
 describe("origen del cliente", () => {
   it("marketplace Yun Express es China", () => expect(clasificarOrigen("Tienda X", "Yun Express")).toBe("China"));
@@ -23,4 +23,14 @@ describe("R5 dirección incorrecta", () => {
   it("sin acentos ni mayúsculas", () => expect(esDireccionIncorrecta("DIRECCION INCORRECTA")).toBe(true));
   it("con typo dirrección", () => expect(esDireccionIncorrecta("Dirrección\u00a0incorrecta")).toBe(true));
   it("otro motivo no", () => expect(esDireccionIncorrecta("Fuera de mi Ruta")).toBe(false));
+});
+
+describe("en reparto hoy", () => {
+  it("Driver_received cuenta", () => expect(esEstadoRepartoHoy("Driver_received")).toBe(true));
+  it("Attempt Failure cuenta", () => expect(esEstadoRepartoHoy("Attempt Failure")).toBe(true));
+  it("Entregado cuenta", () => expect(esEstadoRepartoHoy("Entregado")).toBe(true));
+  it("Cancelar cuenta", () => expect(esEstadoRepartoHoy("Cancelar")).toBe(true));
+  it("INBOUND no cuenta", () => expect(esEstadoRepartoHoy("INBOUND")).toBe(false));
+  it("Assigned no cuenta", () => expect(esEstadoRepartoHoy("Assigned")).toBe(false));
+  it("vacío no cuenta", () => expect(esEstadoRepartoHoy(null)).toBe(false));
 });
