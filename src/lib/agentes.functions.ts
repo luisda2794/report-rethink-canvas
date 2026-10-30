@@ -27,7 +27,7 @@ import { isoAddDays } from "@/lib/business-days";
 // ============================================================
 
 export type Urgencia = "critica" | "informativa";
-export type Hallazgo = Record<string, unknown> & { titulo: string; detalle: string };
+export type Hallazgo = { [k: string]: import("@/integrations/supabase/types").Json | undefined } & { titulo: string; detalle: string };
 export type ResultadoAgente = {
   agente: string;
   hub_id: string | null;
