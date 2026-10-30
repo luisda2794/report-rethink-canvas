@@ -36,6 +36,13 @@
       "when": 1793357412919,
       "tag": "0004_riesgo_cd_incluir_driver_pick_up",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793357595981,
+      "tag": "0005_riesgo_cd_solo_hasta_manana",
+      "breakpoints": true
     }
   ]
 }
