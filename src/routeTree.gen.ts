@@ -9,152 +9,42 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
-import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AgentesRouteImport } from './routes/agentes'
-import { Route as AprobacionesRouteImport } from './routes/aprobaciones'
-import { Route as BorradoresRouteImport } from './routes/borradores'
-import { Route as BuscadorRouteImport } from './routes/buscador'
-import { Route as CainiaoPagosRouteImport } from './routes/cainiao-pagos'
-import { Route as Cd5RouteImport } from './routes/cd5'
-import { Route as DashboardRouteImport } from './routes/dashboard'
-import { Route as DriversRouteImport } from './routes/drivers'
-import { Route as DuplicadosRouteImport } from './routes/duplicados'
-import { Route as EpodRouteImport } from './routes/epod'
-import { Route as FacturacionRouteImport } from './routes/facturacion'
-import { Route as FlowMeetingRouteImport } from './routes/flow-meeting'
-import { Route as HelmRouteImport } from './routes/helm'
-import { Route as LeadsRouteImport } from './routes/leads'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as MapaEntregasRouteImport } from './routes/mapa-entregas'
-import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
-import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
-import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
-import { Route as PudosRouteImport } from './routes/pudos'
-import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
-import { Route as ReclutamientoRouteImport } from './routes/reclutamiento'
 import { Route as ReportesRouteImport } from './routes/reportes'
-import { Route as RecTokenRouteImport } from './routes/rec.$token'
-import { Route as ReportesClientesLocalesRouteImport } from './routes/reportes_.clientes-locales'
-import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
+import { Route as ReclutamientoRouteImport } from './routes/reclutamiento'
+import { Route as ReclamacionesRouteImport } from './routes/reclamaciones'
+import { Route as PudosRouteImport } from './routes/pudos'
+import { Route as PaquetesEnRiesgoRouteImport } from './routes/paquetes-en-riesgo'
+import { Route as MapasProvinciaRouteImport } from './routes/mapas-provincia'
+import { Route as MapasAdminRouteImport } from './routes/mapas-admin'
+import { Route as MapaEntregasRouteImport } from './routes/mapa-entregas'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as LeadsRouteImport } from './routes/leads'
+import { Route as HelmRouteImport } from './routes/helm'
+import { Route as FlowMeetingRouteImport } from './routes/flow-meeting'
+import { Route as FacturacionRouteImport } from './routes/facturacion'
+import { Route as EpodRouteImport } from './routes/epod'
+import { Route as DuplicadosRouteImport } from './routes/duplicados'
+import { Route as DriversRouteImport } from './routes/drivers'
+import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as Cd5RouteImport } from './routes/cd5'
+import { Route as CainiaoPagosRouteImport } from './routes/cainiao-pagos'
+import { Route as BuscadorRouteImport } from './routes/buscador'
+import { Route as BorradoresRouteImport } from './routes/borradores'
+import { Route as AprobacionesRouteImport } from './routes/aprobaciones'
+import { Route as AgentesRouteImport } from './routes/agentes'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportesSuperReporteRouteImport } from './routes/reportes_.super-reporte'
-import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
-import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
+import { Route as ReportesPaquetesEnRiesgoRouteImport } from './routes/reportes_.paquetes-en-riesgo'
+import { Route as ReportesClientesLocalesRouteImport } from './routes/reportes_.clientes-locales'
+import { Route as RecTokenRouteImport } from './routes/rec.$token'
 import { Route as ReportesClientesLocalesAdminRouteImport } from './routes/reportes_.clientes-locales.admin'
+import { Route as ApiReportesIdRouteImport } from './routes/api/reportes.$id'
+import { Route as ApiPublicCd5RouteImport } from './routes/api/public/cd5'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminRoute = AdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AgentesRoute = AgentesRouteImport.update({
-  id: '/agentes',
-  path: '/agentes',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AprobacionesRoute = AprobacionesRouteImport.update({
-  id: '/aprobaciones',
-  path: '/aprobaciones',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BorradoresRoute = BorradoresRouteImport.update({
-  id: '/borradores',
-  path: '/borradores',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BuscadorRoute = BuscadorRouteImport.update({
-  id: '/buscador',
-  path: '/buscador',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CainiaoPagosRoute = CainiaoPagosRouteImport.update({
-  id: '/cainiao-pagos',
-  path: '/cainiao-pagos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const Cd5Route = Cd5RouteImport.update({
-  id: '/cd5',
-  path: '/cd5',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DashboardRoute = DashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DriversRoute = DriversRouteImport.update({
-  id: '/drivers',
-  path: '/drivers',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const DuplicadosRoute = DuplicadosRouteImport.update({
-  id: '/duplicados',
-  path: '/duplicados',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const EpodRoute = EpodRouteImport.update({
-  id: '/epod',
-  path: '/epod',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FacturacionRoute = FacturacionRouteImport.update({
-  id: '/facturacion',
-  path: '/facturacion',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FlowMeetingRoute = FlowMeetingRouteImport.update({
-  id: '/flow-meeting',
-  path: '/flow-meeting',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const HelmRoute = HelmRouteImport.update({
-  id: '/helm',
-  path: '/helm',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeadsRoute = LeadsRouteImport.update({
-  id: '/leads',
-  path: '/leads',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MapaEntregasRoute = MapaEntregasRouteImport.update({
-  id: '/mapa-entregas',
-  path: '/mapa-entregas',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MapasAdminRoute = MapasAdminRouteImport.update({
-  id: '/mapas-admin',
-  path: '/mapas-admin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const MapasProvinciaRoute = MapasProvinciaRouteImport.update({
-  id: '/mapas-provincia',
-  path: '/mapas-provincia',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PaquetesEnRiesgoRoute = PaquetesEnRiesgoRouteImport.update({
-  id: '/paquetes-en-riesgo',
-  path: '/paquetes-en-riesgo',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PudosRoute = PudosRouteImport.update({
-  id: '/pudos',
-  path: '/pudos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReclamacionesRoute = ReclamacionesRouteImport.update({
-  id: '/reclamaciones',
-  path: '/reclamaciones',
+const ReportesRoute = ReportesRouteImport.update({
+  id: '/reportes',
+  path: '/reportes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReclutamientoRoute = ReclutamientoRouteImport.update({
@@ -162,19 +52,124 @@ const ReclutamientoRoute = ReclutamientoRouteImport.update({
   path: '/reclutamiento',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportesRoute = ReportesRouteImport.update({
-  id: '/reportes',
-  path: '/reportes',
+const ReclamacionesRoute = ReclamacionesRouteImport.update({
+  id: '/reclamaciones',
+  path: '/reclamaciones',
   getParentRoute: () => rootRouteImport,
 } as any)
-const RecTokenRoute = RecTokenRouteImport.update({
-  id: '/rec/$token',
-  path: '/rec/$token',
+const PudosRoute = PudosRouteImport.update({
+  id: '/pudos',
+  path: '/pudos',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ReportesClientesLocalesRoute = ReportesClientesLocalesRouteImport.update({
-  id: '/reportes_/clientes-locales',
-  path: '/reportes/clientes-locales',
+const PaquetesEnRiesgoRoute = PaquetesEnRiesgoRouteImport.update({
+  id: '/paquetes-en-riesgo',
+  path: '/paquetes-en-riesgo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapasProvinciaRoute = MapasProvinciaRouteImport.update({
+  id: '/mapas-provincia',
+  path: '/mapas-provincia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapasAdminRoute = MapasAdminRouteImport.update({
+  id: '/mapas-admin',
+  path: '/mapas-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MapaEntregasRoute = MapaEntregasRouteImport.update({
+  id: '/mapa-entregas',
+  path: '/mapa-entregas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeadsRoute = LeadsRouteImport.update({
+  id: '/leads',
+  path: '/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelmRoute = HelmRouteImport.update({
+  id: '/helm',
+  path: '/helm',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FlowMeetingRoute = FlowMeetingRouteImport.update({
+  id: '/flow-meeting',
+  path: '/flow-meeting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FacturacionRoute = FacturacionRouteImport.update({
+  id: '/facturacion',
+  path: '/facturacion',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EpodRoute = EpodRouteImport.update({
+  id: '/epod',
+  path: '/epod',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DuplicadosRoute = DuplicadosRouteImport.update({
+  id: '/duplicados',
+  path: '/duplicados',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DriversRoute = DriversRouteImport.update({
+  id: '/drivers',
+  path: '/drivers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DashboardRoute = DashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Cd5Route = Cd5RouteImport.update({
+  id: '/cd5',
+  path: '/cd5',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CainiaoPagosRoute = CainiaoPagosRouteImport.update({
+  id: '/cainiao-pagos',
+  path: '/cainiao-pagos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BuscadorRoute = BuscadorRouteImport.update({
+  id: '/buscador',
+  path: '/buscador',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BorradoresRoute = BorradoresRouteImport.update({
+  id: '/borradores',
+  path: '/borradores',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AprobacionesRoute = AprobacionesRouteImport.update({
+  id: '/aprobaciones',
+  path: '/aprobaciones',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentesRoute = AgentesRouteImport.update({
+  id: '/agentes',
+  path: '/agentes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportesSuperReporteRoute = ReportesSuperReporteRouteImport.update({
+  id: '/reportes_/super-reporte',
+  path: '/reportes/super-reporte',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportesPaquetesEnRiesgoRoute =
@@ -183,19 +178,14 @@ const ReportesPaquetesEnRiesgoRoute =
     path: '/reportes/paquetes-en-riesgo',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ReportesSuperReporteRoute = ReportesSuperReporteRouteImport.update({
-  id: '/reportes_/super-reporte',
-  path: '/reportes/super-reporte',
+const ReportesClientesLocalesRoute = ReportesClientesLocalesRouteImport.update({
+  id: '/reportes_/clientes-locales',
+  path: '/reportes/clientes-locales',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicCd5Route = ApiPublicCd5RouteImport.update({
-  id: '/api/public/cd5',
-  path: '/api/public/cd5',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiReportesIdRoute = ApiReportesIdRouteImport.update({
-  id: '/api/reportes/$id',
-  path: '/api/reportes/$id',
+const RecTokenRoute = RecTokenRouteImport.update({
+  id: '/rec/$token',
+  path: '/rec/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportesClientesLocalesAdminRoute =
@@ -204,6 +194,16 @@ const ReportesClientesLocalesAdminRoute =
     path: '/admin',
     getParentRoute: () => ReportesClientesLocalesRoute,
   } as any)
+const ApiReportesIdRoute = ApiReportesIdRouteImport.update({
+  id: '/api/reportes/$id',
+  path: '/api/reportes/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicCd5Route = ApiPublicCd5RouteImport.update({
+  id: '/api/public/cd5',
+  path: '/api/public/cd5',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -449,165 +449,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin': {
-      id: '/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/agentes': {
-      id: '/agentes'
-      path: '/agentes'
-      fullPath: '/agentes'
-      preLoaderRoute: typeof AgentesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/aprobaciones': {
-      id: '/aprobaciones'
-      path: '/aprobaciones'
-      fullPath: '/aprobaciones'
-      preLoaderRoute: typeof AprobacionesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/borradores': {
-      id: '/borradores'
-      path: '/borradores'
-      fullPath: '/borradores'
-      preLoaderRoute: typeof BorradoresRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/buscador': {
-      id: '/buscador'
-      path: '/buscador'
-      fullPath: '/buscador'
-      preLoaderRoute: typeof BuscadorRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cainiao-pagos': {
-      id: '/cainiao-pagos'
-      path: '/cainiao-pagos'
-      fullPath: '/cainiao-pagos'
-      preLoaderRoute: typeof CainiaoPagosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/cd5': {
-      id: '/cd5'
-      path: '/cd5'
-      fullPath: '/cd5'
-      preLoaderRoute: typeof Cd5RouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/dashboard': {
-      id: '/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof DashboardRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/drivers': {
-      id: '/drivers'
-      path: '/drivers'
-      fullPath: '/drivers'
-      preLoaderRoute: typeof DriversRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/duplicados': {
-      id: '/duplicados'
-      path: '/duplicados'
-      fullPath: '/duplicados'
-      preLoaderRoute: typeof DuplicadosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/epod': {
-      id: '/epod'
-      path: '/epod'
-      fullPath: '/epod'
-      preLoaderRoute: typeof EpodRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/facturacion': {
-      id: '/facturacion'
-      path: '/facturacion'
-      fullPath: '/facturacion'
-      preLoaderRoute: typeof FacturacionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/flow-meeting': {
-      id: '/flow-meeting'
-      path: '/flow-meeting'
-      fullPath: '/flow-meeting'
-      preLoaderRoute: typeof FlowMeetingRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/helm': {
-      id: '/helm'
-      path: '/helm'
-      fullPath: '/helm'
-      preLoaderRoute: typeof HelmRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leads': {
-      id: '/leads'
-      path: '/leads'
-      fullPath: '/leads'
-      preLoaderRoute: typeof LeadsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mapa-entregas': {
-      id: '/mapa-entregas'
-      path: '/mapa-entregas'
-      fullPath: '/mapa-entregas'
-      preLoaderRoute: typeof MapaEntregasRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mapas-admin': {
-      id: '/mapas-admin'
-      path: '/mapas-admin'
-      fullPath: '/mapas-admin'
-      preLoaderRoute: typeof MapasAdminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mapas-provincia': {
-      id: '/mapas-provincia'
-      path: '/mapas-provincia'
-      fullPath: '/mapas-provincia'
-      preLoaderRoute: typeof MapasProvinciaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/paquetes-en-riesgo': {
-      id: '/paquetes-en-riesgo'
-      path: '/paquetes-en-riesgo'
-      fullPath: '/paquetes-en-riesgo'
-      preLoaderRoute: typeof PaquetesEnRiesgoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pudos': {
-      id: '/pudos'
-      path: '/pudos'
-      fullPath: '/pudos'
-      preLoaderRoute: typeof PudosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reclamaciones': {
-      id: '/reclamaciones'
-      path: '/reclamaciones'
-      fullPath: '/reclamaciones'
-      preLoaderRoute: typeof ReclamacionesRouteImport
+    '/reportes': {
+      id: '/reportes'
+      path: '/reportes'
+      fullPath: '/reportes'
+      preLoaderRoute: typeof ReportesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reclutamiento': {
@@ -617,32 +463,165 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReclutamientoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reportes': {
-      id: '/reportes'
-      path: '/reportes'
-      fullPath: '/reportes'
-      preLoaderRoute: typeof ReportesRouteImport
+    '/reclamaciones': {
+      id: '/reclamaciones'
+      path: '/reclamaciones'
+      fullPath: '/reclamaciones'
+      preLoaderRoute: typeof ReclamacionesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/rec/$token': {
-      id: '/rec/$token'
-      path: '/rec/$token'
-      fullPath: '/rec/$token'
-      preLoaderRoute: typeof RecTokenRouteImport
+    '/pudos': {
+      id: '/pudos'
+      path: '/pudos'
+      fullPath: '/pudos'
+      preLoaderRoute: typeof PudosRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reportes_/clientes-locales': {
-      id: '/reportes_/clientes-locales'
-      path: '/reportes/clientes-locales'
-      fullPath: '/reportes/clientes-locales'
-      preLoaderRoute: typeof ReportesClientesLocalesRouteImport
+    '/paquetes-en-riesgo': {
+      id: '/paquetes-en-riesgo'
+      path: '/paquetes-en-riesgo'
+      fullPath: '/paquetes-en-riesgo'
+      preLoaderRoute: typeof PaquetesEnRiesgoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/reportes_/paquetes-en-riesgo': {
-      id: '/reportes_/paquetes-en-riesgo'
-      path: '/reportes/paquetes-en-riesgo'
-      fullPath: '/reportes/paquetes-en-riesgo'
-      preLoaderRoute: typeof ReportesPaquetesEnRiesgoRouteImport
+    '/mapas-provincia': {
+      id: '/mapas-provincia'
+      path: '/mapas-provincia'
+      fullPath: '/mapas-provincia'
+      preLoaderRoute: typeof MapasProvinciaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapas-admin': {
+      id: '/mapas-admin'
+      path: '/mapas-admin'
+      fullPath: '/mapas-admin'
+      preLoaderRoute: typeof MapasAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mapa-entregas': {
+      id: '/mapa-entregas'
+      path: '/mapa-entregas'
+      fullPath: '/mapa-entregas'
+      preLoaderRoute: typeof MapaEntregasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leads': {
+      id: '/leads'
+      path: '/leads'
+      fullPath: '/leads'
+      preLoaderRoute: typeof LeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/helm': {
+      id: '/helm'
+      path: '/helm'
+      fullPath: '/helm'
+      preLoaderRoute: typeof HelmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/flow-meeting': {
+      id: '/flow-meeting'
+      path: '/flow-meeting'
+      fullPath: '/flow-meeting'
+      preLoaderRoute: typeof FlowMeetingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/facturacion': {
+      id: '/facturacion'
+      path: '/facturacion'
+      fullPath: '/facturacion'
+      preLoaderRoute: typeof FacturacionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/epod': {
+      id: '/epod'
+      path: '/epod'
+      fullPath: '/epod'
+      preLoaderRoute: typeof EpodRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/duplicados': {
+      id: '/duplicados'
+      path: '/duplicados'
+      fullPath: '/duplicados'
+      preLoaderRoute: typeof DuplicadosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/drivers': {
+      id: '/drivers'
+      path: '/drivers'
+      fullPath: '/drivers'
+      preLoaderRoute: typeof DriversRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cd5': {
+      id: '/cd5'
+      path: '/cd5'
+      fullPath: '/cd5'
+      preLoaderRoute: typeof Cd5RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cainiao-pagos': {
+      id: '/cainiao-pagos'
+      path: '/cainiao-pagos'
+      fullPath: '/cainiao-pagos'
+      preLoaderRoute: typeof CainiaoPagosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/buscador': {
+      id: '/buscador'
+      path: '/buscador'
+      fullPath: '/buscador'
+      preLoaderRoute: typeof BuscadorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/borradores': {
+      id: '/borradores'
+      path: '/borradores'
+      fullPath: '/borradores'
+      preLoaderRoute: typeof BorradoresRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/aprobaciones': {
+      id: '/aprobaciones'
+      path: '/aprobaciones'
+      fullPath: '/aprobaciones'
+      preLoaderRoute: typeof AprobacionesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agentes': {
+      id: '/agentes'
+      path: '/agentes'
+      fullPath: '/agentes'
+      preLoaderRoute: typeof AgentesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reportes_/super-reporte': {
@@ -652,18 +631,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportesSuperReporteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/cd5': {
-      id: '/api/public/cd5'
-      path: '/api/public/cd5'
-      fullPath: '/api/public/cd5'
-      preLoaderRoute: typeof ApiPublicCd5RouteImport
+    '/reportes_/paquetes-en-riesgo': {
+      id: '/reportes_/paquetes-en-riesgo'
+      path: '/reportes/paquetes-en-riesgo'
+      fullPath: '/reportes/paquetes-en-riesgo'
+      preLoaderRoute: typeof ReportesPaquetesEnRiesgoRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/reportes/$id': {
-      id: '/api/reportes/$id'
-      path: '/api/reportes/$id'
-      fullPath: '/api/reportes/$id'
-      preLoaderRoute: typeof ApiReportesIdRouteImport
+    '/reportes_/clientes-locales': {
+      id: '/reportes_/clientes-locales'
+      path: '/reportes/clientes-locales'
+      fullPath: '/reportes/clientes-locales'
+      preLoaderRoute: typeof ReportesClientesLocalesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rec/$token': {
+      id: '/rec/$token'
+      path: '/rec/$token'
+      fullPath: '/rec/$token'
+      preLoaderRoute: typeof RecTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reportes_/clientes-locales/admin': {
@@ -672,6 +658,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/reportes/clientes-locales/admin'
       preLoaderRoute: typeof ReportesClientesLocalesAdminRouteImport
       parentRoute: typeof ReportesClientesLocalesRoute
+    }
+    '/api/reportes/$id': {
+      id: '/api/reportes/$id'
+      path: '/api/reportes/$id'
+      fullPath: '/api/reportes/$id'
+      preLoaderRoute: typeof ApiReportesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/cd5': {
+      id: '/api/public/cd5'
+      path: '/api/public/cd5'
+      fullPath: '/api/public/cd5'
+      preLoaderRoute: typeof ApiPublicCd5RouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
