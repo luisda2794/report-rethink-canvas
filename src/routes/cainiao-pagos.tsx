@@ -307,7 +307,7 @@ function CainiaoPagosPage() {
       const chunk = 500;
       setProgress({ done: 0, total: Math.ceil(payload.length / chunk) });
       for (let i = 0; i < payload.length; i += chunk) {
-        const { error: lineErr } = await supabase.from("cainiao_bill_lineas").insert(payload.slice(i, i + chunk));
+        const { error: lineErr } = await supabase.from("cainiao_bill_lineas").insert(payload.slice(i, i + chunk) as never);
         if (lineErr) throw lineErr;
         setProgress({ done: Math.floor(i / chunk) + 1, total: Math.ceil(payload.length / chunk) });
       }
