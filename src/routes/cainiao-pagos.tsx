@@ -301,7 +301,7 @@ function CainiaoPagosPage() {
         aamodel_code: l.aamodel_code,
         weight_g: l.weight_g,
         charging_currency: l.charging_currency,
-        raw: l.raw,
+        raw: l.raw as import("@/integrations/supabase/types").Json,
       }));
 
       const chunk = 500;
