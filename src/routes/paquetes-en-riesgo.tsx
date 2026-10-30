@@ -14,7 +14,7 @@ export const Route = createFileRoute("/paquetes-en-riesgo")({
       { title: "Menssajero — Paquetes en Riesgo" },
       {
         name: "description",
-        content: "Paquetes en reparto con 3+ intentos fallidos y 5+ días desde inbound.",
+        content: "Paquetes que rompen o están por romper CD5 y CD9, medidos por horas desde inbound.",
       },
     ],
   }),
